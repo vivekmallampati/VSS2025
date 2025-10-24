@@ -1142,6 +1142,141 @@ body {
     }
 }
 
+/* Location Map Section Styles */
+.about-location {
+    margin: 3rem 0;
+    padding: 2rem;
+    background: var(--white);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px var(--shadow);
+    border: 3px solid var(--primary-brown);
+    position: relative;
+    overflow: hidden;
+}
+
+.about-location::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, var(--primary-brown), var(--accent-orange), var(--primary-brown));
+}
+
+.about-location h3 {
+    color: var(--primary-brown);
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+    text-align: center;
+    position: relative;
+    padding-bottom: 1rem;
+}
+
+.about-location h3::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-brown), var(--accent-orange));
+    border-radius: 2px;
+}
+
+.about-location-map {
+    position: relative;
+    margin: 2rem 0;
+    text-align: center;
+    background: var(--light-cream);
+    padding: 2rem;
+    border-radius: 15px;
+    border: 2px solid var(--primary-brown);
+    transition: all 0.3s ease;
+}
+
+.about-location-map:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px var(--shadow-dark);
+    border-color: var(--accent-orange);
+}
+
+.about-location-map img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 15px;
+    box-shadow: 0 8px 25px var(--shadow-dark);
+    transition: all 0.3s ease;
+    border: 3px solid var(--white);
+}
+
+.about-location-map:hover img {
+    transform: scale(1.02);
+    box-shadow: 0 12px 35px var(--shadow-dark);
+}
+
+.about-location-map p {
+    margin-top: 1.5rem;
+    color: var(--primary-brown);
+    font-size: 1.1rem;
+    font-weight: 600;
+    line-height: 1.6;
+    padding: 1rem;
+    background: var(--white);
+    border-radius: 10px;
+    border: 2px solid var(--light-cream);
+    position: relative;
+}
+
+.about-location-map p::before {
+    content: '📍';
+    margin-right: 0.5rem;
+    font-size: 1.2rem;
+}
+
+/* Location Map Responsive Design */
+@media (max-width: 768px) {
+    .about-location {
+        margin: 2rem 0;
+        padding: 1.5rem;
+    }
+    
+    .about-location h3 {
+        font-size: 1.6rem;
+    }
+    
+    .about-location-map {
+        padding: 1.5rem;
+    }
+    
+    .about-location-map p {
+        font-size: 1rem;
+        padding: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .about-location {
+        margin: 1.5rem 0;
+        padding: 1rem;
+    }
+    
+    .about-location h3 {
+        font-size: 1.4rem;
+    }
+    
+    .about-location-map {
+        padding: 1rem;
+    }
+    
+    .about-location-map p {
+        font-size: 0.9rem;
+        padding: 0.6rem;
+    }
+}
+
 /* Additional styles for the exact letter content */
 .particulars-section {
     margin: 2rem 0;
