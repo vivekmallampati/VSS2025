@@ -1157,26 +1157,12 @@ body {
         width: 95%;
     }
     
-    .navigation-summary {
+    .quick-navigation {
         padding: 1.5rem;
     }
     
-    .summary-table th,
-    .summary-table td {
-        padding: 0.8rem 0.5rem;
-        font-size: 0.9rem;
-    }
-    
-    .summary-table td:first-child {
-        width: 25%;
-    }
-    
-    .summary-table td:nth-child(2) {
-        width: 45%;
-    }
-    
-    .summary-table td:last-child {
-        width: 30%;
+    .quick-navigation p {
+        font-size: 1rem;
     }
     
     .section-dropdown {
@@ -1320,8 +1306,8 @@ body {
     }
 }
 
-/* Navigation Summary Styles */
-.navigation-summary {
+/* Quick Navigation Styles */
+.quick-navigation {
     background: var(--white);
     padding: 2rem;
     border-radius: 15px;
@@ -1330,82 +1316,24 @@ body {
     margin-bottom: 3rem;
 }
 
-.navigation-summary h3 {
-    color: var(--primary-brown);
-    font-size: 1.8rem;
+.quick-navigation p {
     margin-bottom: 1.5rem;
-    font-weight: 600;
-    text-align: center;
-}
-
-.summary-table-container {
-    overflow-x: auto;
-    margin-bottom: 2rem;
-}
-
-.summary-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--white);
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 2px 10px var(--shadow);
-}
-
-.summary-table th {
-    background: var(--primary-brown);
-    color: var(--white);
-    padding: 1rem;
-    text-align: left;
-    font-weight: 600;
-    font-size: 1rem;
-}
-
-.summary-table td {
-    padding: 1rem;
-    border-bottom: 1px solid var(--light-cream);
-    vertical-align: middle;
-}
-
-.summary-table tr:hover {
-    background: var(--light-cream);
-}
-
-.summary-table td:first-child {
-    font-weight: 600;
-    color: var(--primary-brown);
-    width: 20%;
-}
-
-.summary-table td:nth-child(2) {
-    width: 50%;
+    font-size: 1.1rem;
+    line-height: 1.6;
     color: var(--text-dark);
 }
 
-.summary-table td:last-child {
-    width: 30%;
-    text-align: center;
-}
-
-.btn-sm {
-    padding: 0.5rem 1rem;
-    font-size: 0.9rem;
-    border-radius: 5px;
+.quick-navigation strong {
+    color: var(--primary-brown);
+    font-weight: 600;
 }
 
 .dropdown-navigation {
     text-align: center;
-    padding: 1.5rem;
+    padding: 1rem;
     background: var(--light-cream);
     border-radius: 10px;
     border: 2px solid var(--primary-brown);
-}
-
-.dropdown-navigation h4 {
-    color: var(--primary-brown);
-    font-size: 1.2rem;
-    margin-bottom: 1rem;
-    font-weight: 600;
 }
 
 .section-dropdown {
