@@ -65,6 +65,10 @@ function downloadDocument(type) {
             fileName = 'Generic_SupportLetter_SREE_VISWA_NIKETAN.docx';
             filePath = './docs/Generic_SupportLetter_SREE VISWA NIKETAN.docx';
             break;
+        case 'fundraiser':
+            fileName = 'VSS2025_Fundraiser_Flyer.jpg';
+            filePath = './docs/VSS2025_FA.jfif.jpg';
+            break;
         default:
             console.error('Unknown document type:', type);
             return;

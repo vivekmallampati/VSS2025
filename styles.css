@@ -1431,9 +1431,42 @@ body {
     border-color: var(--accent-orange);
 }
 
+.section-link {
+    color: var(--primary-brown);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.section-link:hover {
+    color: var(--accent-orange);
+    text-decoration: underline;
+}
+
+.click-hint {
+    color: var(--secondary-brown);
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
 /* Additional styles for the exact letter content */
-.particulars-section {
+.particulars-section,
+.info-section,
+.contact-section {
     margin: 2rem 0;
+    padding: 1.5rem;
+    background: var(--light-cream);
+    border-radius: 10px;
+    border-left: 4px solid var(--primary-brown);
+}
+
+.letter-intro {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: var(--white);
+    border-radius: 10px;
+    border: 2px solid var(--light-cream);
 }
 
 .particulars-table {
