@@ -274,18 +274,71 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Add loading animation for images
+// Function to scroll to specific sections in Shibirarthi Info
+function scrollToSection(sectionId) {
+    if (!sectionId) return;
+    
+    const targetElement = document.getElementById(sectionId);
+    if (targetElement) {
+        // Calculate offset to account for fixed navigation
+        const navHeight = document.querySelector('.navigation').offsetHeight;
+        const targetPosition = targetElement.offsetTop - navHeight - 20;
+        
+        window.scrollTo({
+            top: targetPosition,
+            behavior: 'smooth'
+        });
+        
+        // Highlight the section briefly
+        targetElement.style.backgroundColor = 'rgba(255, 107, 53, 0.1)';
+        targetElement.style.transition = 'background-color 0.3s ease';
+        
+        setTimeout(() => {
+            targetElement.style.backgroundColor = '';
+        }, 2000);
+        
+        // Reset dropdown selection
+        const dropdown = document.querySelector('.section-dropdown');
+        if (dropdown) {
+            dropdown.value = '';
+        }
+    }
+}
+
+// Add loading animation for images and Firefox compatibility
 document.addEventListener('DOMContentLoaded', function() {
     const images = document.querySelectorAll('img');
     
     images.forEach(img => {
+        // Handle image load
         img.addEventListener('load', function() {
             this.style.opacity = '1';
+            this.classList.add('loaded');
         });
         
-        // Set initial opacity to 0 for loading effect
-        img.style.opacity = '0';
-        img.style.transition = 'opacity 0.3s ease';
+        // Handle image error
+        img.addEventListener('error', function() {
+            console.warn('Image failed to load:', this.src);
+            this.style.display = 'none';
+            // Show fallback if it exists
+            const fallback = this.nextElementSibling;
+            if (fallback && fallback.style) {
+                fallback.style.display = 'block';
+            }
+        });
+        
+        // Set initial opacity to 0 for loading effect (only for lazy loaded images)
+        if (img.getAttribute('loading') === 'lazy') {
+            img.style.opacity = '0';
+            img.style.transition = 'opacity 0.3s ease';
+        } else {
+            img.style.opacity = '1';
+        }
+        
+        // Force load for Firefox compatibility
+        if (img.complete && img.naturalHeight !== 0) {
+            img.dispatchEvent(new Event('load'));
+        }
     });
 });
 

@@ -14,7 +14,7 @@
         <div class="container">
             <div class="header-content">
                 <div class="logo">
-                    <img src="docs/logo.png" alt="VSS2025 Logo" class="logo-img">
+                    <img src="docs/logo.png" alt="VSS2025 Logo" class="logo-img" loading="eager" decoding="async">
                     <div class="logo-text">
                         <h1>Vishwa Sangh Shibir</h1>
                         <p>2025</p>
@@ -33,9 +33,9 @@
             <ul class="nav-list">
                 <li><a href="#home" class="nav-link active" data-tab="home">Home</a></li>
                 <li><a href="#about" class="nav-link" data-tab="about">About</a></li>
-                <li><a href="#shibirarthi" class="nav-link" data-tab="shibirarthi">Shibirarthi Letter</a></li>
+                <li><a href="#shibirarthi" class="nav-link" data-tab="shibirarthi">Shibirarthi Info</a></li>
                 <li><a href="#documents" class="nav-link" data-tab="documents">Documents</a></li>
-                <li><a href="#donate" class="nav-link" data-tab="donate">Donate</a></li>
+                <!-- <li><a href="#donate" class="nav-link" data-tab="donate">Donate</a></li> -->
                 <li><a href="#contact" class="nav-link" data-tab="contact">Contact</a></li>
             </ul>
         </div>
@@ -112,7 +112,10 @@
                 <div class="about-location">
                     <h3>Shibir Location</h3>
                     <div class="about-location-map">
-                        <img src="docs/VSS_locations.png" alt="VSS2025 Location Map">
+                        <img src="docs/VSS_locations.png" alt="VSS2025 Location Map" loading="lazy" decoding="async" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div style="display:none; padding:2rem; background:#f0f0f0; border-radius:10px; text-align:center;">
+                            <p>Image failed to load. Please check your internet connection or try refreshing the page.</p>
+                        </div>
                         <p>Location of Vishwa Sangh Shibir 2025 (Kanha Shanti Vanam, Bhagyanagar, India)</p>
                     </div>
                 </div>
@@ -120,12 +123,86 @@
             </div>
         </section>
 
-        <!-- Shibirarthi Letter Tab -->
+        <!-- Shibirarthi Info Tab -->
         <section id="shibirarthi" class="tab-content">
             <div class="container">
                 <div class="section-header">
                     <h2>Shibirarthi Information</h2>
                     <p>Important information and guidelines for approved participants</p>
+                </div>
+                
+                <!-- Navigation Summary Table -->
+                <div class="navigation-summary">
+                    <h3>Quick Navigation</h3>
+                    <div class="summary-table-container">
+                        <table class="summary-table">
+                            <thead>
+                                <tr>
+                                    <th>Section</th>
+                                    <th>Description</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Particulars</td>
+                                    <td>Event dates, venue, and basic information</td>
+                                    <td><button class="btn btn-sm btn-primary" onclick="scrollToSection('particulars')">Go to Section</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Contact Points</td>
+                                    <td>Key contact persons for different needs</td>
+                                    <td><button class="btn btn-sm btn-primary" onclick="scrollToSection('contact-points')">Go to Section</button></td>
+                                </tr>
+                                <tr>
+                                    <td>General Guidelines</td>
+                                    <td>General rules and expectations</td>
+                                    <td><button class="btn btn-sm btn-primary" onclick="scrollToSection('general')">Go to Section</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Ganvesh (Uniform)</td>
+                                    <td>Dress code requirements for participants</td>
+                                    <td><button class="btn btn-sm btn-primary" onclick="scrollToSection('ganvesh')">Go to Section</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Accommodation</td>
+                                    <td>Lodging arrangements and details</td>
+                                    <td><button class="btn btn-sm btn-primary" onclick="scrollToSection('accommodation')">Go to Section</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Pickup Arrangements</td>
+                                    <td>Transportation from arrival points</td>
+                                    <td><button class="btn btn-sm btn-primary" onclick="scrollToSection('pickup')">Go to Section</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Return Journey</td>
+                                    <td>Recommended departure times and booking</td>
+                                    <td><button class="btn btn-sm btn-primary" onclick="scrollToSection('return-journey')">Go to Section</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Things to Carry</td>
+                                    <td>Essential items and clothing requirements</td>
+                                    <td><button class="btn btn-sm btn-primary" onclick="scrollToSection('things-to-carry')">Go to Section</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Dropdown Navigation -->
+                    <div class="dropdown-navigation">
+                        <h4>Quick Jump to Section:</h4>
+                        <select class="section-dropdown" onchange="scrollToSection(this.value)">
+                            <option value="">Select a section...</option>
+                            <option value="particulars">Particulars</option>
+                            <option value="contact-points">Contact Points</option>
+                            <option value="general">General Guidelines</option>
+                            <option value="ganvesh">Ganvesh (Uniform)</option>
+                            <option value="accommodation">Accommodation</option>
+                            <option value="pickup">Pickup Arrangements</option>
+                            <option value="return-journey">Return Journey</option>
+                            <option value="things-to-carry">Things to Carry</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <div class="letter-content">
@@ -137,7 +214,7 @@
                         
                         <p>Please find below some additional information and instructions about the shibir. Please go through all the information diligently to appropriately plan for your trip.</p>
                         
-                        <div class="particulars-section">
+                        <div class="particulars-section" id="particulars">
                             <h3>Particulars</h3>
                             <table class="particulars-table">
                                 <tr>
@@ -166,7 +243,7 @@
                             </table>
                         </div>
                         
-                        <h3>Contact Points:</h3>
+                        <h3 id="contact-points">Contact Points:</h3>
                         <div class="contact-points">
                             <div class="contact-person">
                                 <h4>Contact Person</h4>
@@ -198,14 +275,14 @@
                         <h3>For non-Bharatiya citizen who do not have an OCI card:</h3>
                         <p>If you are not a Bharatiya citizen and do not have an OCI card, please send a copy of the first page of your passport to Santosh Pillai (santovpillai@gmail.com) before November 10. This would be needed to complete formalities related to conducting an international camp in Bharat.</p>
                         
-                        <h3>1. General:</h3>
+                        <h3 id="general">1. General:</h3>
                         <ul>
                             <li>Shibirarthis are expected to attend the shibir full time including nivas at the venue.</li>
                             <li>Please ensure that you carry enough cash in INR for the shibir shulk and any other purchases.</li>
                             <li>If you are not able to attend the shibir for any reason, please convey it immediately to your country karyavah and Santosh Pillai.</li>
                         </ul>
                         
-                        <h3>2. Ganvesh:</h3>
+                        <h3 id="ganvesh">2. Ganvesh:</h3>
                         <p><strong>For Swayamsevaks</strong> - Black formal trousers, VSS ganvesh kurta, any shoes (preferably black) with socks.</p>
                         <p>VSS ganvesh kurta will have to be purchased at the shibir. Participants will have to bring the trousers and shoes while coming for the shibir.</p>
                         
@@ -219,7 +296,7 @@
                         
                         <p>All participants will have to bring their shoes and socks and those opting for Kurti will have to bring their black salwar / leggings/ pants while coming for the shibir.</p>
                         
-                        <h3>3. Accommodation:</h3>
+                        <h3 id="accommodation">3. Accommodation:</h3>
                         <ul>
                             <li>A modest dormitory accommodation (separate for swayamsevaks and sevikas) with common wash areas will be arranged during the shibir.</li>
                             <li>Accommodation during the post-shibir tour to Srisailam and Yadadri will be arranged as per the destination.</li>
@@ -229,7 +306,7 @@
                         <h3>4. Shulk:</h3>
                         <p>The shulk will be collected in INR at the VSS venue. Foreign currency exchange facility will be made available there.</p>
                         
-                        <h3>5. Pickup:</h3>
+                        <h3 id="pickup">5. Pickup:</h3>
                         <p>Arrangements for pickup will be made at Bhagyanagar airport, railway station and bus terminals.</p>
                         
                         <p>To ensure a smooth pickup, please</p>
@@ -243,7 +320,7 @@
                         <h3>6. Post Shibir Tour:</h3>
                         <p>If you have selected 'Kandakurthi' as the tour option, we regret to inform you that the tour to Kandakurthi has to be cancelled as the project undertaken there is not yet complete. You can edit your registration and opt to go for the 'Srisailam' tour or to 'Yadadri Mandir and local sites in Bhagyanagar'.</p>
                         
-                        <h3>7. Return Journey:</h3>
+                        <h3 id="return-journey">7. Return Journey:</h3>
                         <p>You have already selected a tour option while registering. Accordingly, it is advisable to book the return tickets from Bhagyanagar as follows:</p>
                         
                         <div class="return-journey-tables">
@@ -296,7 +373,7 @@
                         <h3>9. Weather:</h3>
                         <p>The temperature in Bhagyanagar is expected to be around 15-29 °C (59-84 °F).</p>
                         
-                        <h3>10. Things to Carry:</h3>
+                        <h3 id="things-to-carry">10. Things to Carry:</h3>
                         <p><strong>a) Personal Clothing:</strong> Please bring a trainer for shareerik, Bharatiya Vesh for udghatan and other programs, hangers</p>
                         <p><strong>b) Essential Toiletries</strong></p>
                         <p><strong>c) Personal medicines if any</strong></p>
@@ -370,11 +447,22 @@
                             <button class="btn btn-primary" onclick="showNotification('Event brochure will be available soon!', 'info')">Coming Soon</button>
                         </div>
                     </div>
+                    <div class="document-card">
+                        <h3>VSS2025 Event Image</h3>
+                        <p>Official event image for Vishwa Sangh Shibir 2025.</p>
+                        <div class="document-image">
+                            <img src="docs/VSS2025_FA.jfif.jpg" alt="VSS2025 Event" class="event-image" loading="lazy" decoding="async" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                            <div style="display:none; padding:2rem; background:#f0f0f0; border-radius:10px; text-align:center;">
+                                <p>Event image failed to load. Please check your internet connection or try refreshing the page.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- Donate Tab -->
+        <!-- Donate Tab - Commented Out -->
+        <!--
         <section id="donate" class="tab-content">
             <div class="container">
                 <div class="section-header">
@@ -412,7 +500,6 @@
                                 <button class="btn btn-silver" onclick="donate('half-page')">Book Half Page</button>
                             </div>
                         </div>
-    o
 
                         <div class="payment-info">
                             <h4>Payment Information</h4>
@@ -425,6 +512,7 @@
                 </div>
             </div>
         </section>
+        -->
 
         <!-- Contact Tab -->
         <section id="contact" class="tab-content">
@@ -473,7 +561,7 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-logo">
-                    <img src="docs/logo.png" alt="VSS2025 Logo" class="footer-logo-img">
+                    <img src="docs/logo.png" alt="VSS2025 Logo" class="footer-logo-img" loading="lazy" decoding="async">
                     <p>Vishwa Sangh Shibir 2025</p>
                 </div>
                 <div class="footer-text">

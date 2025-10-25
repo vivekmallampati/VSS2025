@@ -19,6 +19,22 @@
     box-sizing: border-box;
 }
 
+/* Image loading improvements for Firefox */
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+img[loading="lazy"] {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+img[loading="lazy"].loaded {
+    opacity: 1;
+}
+
 body {
     font-family: 'Inter', sans-serif;
     line-height: 1.6;
@@ -1140,6 +1156,33 @@ body {
         margin: 20% auto;
         width: 95%;
     }
+    
+    .navigation-summary {
+        padding: 1.5rem;
+    }
+    
+    .summary-table th,
+    .summary-table td {
+        padding: 0.8rem 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .summary-table td:first-child {
+        width: 25%;
+    }
+    
+    .summary-table td:nth-child(2) {
+        width: 45%;
+    }
+    
+    .summary-table td:last-child {
+        width: 30%;
+    }
+    
+    .section-dropdown {
+        min-width: 200px;
+        font-size: 0.9rem;
+    }
 }
 
 /* Location Map Section Styles */
@@ -1275,6 +1318,117 @@ body {
         font-size: 0.9rem;
         padding: 0.6rem;
     }
+}
+
+/* Navigation Summary Styles */
+.navigation-summary {
+    background: var(--white);
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px var(--shadow);
+    border-left: 5px solid var(--accent-orange);
+    margin-bottom: 3rem;
+}
+
+.navigation-summary h3 {
+    color: var(--primary-brown);
+    font-size: 1.8rem;
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.summary-table-container {
+    overflow-x: auto;
+    margin-bottom: 2rem;
+}
+
+.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--white);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px var(--shadow);
+}
+
+.summary-table th {
+    background: var(--primary-brown);
+    color: var(--white);
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.summary-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--light-cream);
+    vertical-align: middle;
+}
+
+.summary-table tr:hover {
+    background: var(--light-cream);
+}
+
+.summary-table td:first-child {
+    font-weight: 600;
+    color: var(--primary-brown);
+    width: 20%;
+}
+
+.summary-table td:nth-child(2) {
+    width: 50%;
+    color: var(--text-dark);
+}
+
+.summary-table td:last-child {
+    width: 30%;
+    text-align: center;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 5px;
+}
+
+.dropdown-navigation {
+    text-align: center;
+    padding: 1.5rem;
+    background: var(--light-cream);
+    border-radius: 10px;
+    border: 2px solid var(--primary-brown);
+}
+
+.dropdown-navigation h4 {
+    color: var(--primary-brown);
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.section-dropdown {
+    padding: 0.8rem 1rem;
+    border: 2px solid var(--primary-brown);
+    border-radius: 8px;
+    background: var(--white);
+    color: var(--text-dark);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 250px;
+}
+
+.section-dropdown:focus {
+    outline: none;
+    border-color: var(--accent-orange);
+    box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+}
+
+.section-dropdown:hover {
+    border-color: var(--accent-orange);
 }
 
 /* Additional styles for the exact letter content */
