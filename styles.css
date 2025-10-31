@@ -467,6 +467,53 @@ body {
     line-height: 1.6;
 }
 
+/* Profile and Transportation Sections */
+.profile-content,
+.transportation-content {
+    background: var(--white);
+    padding: 3rem;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px var(--shadow);
+    border-left: 5px solid var(--primary-brown);
+}
+
+.profile-card,
+.transportation-card {
+    background: var(--white);
+}
+
+.profile-card h3,
+.transportation-card h3 {
+    color: var(--primary-brown);
+    font-size: 1.8rem;
+    margin-bottom: 2rem;
+    font-weight: 600;
+}
+
+.profile-card .info-item,
+.transportation-card .info-item {
+    display: flex;
+    margin-bottom: 1.5rem;
+    align-items: center;
+    padding: 1rem;
+    background: var(--light-cream);
+    border-radius: 8px;
+}
+
+.profile-card .info-label,
+.transportation-card .info-label {
+    font-weight: 600;
+    color: var(--primary-brown);
+    min-width: 150px;
+    margin-right: 1rem;
+}
+
+.profile-card .info-value,
+.transportation-card .info-value {
+    color: var(--text-dark);
+    font-weight: 500;
+}
+
 /* Contact Section */
 .contact-content {
     display: grid;

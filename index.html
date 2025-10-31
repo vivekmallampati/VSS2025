@@ -21,7 +21,6 @@
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button class="login-btn" onclick="openRegister()" style="margin-right: 0.5rem;">Register</button>
                     <button class="login-btn" onclick="openLogin()">Login</button>
                 </div>
             </div>
@@ -32,23 +31,25 @@
     <nav class="navigation">
         <div class="container">
             <ul class="nav-list">
-                <li><a href="#home" class="nav-link active" data-tab="home">Home</a></li>
-                <li><a href="#about" class="nav-link" data-tab="about">About</a></li>
-                <li class="has-dropdown">
+                <li id="homeNavItem"><a href="#home" class="nav-link active" data-tab="home">Home</a></li>
+                <li id="aboutNavItem"><a href="#about" class="nav-link" data-tab="about">About</a></li>
+                <li class="has-dropdown" id="shibirarthiNavItem" style="display: none;">
                     <a href="#shibirarthi" class="nav-link" data-tab="shibirarthi">Shibirarthi Info <span class="arrow">▼</span></a>
                     <ul class="dropdown-menu">
-                        <!-- <li><a href="#shibirarthi" onclick="navigateToShibirSection('particulars'); return false;">Particulars</a></li>
-                        <li><a href="#shibirarthi" onclick="navigateToShibirSection('contact-points'); return false;">Contact Points</a></li> -->
+                        <!-- <li><a href="#shibirarthi" onclick="navigateToShibirSection('particulars'); return false;">Particulars</a></li>-->
                         <li><a href="#shibirarthi" onclick="navigateToShibirSection('general'); return false;">General Guidelines</a></li>
                         <li><a href="#shibirarthi" onclick="navigateToShibirSection('ganvesh'); return false;">Ganvesh</a></li>
                         <li><a href="#shibirarthi" onclick="navigateToShibirSection('accommodation'); return false;">Accommodation</a></li>
                         <li><a href="#shibirarthi" onclick="navigateToShibirSection('pickup'); return false;">Pickup</a></li>
                         <li><a href="#shibirarthi" onclick="navigateToShibirSection('return-journey'); return false;">Return Journey</a></li>
                         <li><a href="#shibirarthi" onclick="navigateToShibirSection('things-to-carry'); return false;">Things to Carry</a></li>
+                        <li><a href="#shibirarthi" onclick="navigateToShibirSection('contact-points'); return false;">Contact</a></li> 
                     </ul>
                 </li>
                 <li><a href="#documents" class="nav-link" data-tab="documents">Documents</a></li>
-                <li><a href="#media" class="nav-link" data-tab="media">Media</a></li>
+                <li id="mediaNavItem"><a href="#media" class="nav-link" data-tab="media">Media</a></li>
+                <li id="myProfileNavItem" style="display: none;"><a href="#myprofile" class="nav-link" data-tab="myprofile">My Profile</a></li>
+                <li id="myTransportationNavItem" style="display: none;"><a href="#mytransportation" class="nav-link" data-tab="mytransportation">My Transportation</a></li>
                 <!-- <li><a href="#donate" class="nav-link" data-tab="donate">Donate</a></li> -->
                 <li><a href="#contact" class="nav-link" data-tab="contact">Contact</a></li>
             </ul>
@@ -552,6 +553,36 @@
         </section>
         -->
 
+        <!-- My Profile Tab -->
+        <section id="myprofile" class="tab-content">
+            <div class="container">
+                <div class="section-header">
+                    <h2>My Profile</h2>
+                    <p>View and manage your profile information</p>
+                </div>
+                <div class="profile-content">
+                    <div id="profileInfo" class="profile-card">
+                        <p>Loading profile information...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- My Transportation Tab -->
+        <section id="mytransportation" class="tab-content">
+            <div class="container">
+                <div class="section-header">
+                    <h2>My Transportation</h2>
+                    <p>View and update your transportation details</p>
+                </div>
+                <div class="transportation-content">
+                    <div id="transportationInfo" class="transportation-card">
+                        <p>Loading transportation information...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Contact Tab -->
         <section id="contact" class="tab-content">
             <div class="container">
@@ -617,14 +648,14 @@
             <h2>Login</h2>
             <form class="login-form">
                 <div class="form-group">
-                    <input type="email" placeholder="Email" required>
+                    <input type="text" id="loginIdentifier" placeholder="Email or Unique ID" required>
                 </div>
                 <div class="form-group">
-                    <input type="password" placeholder="Password" required>
+                    <input type="password" id="loginPassword" placeholder="Password" required>
                 </div>
                 <button type="submit" class="btn btn-primary">Login</button>
             </form>
-            <p class="login-note">Login to access transportation information and registration details.</p>
+            <p class="login-note">Login with your Email or Unique ID to access transportation information and registration details.</p>
             <p class="login-note">Don't have an account? <a href="#" onclick="closeLogin(); openRegister(); return false;">Register</a></p>
         </div>
     </div>
@@ -634,26 +665,42 @@
         <div class="modal-content">
             <span class="close" onclick="closeRegister()">&times;</span>
             <h2>Register</h2>
-            <form class="register-form">
-                <div class="form-group">
-                    <input type="text" placeholder="Full Name" required>
-                </div>
-                <div class="form-group">
-                    <input type="text" placeholder="Unique ID" required>
-                </div>
-                <div class="form-group">
-                    <input type="email" placeholder="Email" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Verify & Continue</button>
-            </form>
-            <p class="login-note">We will verify your Name and Unique ID with our records. On success, you'll be prompted to set a password.</p>
+            <div id="registerVerifyForm">
+                <form class="register-form">
+                    <div class="form-group">
+                        <input type="text" id="regName" placeholder="Full Name" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="text" id="regUniqueId" placeholder="Unique ID" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="email" id="regEmail" placeholder="Email" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Verify & Continue</button>
+                </form>
+                <p class="login-note">We will verify your Name and Unique ID with our records. On success, you'll be prompted to set a password.</p>
+            </div>
+            <div id="registerPasswordForm" style="display:none;">
+                <form class="password-setup-form">
+                    <div class="form-group">
+                        <input type="password" id="regPassword" placeholder="Password (min 6 characters)" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="regPasswordConfirm" placeholder="Confirm Password" required minlength="6">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Account</button>
+                </form>
+                <p class="login-note">Please set a secure password for your account.</p>
+            </div>
         </div>
     </div>
 
-    <!-- Firebase SDKs (placeholders - add your config in script.js) -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <!-- Firebase Configuration - Add your config here -->
+    <script src="firebase-config.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
