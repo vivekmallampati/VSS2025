@@ -22,6 +22,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Media filter default
+    const mediaSelect = document.getElementById('mediaType');
+    if (mediaSelect) {
+        switchMediaView(mediaSelect.value);
+    }
 });
 
 // Login Modal Functionality
@@ -37,11 +43,28 @@ function closeLogin() {
     document.body.style.overflow = 'auto'; // Restore scrolling
 }
 
+// Register Modal Functionality
+function openRegister() {
+    const modal = document.getElementById('registerModal');
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeRegister() {
+    const modal = document.getElementById('registerModal');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
 // Close modal when clicking outside of it
 window.addEventListener('click', function(event) {
     const modal = document.getElementById('loginModal');
+    const regModal = document.getElementById('registerModal');
     if (event.target === modal) {
         closeLogin();
+    }
+    if (event.target === regModal) {
+        closeRegister();
     }
 });
 
@@ -49,6 +72,7 @@ window.addEventListener('click', function(event) {
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         closeLogin();
+        closeRegister();
     }
 });
 
@@ -184,9 +208,59 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Simulate login process
-            showNotification('Login functionality will be connected to the backend system.', 'info');
-            closeLogin();
+            // Placeholder: Firebase login
+            if (window.firebase && firebase.auth) {
+                firebase.auth().signInWithEmailAndPassword(email, password)
+                    .then(() => {
+                        showNotification('Logged in successfully.', 'success');
+                        closeLogin();
+                    })
+                    .catch(err => {
+                        showNotification(err.message || 'Login failed.', 'error');
+                    });
+            } else {
+                showNotification('Login functionality will be connected to Firebase.', 'info');
+            }
+        });
+    }
+});
+
+// Register Form Submission
+document.addEventListener('DOMContentLoaded', function() {
+    const registerForm = document.querySelector('.register-form');
+    if (registerForm) {
+        registerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const name = this.querySelector('input[placeholder="Full Name"]').value;
+            const uniqueId = this.querySelector('input[placeholder="Unique ID"]').value;
+            const email = this.querySelector('input[type="email"]').value;
+
+            if (!name || !uniqueId || !email) {
+                showNotification('Please fill in all fields.', 'error');
+                return;
+            }
+            if (!isValidEmail(email)) {
+                showNotification('Please enter a valid email address.', 'error');
+                return;
+            }
+
+            // Placeholder verification with Firestore
+            if (window.firebase && firebase.firestore) {
+                const db = firebase.firestore();
+                db.collection('registrations').doc(uniqueId).get()
+                    .then(doc => {
+                        if (doc.exists && doc.data().name && doc.data().name.toLowerCase() === name.toLowerCase()) {
+                            showNotification('Verified. Please check your email to set a password.', 'success');
+                            closeRegister();
+                        } else {
+                            showNotification('Verification failed. Please check Name/Unique ID.', 'error');
+                        }
+                    })
+                    .catch(err => showNotification(err.message || 'Verification error.', 'error'));
+            } else {
+                showNotification('Verification will be connected to Firebase.', 'info');
+                closeRegister();
+            }
         });
     }
 });
@@ -309,6 +383,36 @@ function scrollToSection(sectionId) {
     }
 }
 
+// Navigate from header dropdown into Shibirarthi and scroll
+function navigateToShibirSection(sectionId) {
+    const navLinks = document.querySelectorAll('.nav-link');
+    const tabContents = document.querySelectorAll('.tab-content');
+    navLinks.forEach(nav => nav.classList.remove('active'));
+    tabContents.forEach(tab => tab.classList.remove('active'));
+    const shibirLink = document.querySelector('.nav-link[data-tab="shibirarthi"]');
+    const shibirTab = document.getElementById('shibirarthi');
+    if (shibirLink && shibirTab) {
+        shibirLink.classList.add('active');
+        shibirTab.classList.add('active');
+        // Wait a tick to ensure visibility, then scroll
+        setTimeout(() => scrollToSection(sectionId), 50);
+    }
+}
+
+// Media view switcher
+function switchMediaView(view) {
+    const vids = document.getElementById('mediaVideos');
+    const imgs = document.getElementById('mediaImages');
+    if (!vids || !imgs) return;
+    if (view === 'images') {
+        imgs.style.display = 'block';
+        vids.style.display = 'none';
+    } else {
+        vids.style.display = 'block';
+        imgs.style.display = 'none';
+    }
+}
+
 // Add loading animation for images and Firefox compatibility
 document.addEventListener('DOMContentLoaded', function() {
     const images = document.querySelectorAll('img');
@@ -388,3 +492,19 @@ document.addEventListener('DOMContentLoaded', function() {
         observer.observe(el);
     });
 });
+
+// Firebase initialization placeholder
+try {
+    if (window.firebase) {
+        const firebaseConfig = {
+            apiKey: 'YOUR_API_KEY',
+            authDomain: 'YOUR_AUTH_DOMAIN',
+            projectId: 'YOUR_PROJECT_ID'
+        };
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+    }
+} catch (e) {
+    // no-op
+}

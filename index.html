@@ -21,6 +21,7 @@
                     </div>
                 </div>
                 <div class="header-actions">
+                    <button class="login-btn" onclick="openRegister()" style="margin-right: 0.5rem;">Register</button>
                     <button class="login-btn" onclick="openLogin()">Login</button>
                 </div>
             </div>
@@ -33,8 +34,21 @@
             <ul class="nav-list">
                 <li><a href="#home" class="nav-link active" data-tab="home">Home</a></li>
                 <li><a href="#about" class="nav-link" data-tab="about">About</a></li>
-                <li><a href="#shibirarthi" class="nav-link" data-tab="shibirarthi">Shibirarthi Info</a></li>
+                <li class="has-dropdown">
+                    <a href="#shibirarthi" class="nav-link" data-tab="shibirarthi">Shibirarthi Info <span class="arrow">▼</span></a>
+                    <ul class="dropdown-menu">
+                        <!-- <li><a href="#shibirarthi" onclick="navigateToShibirSection('particulars'); return false;">Particulars</a></li>
+                        <li><a href="#shibirarthi" onclick="navigateToShibirSection('contact-points'); return false;">Contact Points</a></li> -->
+                        <li><a href="#shibirarthi" onclick="navigateToShibirSection('general'); return false;">General Guidelines</a></li>
+                        <li><a href="#shibirarthi" onclick="navigateToShibirSection('ganvesh'); return false;">Ganvesh</a></li>
+                        <li><a href="#shibirarthi" onclick="navigateToShibirSection('accommodation'); return false;">Accommodation</a></li>
+                        <li><a href="#shibirarthi" onclick="navigateToShibirSection('pickup'); return false;">Pickup</a></li>
+                        <li><a href="#shibirarthi" onclick="navigateToShibirSection('return-journey'); return false;">Return Journey</a></li>
+                        <li><a href="#shibirarthi" onclick="navigateToShibirSection('things-to-carry'); return false;">Things to Carry</a></li>
+                    </ul>
+                </li>
                 <li><a href="#documents" class="nav-link" data-tab="documents">Documents</a></li>
+                <li><a href="#media" class="nav-link" data-tab="media">Media</a></li>
                 <!-- <li><a href="#donate" class="nav-link" data-tab="donate">Donate</a></li> -->
                 <li><a href="#contact" class="nav-link" data-tab="contact">Contact</a></li>
             </ul>
@@ -79,6 +93,12 @@
                         <div class="hero-description">
                             <p>Sree Viswa Niketan is privileged to organize the Vishwa Sangh Shibir 2025 (VSS2025), an international gathering of Pravasi Bharatiyas and delegates from various countries. The event will bring together representatives from over 70 countries to celebrate and strengthen the global Hindu fraternity.</p>
                             <p>The Shibir aims to foster cultural exchange, national pride, and collective action for global well-being rooted in the timeless values of Sanatan Dharma.</p>
+                        </div>
+                        <div class="login-cta">
+                            <h3>Shibirarthi Login</h3>
+                            <p>Access your registration and transportation details.</p>
+                            <button class="btn btn-primary" onclick="openLogin()">Login</button>
+                            <button class="btn btn-secondary" onclick="openRegister()" style="margin-left: 0.5rem;">Register</button>
                         </div>
                     </div>
                 </div>
@@ -131,23 +151,7 @@
                     <p>Important information and guidelines for approved participants</p>
                 </div>
                 
-                <!-- Quick Navigation Dropdown -->
-                <div class="quick-navigation">
-                    <p>Please find below some additional information and instructions about the shibir. Please go through all the information diligently to appropriately plan for your trip. <strong>Quick navigation:</strong></p>
-                    <div class="dropdown-navigation">
-                        <select class="section-dropdown" onchange="scrollToSection(this.value)">
-                            <option value="">Select a section to jump to...</option>
-                            <option value="particulars">1. Particulars</option>
-                            <option value="contact-points">2. Contact Points</option>
-                            <option value="general">3. General Guidelines</option>
-                            <option value="ganvesh">4. Ganvesh (Uniform)</option>
-                            <option value="accommodation">5. Accommodation</option>
-                            <option value="pickup">6. Pickup Arrangements</option>
-                            <option value="return-journey">7. Return Journey</option>
-                            <option value="things-to-carry">8. Things to Carry</option>
-                        </select>
-                    </div>
-                </div>
+                <!-- Quick navigation moved to header dropdown -->
                 
                 <div class="letter-content">
                     <div class="letter-body">
@@ -398,6 +402,71 @@
             </div>
         </section>
 
+        <!-- Media Tab -->
+        <section id="media" class="tab-content">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Media</h2>
+                    <p>Photos and videos from VSS2025</p>
+                </div>
+                <div class="media-filters" style="display: flex; align-items: center; gap: 1rem;">
+                    <button
+                        id="btnVideos"
+                        class="media-toggle-btn btn btn-primary"
+                        onclick="switchMediaView('videos')"
+                        type="button"
+                        style="margin-right: 0.5rem;"
+                    >Videos</button>
+                    <button
+                        id="btnImages"
+                        class="media-toggle-btn btn btn-secondary"
+                        onclick="switchMediaView('images')"
+                        type="button"
+                    >Images</button>
+                </div>
+                <script>
+                  // Ensure correct highlighting of selection
+                  function updateMediaButtons(selected) {
+                      const btnVideos = document.getElementById('btnVideos');
+                      const btnImages = document.getElementById('btnImages');
+                      if (!btnVideos || !btnImages) return;
+                      if (selected === 'videos') {
+                          btnVideos.classList.add('btn-primary');
+                          btnVideos.classList.remove('btn-secondary');
+                          btnImages.classList.add('btn-secondary');
+                          btnImages.classList.remove('btn-primary');
+                      } else {
+                          btnImages.classList.add('btn-primary');
+                          btnImages.classList.remove('btn-secondary');
+                          btnVideos.classList.add('btn-secondary');
+                          btnVideos.classList.remove('btn-primary');
+                      }
+                  }
+                  // Patch the switchMediaView function if not already present
+                  (function() {
+                    window._origSwitchMediaView = window.switchMediaView;
+                    window.switchMediaView = function(type) {
+                        if(window._origSwitchMediaView) window._origSwitchMediaView(type);
+                        updateMediaButtons(type);
+                    }
+                    // Set initial state
+                    document.addEventListener("DOMContentLoaded", function() {updateMediaButtons('videos')});
+                  })();
+                </script>
+                <div id="mediaVideos" class="media-section">
+                    <div class="video-wrapper">
+                        <iframe width="560" height="315" src="https://www.youtube.com/embed/pV9kMswEfqM" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                </div>
+                <div id="mediaImages" class="media-section" style="display:none;">
+                    <div class="image-grid">
+                        <img src="docs/logo.png" alt="VSS2025" loading="lazy">
+                        <img src="docs/VSS_locations.png" alt="Location" loading="lazy">
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Documents Tab -->
         <section id="documents" class="tab-content">
             <div class="container">
@@ -556,9 +625,35 @@
                 <button type="submit" class="btn btn-primary">Login</button>
             </form>
             <p class="login-note">Login to access transportation information and registration details.</p>
+            <p class="login-note">Don't have an account? <a href="#" onclick="closeLogin(); openRegister(); return false;">Register</a></p>
         </div>
     </div>
 
+    <!-- Register Modal -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeRegister()">&times;</span>
+            <h2>Register</h2>
+            <form class="register-form">
+                <div class="form-group">
+                    <input type="text" placeholder="Full Name" required>
+                </div>
+                <div class="form-group">
+                    <input type="text" placeholder="Unique ID" required>
+                </div>
+                <div class="form-group">
+                    <input type="email" placeholder="Email" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Verify & Continue</button>
+            </form>
+            <p class="login-note">We will verify your Name and Unique ID with our records. On success, you'll be prompted to set a password.</p>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs (placeholders - add your config in script.js) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

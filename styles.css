@@ -135,6 +135,32 @@ body {
     background: var(--light-cream);
 }
 
+/* Dropdown under Shibirarthi in nav */
+.has-dropdown { position: relative; }
+.has-dropdown .arrow { font-size: 0.8rem; }
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--white);
+    box-shadow: 0 8px 20px var(--shadow);
+    border: 2px solid var(--primary-brown);
+    border-radius: 10px;
+    min-width: 280px;
+    z-index: 1001;
+}
+.dropdown-menu li { list-style: none; }
+.dropdown-menu a {
+    display: block;
+    padding: 0.75rem 1rem;
+    color: var(--text-dark);
+    text-decoration: none;
+    border-bottom: 1px solid var(--light-cream);
+}
+.dropdown-menu a:hover { background: var(--light-cream); color: var(--primary-brown); }
+.has-dropdown:hover .dropdown-menu { display: block; }
+
 /* Main Content */
 .main-content {
     min-height: calc(100vh - 200px);
@@ -245,6 +271,18 @@ body {
     box-shadow: 0 5px 20px var(--shadow);
     border-left: 5px solid var(--primary-brown);
 }
+
+.login-cta {
+    margin-top: 2rem;
+    text-align: center;
+    background: var(--white);
+    padding: 1.5rem;
+    border-radius: 12px;
+    border: 2px solid var(--light-cream);
+    box-shadow: 0 5px 15px var(--shadow);
+}
+.login-cta h3 { color: var(--primary-brown); margin-bottom: 0.5rem; }
+.login-cta p { margin-bottom: 1rem; }
 
 .hero-description p {
     margin-bottom: 1rem;
@@ -648,6 +686,21 @@ body {
 .login-form {
     margin-top: 2rem;
 }
+
+/* Media */
+.media-filters { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.video-wrapper {
+    position: relative;
+    padding-bottom: 56.25%;
+    height: 0;
+    overflow: hidden;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px var(--shadow-dark);
+    border: 3px solid var(--primary-brown);
+}
+.video-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.image-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+.image-grid img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 4px 16px var(--shadow); border: 2px solid var(--light-cream); }
 
 .login-note {
     margin-top: 1rem;
