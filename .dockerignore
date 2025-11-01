@@ -1,0 +1,17 @@
+node_modules/
+npm-debug.log*
+.git/
+.gitignore
+README.md
+*.md
+docs/
+guides/
+index.html
+script.js
+styles.css
+firebase-config.js
+vercel.json
+.gitattributes
+# Keep TestData.xlsx - we need it
+# serviceAccountKey.json should be passed as volume or env var
+

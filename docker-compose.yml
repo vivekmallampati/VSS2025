@@ -1,0 +1,14 @@
+services:
+  excel-import:
+    build: .
+    container_name: vss2025-excel-import
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+      # Optionally mount a different Excel file
+      - ./TestData.xlsx:/app/TestData.xlsx:ro
+    environment:
+      - NODE_ENV=production
+    # Uncomment to override the Excel file path
+    # command: node import-excel-to-firebase.js
+

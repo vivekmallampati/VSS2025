@@ -60,23 +60,33 @@ Based on the thematic colors from the event materials:
 
 ## Technical Stack
 
-- **HTML5**: Semantic markup structure
-- **CSS3**: Modern styling with CSS Grid and Flexbox
-- **JavaScript**: Interactive functionality and form handling
+- **Frontend**: HTML5, CSS3, JavaScript
+- **Backend**: Firebase (Authentication, Firestore)
+- **Deployment**: Vercel
+- **Data Import**: Node.js script with Docker support
 - **Fonts**: Inter font family for modern typography
 
 ## File Structure
 
 ```
 VSS2025/
-├── index.html              # Main website with all tabs
-├── styles.css              # CSS styles and responsive design
-├── script.js               # JavaScript functionality
-├── vercel.json             # Vercel deployment configuration
-├── README.md               # Project documentation
-└── docs/                   # Assets and documents
-    ├── logo.png            # Event logo
-    ├── VSS2025_FA.jfif.jpg # Event promotional image
+├── index.html                      # Main website with all tabs
+├── styles.css                      # CSS styles and responsive design
+├── script.js                       # JavaScript functionality
+├── firebase-config.js              # Firebase configuration
+├── import-excel-to-firebase.js     # Excel to Firebase import script
+├── Dockerfile                      # Docker configuration for import
+├── docker-compose.yml              # Docker Compose configuration
+├── package.json                    # Node.js dependencies
+├── vercel.json                     # Vercel deployment configuration
+├── README.md                       # Project documentation
+├── guides/                         # Setup and usage guides
+│   ├── FIREBASE_SETUP_GUIDE.md
+│   ├── EXCEL_IMPORT_GUIDE.md
+│   └── DOCKER_IMPORT_GUIDE.md
+└── docs/                           # Assets and documents
+    ├── logo.png                    # Event logo
+    ├── VSS2025_FA.jfif.jpg         # Event promotional image
     ├── Letter to Approved shibirarthi.docx
     └── Generic_SupportLetter_SREE VISWA NIKETAN.docx
 ```
@@ -92,6 +102,33 @@ VSS2025/
    - Donation buttons
    - Contact form
    - Login modal
+
+### Data Import (Excel to Firebase)
+
+#### Option 1: Using Docker (Recommended - No Node.js installation needed)
+
+1. **Ensure Docker is installed** ([Download Docker](https://www.docker.com/products/docker-desktop))
+2. **Place your service account key** as `serviceAccountKey.json` in the project root
+3. **Run the import:**
+   ```bash
+   docker-compose up --build
+   ```
+
+For detailed Docker instructions, see [Docker Import Guide](./guides/DOCKER_IMPORT_GUIDE.md)
+
+#### Option 2: Using Node.js directly
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+2. **Place your service account key** as `serviceAccountKey.json` in the project root
+3. **Run the import:**
+   ```bash
+   npm run import
+   ```
+
+For detailed instructions, see [Excel Import Guide](./guides/EXCEL_IMPORT_GUIDE.md)
 
 ### Deployment on Vercel
 1. **Push your code** to a GitHub repository

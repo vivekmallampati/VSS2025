@@ -33,6 +33,7 @@
             <ul class="nav-list">
                 <li id="homeNavItem"><a href="#home" class="nav-link active" data-tab="home">Home</a></li>
                 <li id="aboutNavItem"><a href="#about" class="nav-link" data-tab="about">About</a></li>
+                <li id="myProfileNavItem" style="display: none;"><a href="#myprofile" class="nav-link" data-tab="myprofile">My Profile</a></li>
                 <li class="has-dropdown" id="shibirarthiNavItem" style="display: none;">
                     <a href="#shibirarthi" class="nav-link" data-tab="shibirarthi">Shibirarthi Info <span class="arrow">▼</span></a>
                     <ul class="dropdown-menu">
@@ -46,10 +47,10 @@
                         <li><a href="#shibirarthi" onclick="navigateToShibirSection('contact-points'); return false;">Contact</a></li> 
                     </ul>
                 </li>
+                <li id="myTransportationNavItem" style="display: none;"><a href="#mytransportation" class="nav-link" data-tab="mytransportation">My Transportation</a></li>
+                <li id="myToursNavItem" style="display: none;"><a href="#mytours" class="nav-link" data-tab="mytours">My Tours</a></li>
                 <li><a href="#documents" class="nav-link" data-tab="documents">Documents</a></li>
                 <li id="mediaNavItem"><a href="#media" class="nav-link" data-tab="media">Media</a></li>
-                <li id="myProfileNavItem" style="display: none;"><a href="#myprofile" class="nav-link" data-tab="myprofile">My Profile</a></li>
-                <li id="myTransportationNavItem" style="display: none;"><a href="#mytransportation" class="nav-link" data-tab="mytransportation">My Transportation</a></li>
                 <!-- <li><a href="#donate" class="nav-link" data-tab="donate">Donate</a></li> -->
                 <li><a href="#contact" class="nav-link" data-tab="contact">Contact</a></li>
             </ul>
@@ -500,58 +501,6 @@
             </div>
         </section>
 
-        <!-- Donate Tab - Commented Out -->
-        <!--
-        <section id="donate" class="tab-content">
-            <div class="container">
-                <div class="section-header">
-                    <h2>Support the Global Gathering</h2>
-                    <p>Please support the global gathering of Swayamsevaks</p>
-                </div>
-                <div class="donate-content">
-                    <div class="donate-image">
-                        <img src="docs/VSS2025_FA.jfif.jpg" alt="VSS2025 Event" class="event-image">
-                    </div>
-                    <div class="donation-options">
-                        <h3>Well-wishers Contributions</h3>
-                        <div class="contribution-tiers">
-                            <div class="tier-card">
-                                <h4>Gold</h4>
-                                <div class="tier-amount">₹10,00,000</div>
-                                <button class="btn btn-gold" onclick="donate('gold')">Donate Gold</button>
-                            </div>
-                            <div class="tier-card">
-                                <h4>Silver</h4>
-                                <div class="tier-amount">₹5,00,000</div>
-                                <button class="btn btn-silver" onclick="donate('silver')">Donate Silver</button>
-                            </div>
-                        </div>
-                        <h3>Souvenir Advertisement</h3>
-                        <div class="contribution-tiers">
-                            <div class="tier-card">
-                                <h4>Full Page</h4>
-                                <div class="tier-amount">₹10,00,000</div>
-                                <button class="btn btn-gold" onclick="donate('full-page')">Book Full Page</button>
-                            </div>
-                            <div class="tier-card">
-                                <h4>Half Page</h4>
-                                <div class="tier-amount">₹5,00,000</div>
-                                <button class="btn btn-silver" onclick="donate('half-page')">Book Half Page</button>
-                            </div>
-                        </div>
-
-                        <div class="payment-info">
-                            <h4>Payment Information</h4>
-                            <p>Please make cheques payable to:</p>
-                            <p><strong>Shri Vishwa Niketan</strong><br>
-                            101, Viswa Residency, Chitra Layout<br>
-                            L. B. Nagar, Hyderabad - 500074</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        -->
 
         <!-- My Profile Tab -->
         <section id="myprofile" class="tab-content">
@@ -578,6 +527,21 @@
                 <div class="transportation-content">
                     <div id="transportationInfo" class="transportation-card">
                         <p>Loading transportation information...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- My Tours Tab -->
+        <section id="mytours" class="tab-content">
+            <div class="container">
+                <div class="section-header">
+                    <h2>My Tours</h2>
+                    <p>View and update your post shibir tour selection</p>
+                </div>
+                <div class="tours-content">
+                    <div id="toursInfo" class="tours-card">
+                        <p>Loading tour information...</p>
                     </div>
                 </div>
             </div>
@@ -648,14 +612,14 @@
             <h2>Login</h2>
             <form class="login-form">
                 <div class="form-group">
-                    <input type="text" id="loginIdentifier" placeholder="Email or Unique ID" required>
+                    <input type="text" id="loginIdentifier" placeholder="Email or Praveshika ID" required>
                 </div>
                 <div class="form-group">
                     <input type="password" id="loginPassword" placeholder="Password" required>
                 </div>
                 <button type="submit" class="btn btn-primary">Login</button>
             </form>
-            <p class="login-note">Login with your Email or Unique ID to access transportation information and registration details.</p>
+            <p class="login-note">Login with your Email or Praveshika ID to access transportation information and registration details.</p>
             <p class="login-note">Don't have an account? <a href="#" onclick="closeLogin(); openRegister(); return false;">Register</a></p>
         </div>
     </div>
@@ -668,17 +632,11 @@
             <div id="registerVerifyForm">
                 <form class="register-form">
                     <div class="form-group">
-                        <input type="text" id="regName" placeholder="Full Name" required>
-                    </div>
-                    <div class="form-group">
-                        <input type="text" id="regUniqueId" placeholder="Unique ID" required>
-                    </div>
-                    <div class="form-group">
-                        <input type="email" id="regEmail" placeholder="Email" required>
+                        <input type="text" id="regUniqueId" placeholder="Praveshika ID (e.g., AM/KK/1001)" required>
                     </div>
                     <button type="submit" class="btn btn-primary">Verify & Continue</button>
                 </form>
-                <p class="login-note">We will verify your Name and Unique ID with our records. On success, you'll be prompted to set a password.</p>
+                <p class="login-note">Enter your Praveshika ID to verify your registration. Case, slashes, and dashes don't matter (e.g., "am/kk/1001", "AM-KK-1001", "amkk1001" all work).</p>
             </div>
             <div id="registerPasswordForm" style="display:none;">
                 <form class="password-setup-form">
@@ -699,6 +657,11 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <!-- Barcode Generation Library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <!-- PDF Generation Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <!-- Firebase Configuration - Add your config here -->
     <script src="firebase-config.js"></script>
     <script src="script.js"></script>

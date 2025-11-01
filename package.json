@@ -1,0 +1,17 @@
+{
+  "name": "vss2025",
+  "version": "1.0.0",
+  "description": "Vishwa Sangh Shibir 2025 Web Application",
+  "scripts": {
+    "import": "node import-excel-to-firebase.js"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5",
+    "firebase-admin": "^12.0.0"
+  },
+  "devDependencies": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
+

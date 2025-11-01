@@ -1,0 +1,26 @@
+# Firebase Service Account Key (NEVER commit this!)
+serviceAccountKey.json
+serviceAccountKey*.json
+
+# Docker
+.docker/
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+*.xlsx
+*.xlsx

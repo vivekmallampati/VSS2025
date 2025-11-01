@@ -101,20 +101,56 @@ Your Firestore database needs a collection called `registrations`. Each document
 
 1. **Open Firestore Rules**
    - In Firestore Database, click "Rules" tab
-   - Replace the rules with:
+   - Replace the rules with the contents of `firestore.rules` file in the project root, OR copy the following:
 
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read access to registrations for verification
-    match /registrations/{uniqueId} {
-      allow read: if true; // Anyone can read for verification
-      allow write: if false; // Only admin can write (use Firebase Admin SDK)
+    // Helper function to check if user owns the registration
+    function isOwnerOfRegistration(registrationId) {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId == registrationId;
     }
     
-    // Allow authenticated users to read their own data
+    // Helper function to normalize Praveshika ID for comparison
+    function normalizeId(id) {
+      return id.lower().replaceAll('/', '').replaceAll('-', '');
+    }
+    
+    // Registrations collection
+    match /registrations/{uniqueId} {
+      // Anyone can read for verification
+      allow read: if true;
+      
+      // Only admin can create/delete (handled via Admin SDK)
+      allow create, delete: if false;
+      
+      // Allow authenticated users to update only their own transportation info
+      allow update: if request.auth != null && 
+                       // Check if user's uniqueId matches (normalized comparison)
+                       (isOwnerOfRegistration(uniqueId) ||
+                        // Also check normalized comparison for flexible matching
+                        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                         normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(uniqueId))) &&
+                       // Only allow updating transportation-related fields
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['pickupLocation', 'Pickup Location', 'arrivalDate', 'Arrival Date',
+                                  'arrivalTime', 'Arrival Time', 'flightTrainNumber', 'Flight/Train Number',
+                                  'returnDate', 'Return Date', 'returnTime', 'Return Time',
+                                  'returnFlightTrainNumber', 'Return Flight/Train Number',
+                                  'transportationUpdatedAt']) &&
+                       // Ensure critical fields are not modified
+                       request.resource.data.uniqueId == resource.data.uniqueId &&
+                       request.resource.data.normalizedId == resource.data.normalizedId &&
+                       request.resource.data.name == resource.data.name &&
+                       request.resource.data.email == resource.data.email;
+    }
+    
+    // Users collection
     match /users/{userId} {
+      // Users can only read/write their own data
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
