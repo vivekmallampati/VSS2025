@@ -1,5 +1,40 @@
 // Global variables
 let pendingRegistration = null;
+let firebaseInitialized = false;
+
+// Helper function to wait for Firebase initialization
+function waitForFirebase(callback, maxRetries = 50) {
+    // Check if Firebase is initialized
+    if (window.firebase && typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
+        firebaseInitialized = true;
+        callback();
+        return;
+    }
+    
+    // Also check global flag
+    if (window.firebaseInitialized && window.firebase && typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
+        firebaseInitialized = true;
+        callback();
+        return;
+    }
+
+    if (maxRetries <= 0) {
+        console.error('Firebase initialization timeout after 5 seconds');
+        console.error('Firebase available:', typeof window.firebase !== 'undefined');
+        console.error('Firebase apps:', window.firebase && window.firebase.apps ? window.firebase.apps.length : 'N/A');
+        return;
+    }
+
+    setTimeout(function() {
+        if (window.firebase && typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
+            firebaseInitialized = true;
+            window.firebaseInitialized = true;
+            callback();
+        } else {
+            waitForFirebase(callback, maxRetries - 1);
+        }
+    }, 100);
+}
 
 // Protected tabs that require authentication
 const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours'];
@@ -118,29 +153,31 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Handle initial page load - wait for auth state before checking hash
+    // Handle initial page load - wait for Firebase to initialize first
     const initialHash = window.location.hash.substring(1);
     
-    // Wait for Firebase auth to initialize before checking protected tabs
-    if (window.firebase && firebase.auth) {
-        firebase.auth().onAuthStateChanged((user) => {
-            // Small delay to ensure UI is updated
-            setTimeout(() => {
-                if (initialHash) {
-                    activateTab(initialHash);
-                } else {
-                    activateTab('home');
-                }
-            }, 100);
-        });
-    } else {
-        // If Firebase not available, just activate based on hash
-        if (initialHash) {
-            activateTab(initialHash);
+    // Wait for Firebase to be initialized before checking auth state
+    waitForFirebase(function() {
+        if (window.firebase && firebase.auth) {
+            firebase.auth().onAuthStateChanged((user) => {
+                // Small delay to ensure UI is updated
+                setTimeout(() => {
+                    if (initialHash) {
+                        activateTab(initialHash);
+                    } else {
+                        activateTab('home');
+                    }
+                }, 100);
+            });
         } else {
-            activateTab('home');
+            // If Firebase not available, just activate based on hash
+            if (initialHash) {
+                activateTab(initialHash);
+            } else {
+                activateTab('home');
+            }
         }
-    }
+    });
 
     // Media filter default
     const mediaSelect = document.getElementById('mediaType');
@@ -674,9 +711,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Update UI based on auth state
 function updateAuthUI() {
-    if (window.firebase && firebase.auth) {
-        firebase.auth().onAuthStateChanged((user) => {
-            const loginBtn = document.querySelector('.header-actions .login-btn');
+    // Wait for Firebase to be initialized
+    waitForFirebase(function() {
+        if (window.firebase && firebase.auth) {
+            firebase.auth().onAuthStateChanged((user) => {
+                const loginBtn = document.querySelector('.header-actions .login-btn');
             const homeNavItem = document.getElementById('homeNavItem');
             const aboutNavItem = document.getElementById('aboutNavItem');
             const mediaNavItem = document.getElementById('mediaNavItem');
@@ -770,25 +809,26 @@ function updateAuthUI() {
                     activateTab('home');
                 }
             }
-        });
-    } else {
-        // Firebase not available - show public tabs, hide protected tabs
-        const homeNavItem = document.getElementById('homeNavItem');
-        const aboutNavItem = document.getElementById('aboutNavItem');
-        const mediaNavItem = document.getElementById('mediaNavItem');
-        const shibirarthiNavItem = document.getElementById('shibirarthiNavItem');
-        const myProfileNavItem = document.getElementById('myProfileNavItem');
-        const myTransportationNavItem = document.getElementById('myTransportationNavItem');
-        const myToursNavItem = document.getElementById('myToursNavItem');
-        
-        if (homeNavItem) homeNavItem.style.display = '';
-        if (aboutNavItem) aboutNavItem.style.display = '';
-        if (mediaNavItem) mediaNavItem.style.display = '';
-        if (shibirarthiNavItem) shibirarthiNavItem.style.display = 'none';
-        if (myProfileNavItem) myProfileNavItem.style.display = 'none';
-        if (myTransportationNavItem) myTransportationNavItem.style.display = 'none';
-        if (myToursNavItem) myToursNavItem.style.display = 'none';
-    }
+            });
+        } else {
+            // Firebase not available - show public tabs, hide protected tabs
+            const homeNavItem = document.getElementById('homeNavItem');
+            const aboutNavItem = document.getElementById('aboutNavItem');
+            const mediaNavItem = document.getElementById('mediaNavItem');
+            const shibirarthiNavItem = document.getElementById('shibirarthiNavItem');
+            const myProfileNavItem = document.getElementById('myProfileNavItem');
+            const myTransportationNavItem = document.getElementById('myTransportationNavItem');
+            const myToursNavItem = document.getElementById('myToursNavItem');
+            
+            if (homeNavItem) homeNavItem.style.display = '';
+            if (aboutNavItem) aboutNavItem.style.display = '';
+            if (mediaNavItem) mediaNavItem.style.display = '';
+            if (shibirarthiNavItem) shibirarthiNavItem.style.display = 'none';
+            if (myProfileNavItem) myProfileNavItem.style.display = 'none';
+            if (myTransportationNavItem) myTransportationNavItem.style.display = 'none';
+            if (myToursNavItem) myToursNavItem.style.display = 'none';
+        }
+    });
 }
 
 // Load user profile information
@@ -2687,13 +2727,18 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Firebase initialization is handled in firebase-config.js
-// Check if Firebase is properly initialized
+// Check if Firebase is properly initialized (with longer timeout for slow connections)
 document.addEventListener('DOMContentLoaded', function() {
+    // Wait longer for Firebase to initialize, especially on slow connections
     setTimeout(() => {
-        if (window.firebase && firebase.apps.length > 0) {
-            console.log('Firebase initialized successfully');
-        } else {
-            console.warn('Firebase not initialized. Please check firebase-config.js and ensure you have added your Firebase configuration.');
-        }
-    }, 500);
+        waitForFirebase(function() {
+            if (window.firebase && firebase.apps && firebase.apps.length > 0) {
+                console.log('Firebase initialized successfully');
+            } else {
+                console.warn('Firebase not initialized after waiting. Please check firebase-config.js and ensure you have added your Firebase configuration.');
+                console.warn('Firebase SDK loaded:', typeof window.firebase !== 'undefined');
+                console.warn('Firebase apps:', window.firebase && window.firebase.apps ? window.firebase.apps.length : 'N/A');
+            }
+        }, 60); // Wait up to 6 seconds
+    }, 200);
 });
