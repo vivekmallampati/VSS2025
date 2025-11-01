@@ -632,11 +632,11 @@
             <div id="registerVerifyForm">
                 <form class="register-form">
                     <div class="form-group">
-                        <input type="text" id="regUniqueId" placeholder="Praveshika ID (e.g., AM/KK/1001)" required>
+                        <input type="text" id="regUniqueId" placeholder="Praveshika ID (e.g., AABB0000)" required>
                     </div>
                     <button type="submit" class="btn btn-primary">Verify & Continue</button>
                 </form>
-                <p class="login-note">Enter your Praveshika ID to verify your registration. Case, slashes, and dashes don't matter (e.g., "am/kk/1001", "AM-KK-1001", "amkk1001" all work).</p>
+                <p class="login-note">Enter your Praveshika ID to verify your registration).</p>
             </div>
             <div id="registerPasswordForm" style="display:none;">
                 <form class="password-setup-form">
@@ -670,7 +670,6 @@
             configScript.src = 'firebase-config.js';
             configScript.onerror = function() {
                 // Fallback: Initialize Firebase inline if external file fails
-                console.warn('firebase-config.js not found, using inline config');
                 
                 // Firebase Configuration
                 const firebaseConfig = {
@@ -686,14 +685,12 @@
                 // Initialize Firebase with retry logic
                 function initializeFirebase() {
                     if (typeof firebase === 'undefined') {
-                        console.warn('Firebase SDK not yet loaded, retrying...');
                         setTimeout(initializeFirebase, 100);
                         return;
                     }
 
                     try {
                         if (firebase.apps && firebase.apps.length > 0) {
-                            console.log('Firebase already initialized');
                             if (typeof window !== 'undefined') {
                                 window.firebaseInitialized = true;
                             }
@@ -701,12 +698,10 @@
                         }
 
                         firebase.initializeApp(firebaseConfig);
-                        console.log('Firebase initialized successfully (inline config)');
                         if (typeof window !== 'undefined') {
                             window.firebaseInitialized = true;
                         }
                     } catch (error) {
-                        console.error('Error initializing Firebase:', error);
                         if (error.code !== 'app/duplicate-app') {
                             setTimeout(initializeFirebase, 500);
                         }

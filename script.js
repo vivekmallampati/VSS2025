@@ -19,9 +19,6 @@ function waitForFirebase(callback, maxRetries = 50) {
     }
 
     if (maxRetries <= 0) {
-        console.error('Firebase initialization timeout after 5 seconds');
-        console.error('Firebase available:', typeof window.firebase !== 'undefined');
-        console.error('Firebase apps:', window.firebase && window.firebase.apps ? window.firebase.apps.length : 'N/A');
         return;
     }
 
@@ -506,7 +503,6 @@ function handleLoginSuccess(loginForm) {
 
 // Helper function for login errors
 function handleLoginError(error) {
-    console.error('Login error:', error);
     let errorMessage = 'Login failed. ';
     
     if (error.code === 'auth/user-not-found') {
@@ -514,10 +510,6 @@ function handleLoginError(error) {
         // This is handled in the login flow, but keeping for other cases
     } else if (error.code === 'permission-denied' || error.message?.includes('Missing or insufficient permissions')) {
         errorMessage = 'Permission denied. Please make sure Firestore security rules are properly deployed.';
-        console.error('Firestore permissions error. Please check:');
-        console.error('1. Firestore security rules are published in Firebase Console');
-        console.error('2. Rules allow users to read their own user documents');
-        console.error('3. Rules allow reading registrations collection');
     } else if (error.code === 'auth/wrong-password') {
         errorMessage += 'Incorrect password.';
     } else if (error.code === 'auth/invalid-email') {
@@ -554,7 +546,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Normalize the input Praveshika ID
             const normalizedId = normalizePraveshikaId(uniqueId);
-            console.log('Registering with Praveshika ID:', uniqueId, 'Normalized:', normalizedId);
 
             // Verify with Firestore using normalized Praveshika ID
             if (window.firebase && firebase.firestore) {
@@ -566,7 +557,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 // This works even without indexes and handles both normalizedId field and document ID normalization
                 db.collection('registrations').get()
                     .then(querySnapshot => {
-                        console.log('Total registrations found:', querySnapshot.size);
                         let matchingDoc = null;
                         let actualPraveshikaId = null;
                         
@@ -578,15 +568,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             const docFieldNormalized = docData.normalizedId ? normalizePraveshikaId(String(docData.normalizedId)) : '';
                             const docFieldValue = docData.normalizedId ? String(docData.normalizedId) : '';
                             
-                            console.log(`Checking: Doc ID="${docIdStr}" (type: ${typeof doc.id}, normalized: ${docIdNormalized}), Field normalizedId="${docFieldValue || 'none'}" (normalized: ${docFieldNormalized})`);
-                            
                             // Match if either the normalized document ID or the normalizedId field matches
                             // Check both the normalized version and direct field value
                             if (docIdNormalized === normalizedId || 
                                 docFieldNormalized === normalizedId || 
                                 docFieldValue === normalizedId ||
                                 docData.normalizedId === normalizedId) {
-                                console.log('✓ Match found!', `Doc ID: ${docIdStr}, normalizedId field: ${docFieldValue}`);
                                 matchingDoc = doc;
                                 actualPraveshikaId = docIdStr;
                                 return; // Break out of forEach
@@ -594,13 +581,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         });
                         
                         if (!matchingDoc) {
-                            console.error('No matching document found for normalized ID:', normalizedId);
                             showNotification('Verification failed. Praveshika ID not found.', 'error');
                             return;
                         }
                         
                         const data = matchingDoc.data();
-                        console.log('Match found:', actualPraveshikaId, 'Name:', data.name);
                         
                         // Verification successful - show password setup
                         pendingRegistration = {
@@ -1861,9 +1846,6 @@ function loadToursInfo(user) {
 
                 const data = regDoc && regDoc.exists ? regDoc.data() : {};
                 
-                // Debug: Log all field names to help identify the correct field
-                console.log('Tours Debug - All data keys:', Object.keys(data));
-                
                 // Get post shibir tour field - check multiple possible field names
                 let postShibirTour = data.postShibirTour || 
                                     data['Post Shibir Tour'] || 
@@ -1871,10 +1853,8 @@ function loadToursInfo(user) {
                                     data['Please select a post shibir tour option'] ||
                                     null;
                 
-                // Debug: Log all field names to help identify the correct field
+                // Fallback: try to find any field containing "tour" and "post"/"shibir"
                 if (!postShibirTour) {
-                    console.log('Tours Debug - postShibirTour not found. All data keys:', Object.keys(data));
-                    // Fallback: try to find any field containing "tour" and "post"/"shibir"
                     const allKeys = Object.keys(data);
                     const tourKey = allKeys.find(key => {
                         const lowerKey = key.toLowerCase();
@@ -1884,14 +1864,10 @@ function loadToursInfo(user) {
                     
                     if (tourKey) {
                         postShibirTour = data[tourKey];
-                        console.log('Tours Debug - Found tour field as fallback:', tourKey, 'Value:', postShibirTour);
                     }
-                } else {
-                    console.log('Tours Debug - Found tour field. Value:', postShibirTour);
                 }
                 
                 const tourValue = postShibirTour ? postShibirTour.toString().trim() : '';
-                console.log('Tours Debug - Final tour value:', tourValue);
                 
                 const isNone = !tourValue || tourValue === '' || tourValue.toLowerCase() === 'none' || 
                               tourValue === 'N/A' || tourValue === 'null' || tourValue === 'undefined';
@@ -2659,7 +2635,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Handle image error
         img.addEventListener('error', function() {
-            console.warn('Image failed to load:', this.src);
             this.style.display = 'none';
             // Show fallback if it exists
             const fallback = this.nextElementSibling;
@@ -2732,13 +2707,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Wait longer for Firebase to initialize, especially on slow connections
     setTimeout(() => {
         waitForFirebase(function() {
-            if (window.firebase && firebase.apps && firebase.apps.length > 0) {
-                console.log('Firebase initialized successfully');
-            } else {
-                console.warn('Firebase not initialized after waiting. Please check firebase-config.js and ensure you have added your Firebase configuration.');
-                console.warn('Firebase SDK loaded:', typeof window.firebase !== 'undefined');
-                console.warn('Firebase apps:', window.firebase && window.firebase.apps ? window.firebase.apps.length : 'N/A');
-            }
+            // Firebase initialization check complete
         }, 60); // Wait up to 6 seconds
     }, 200);
 });

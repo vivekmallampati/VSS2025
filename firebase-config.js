@@ -16,7 +16,6 @@ const firebaseConfig = {
 function initializeFirebase() {
     // Check if Firebase is available
     if (typeof firebase === 'undefined') {
-        console.warn('Firebase SDK not yet loaded, retrying...');
         // Retry after a short delay
         setTimeout(initializeFirebase, 100);
         return;
@@ -25,7 +24,6 @@ function initializeFirebase() {
     try {
         // Check if Firebase is already initialized
         if (firebase.apps && firebase.apps.length > 0) {
-            console.log('Firebase already initialized');
             // Set global flag if it exists
             if (typeof window !== 'undefined') {
                 window.firebaseInitialized = true;
@@ -35,7 +33,6 @@ function initializeFirebase() {
 
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
-        console.log('Firebase initialized successfully');
         // Set global flags
         if (typeof window !== 'undefined') {
             window.firebaseInitialized = true;
@@ -49,7 +46,6 @@ function initializeFirebase() {
             }
         }
     } catch (error) {
-        console.error('Error initializing Firebase:', error);
         // Retry initialization if there was an error
         if (error.code !== 'app/duplicate-app') {
             setTimeout(initializeFirebase, 500);
