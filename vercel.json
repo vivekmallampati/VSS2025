@@ -8,16 +8,33 @@
   ],
   "routes": [
     {
-      "src": "/styles.css",
-      "dest": "/styles.css"
+      "src": "/firebase-config.js",
+      "dest": "/firebase-config.js",
+      "headers": {
+        "Content-Type": "application/javascript"
+      }
     },
     {
-      "src": "/script.js", 
-      "dest": "/script.js"
+      "src": "/script.js",
+      "dest": "/script.js",
+      "headers": {
+        "Content-Type": "application/javascript"
+      }
+    },
+    {
+      "src": "/styles.css",
+      "dest": "/styles.css",
+      "headers": {
+        "Content-Type": "text/css"
+      }
     },
     {
       "src": "/docs/(.*)",
       "dest": "/docs/$1"
+    },
+    {
+      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|json|pdf|docx|txt))",
+      "dest": "/$1"
     },
     {
       "src": "/(.*)",
