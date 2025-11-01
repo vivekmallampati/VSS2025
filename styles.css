@@ -52,8 +52,9 @@ body {
 .header {
     background: linear-gradient(135deg, var(--primary-brown), var(--secondary-brown));
     color: var(--white);
-    padding: 1rem 0;
+    padding: 0.75rem 0;
     box-shadow: 0 2px 10px var(--shadow);
+    position: relative;
 }
 
 .header-content {
@@ -104,11 +105,48 @@ body {
     box-shadow: 0 4px 15px var(--shadow-dark);
 }
 
+/* Mobile Menu Toggle Button */
+.mobile-menu-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: space-around;
+    width: 30px;
+    height: 30px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    z-index: 1002;
+    position: relative;
+}
+
+.mobile-menu-toggle span {
+    width: 100%;
+    height: 3px;
+    background: var(--white);
+    border-radius: 3px;
+    transition: all 0.3s ease;
+    transform-origin: center;
+}
+
+.mobile-menu-toggle.active span:nth-child(1) {
+    transform: rotate(45deg) translate(8px, 8px);
+}
+
+.mobile-menu-toggle.active span:nth-child(2) {
+    opacity: 0;
+}
+
+.mobile-menu-toggle.active span:nth-child(3) {
+    transform: rotate(-45deg) translate(8px, -8px);
+}
+
 /* Navigation Styles */
 .navigation {
     background: var(--white);
     border-bottom: 3px solid var(--primary-brown);
     box-shadow: 0 2px 5px var(--shadow);
+    margin-top: 0;
 }
 
 .nav-list {
@@ -120,7 +158,7 @@ body {
 
 .nav-link {
     display: block;
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1.25rem;
     text-decoration: none;
     color: var(--text-dark);
     font-weight: 500;
@@ -161,6 +199,12 @@ body {
 .dropdown-menu a:hover { background: var(--light-cream); color: var(--primary-brown); }
 .has-dropdown:hover .dropdown-menu { display: block; }
 
+/* Mobile dropdown - show on click instead of hover */
+@media (max-width: 768px) {
+    .has-dropdown:hover .dropdown-menu { display: none; }
+    .has-dropdown.active .dropdown-menu { display: block; position: relative; min-width: 100%; }
+}
+
 /* Main Content */
 .main-content {
     min-height: calc(100vh - 200px);
@@ -183,7 +227,7 @@ body {
 /* Hero Section */
 .hero-section {
     background: linear-gradient(135deg, var(--light-cream), var(--off-white));
-    padding: 4rem 0;
+    padding: 2rem 0;
     text-align: center;
 }
 
@@ -198,7 +242,7 @@ body {
 .hero-subtitle {
     font-size: 1.5rem;
     color: var(--secondary-brown);
-    margin-bottom: 3rem;
+    margin-bottom: 1.5rem;
     font-weight: 500;
 }
 
@@ -293,8 +337,8 @@ body {
 /* Section Headers */
 .section-header {
     text-align: center;
-    margin-bottom: 3rem;
-    padding: 2rem 0;
+    margin-bottom: 1.5rem;
+    padding: 1rem 0;
 }
 
 .section-header h2 {
@@ -576,7 +620,8 @@ body {
 }
 
 .form-group input,
-.form-group textarea {
+.form-group textarea,
+.form-group select {
     width: 100%;
     padding: 1rem;
     border: 2px solid var(--light-cream);
@@ -584,10 +629,27 @@ body {
     font-size: 1rem;
     transition: border-color 0.3s ease;
     font-family: inherit;
+    background-color: var(--white);
+}
+
+.form-group select {
+    cursor: pointer;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-dark);
+}
+
+.form-group .required {
+    color: var(--accent-orange);
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
     outline: none;
     border-color: var(--primary-brown);
     box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
@@ -754,6 +816,19 @@ body {
     font-size: 0.9rem;
     color: var(--secondary-brown);
     text-align: center;
+}
+
+.register-error {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    background-color: #fee;
+    border: 2px solid #e74c3c;
+    border-radius: 8px;
+    color: #c0392b;
+    font-size: 0.9rem;
+    text-align: center;
+    font-weight: 500;
+    animation: fadeIn 0.3s ease;
 }
 
 /* Shibirarthi Letter Tab Styles */
@@ -1154,18 +1229,72 @@ body {
 /* Responsive Design */
 @media (max-width: 768px) {
     .header-content {
-        flex-direction: column;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .logo-text h1 {
+        font-size: 1.4rem;
+    }
+    
+    .logo-text p {
+        font-size: 1rem;
+    }
+    
+    .logo-img {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .mobile-menu-toggle {
+        display: flex;
+    }
+    
+    .header-actions {
+        display: flex;
+        align-items: center;
         gap: 1rem;
+    }
+    
+    .login-btn {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+    }
+    
+    .navigation {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--white);
+        box-shadow: 0 4px 10px var(--shadow);
+        z-index: 1000;
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+    }
+    
+    .navigation.mobile-menu-open {
+        display: block;
     }
     
     .nav-list {
         flex-direction: column;
         gap: 0;
+        padding: 0;
     }
     
     .nav-link {
-        padding: 0.8rem 1rem;
-        text-align: center;
+        padding: 1rem 1.5rem;
+        text-align: left;
+        border-bottom: 1px solid var(--light-cream);
+    }
+    
+    .nav-link:hover,
+    .nav-link.active {
+        border-bottom-color: var(--primary-brown);
+        border-bottom-width: 3px;
     }
     
     .hero-title {
@@ -1852,6 +1981,71 @@ body {
 }
 
 /* Tours Styling */
+.profile-tours-section {
+    margin-top: 2rem;
+    background: var(--white);
+    border-radius: 10px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px var(--shadow);
+}
+
+.profile-tours-section h3 {
+    color: var(--primary-brown);
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+}
+
+.tours-tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--light-cream);
+    margin-bottom: 1.5rem;
+}
+
+.tour-tab {
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-dark);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+}
+
+.tour-tab:hover {
+    color: var(--primary-brown);
+    background: var(--light-cream);
+}
+
+.tour-tab.active {
+    color: var(--primary-brown);
+    border-bottom-color: var(--primary-brown);
+    background: var(--light-cream);
+}
+
+.tour-tab-content {
+    position: relative;
+    min-height: 200px;
+}
+
+.tour-tab-pane {
+    display: none;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.tour-tab-pane.active {
+    display: block;
+}
+
+.tour-content {
+    text-align: center;
+    padding: 1rem;
+}
+
 .tours-display {
     background: var(--white);
     border-radius: 10px;

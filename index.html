@@ -16,19 +16,23 @@
                 <div class="logo">
                     <img src="docs/logo.png" alt="VSS2025 Logo" class="logo-img" loading="eager" decoding="async">
                     <div class="logo-text">
-                        <h1>Vishwa Sangh Shibir</h1>
-                        <p>2025</p>
+                        <h1>Vishwa Sangh Shibir 2025</h1>
                     </div>
                 </div>
                 <div class="header-actions">
                     <button class="login-btn" onclick="openLogin()">Login</button>
+                    <button class="mobile-menu-toggle" aria-label="Toggle mobile menu" onclick="toggleMobileMenu()">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
                 </div>
             </div>
         </div>
     </header>
 
     <!-- Navigation -->
-    <nav class="navigation">
+    <nav class="navigation" id="mainNavigation">
         <div class="container">
             <ul class="nav-list">
                 <li id="homeNavItem"><a href="#home" class="nav-link active" data-tab="home">Home</a></li>
@@ -48,8 +52,7 @@
                     </ul>
                 </li>
                 <li id="myTransportationNavItem" style="display: none;"><a href="#mytransportation" class="nav-link" data-tab="mytransportation">My Transportation</a></li>
-                <li id="myToursNavItem" style="display: none;"><a href="#mytours" class="nav-link" data-tab="mytours">My Tours</a></li>
-                <li><a href="#documents" class="nav-link" data-tab="documents">Documents</a></li>
+                <!-- <li><a href="#documents" class="nav-link" data-tab="documents">Documents</a></li> -->
                 <li id="mediaNavItem"><a href="#media" class="nav-link" data-tab="media">Media</a></li>
                 <!-- <li><a href="#donate" class="nav-link" data-tab="donate">Donate</a></li> -->
                 <li><a href="#contact" class="nav-link" data-tab="contact">Contact</a></li>
@@ -66,31 +69,6 @@
                     <div class="hero-content">
                         <h2 class="hero-title">Vishwa Sangh Shibir 2025</h2>
                         <p class="hero-subtitle">Global Gathering of Swayamsevaks</p>
-                        <div class="event-details">
-                            <div class="event-info">
-                                <div class="info-item">
-                                    <span class="info-label">Date:</span>
-                                    <span class="info-value">25th - 29th December 2025</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-label">Location:</span>
-                                    <span class="info-value">Kanha Shanti Vanam, SRCM Heartfulness Meditation Center</span>
-                                </div>
-                                <!-- <div class="info-item">
-                                    <span class="info-label">Address:</span>
-                                    <span class="info-value">Kanha Village, Chegur, Telangana 509328, India</span>
-                                </div> -->
-                            </div>
-                            <div class="stats">
-                                <div class="stat-item">
-                                    <span class="stat-number">2000+</span>
-                                    <span class="stat-label">Delegates</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-number">70+</span>
-                                    <span class="stat-label">Countries</span>
-                                </div>
-                            </div>
                         </div>
                         <div class="hero-description">
                             <p>Sree Viswa Niketan is privileged to organize the Vishwa Sangh Shibir 2025 (VSS2025), an international gathering of Pravasi Bharatiyas and delegates from various countries. The event will bring together representatives from over 70 countries to celebrate and strengthen the global Hindu fraternity.</p>
@@ -98,7 +76,8 @@
                         </div>
                         <div class="login-cta">
                             <h3>Shibirarthi Login</h3>
-                            <p>Access your registration and transportation details.</p>
+                            <p>Please use your Praveshika ID provided in the email to register.
+                            <br> Please login to access your registration</p>
                             <button class="btn btn-primary" onclick="openLogin()">Login</button>
                             <button class="btn btn-secondary" onclick="openRegister()" style="margin-left: 0.5rem;">Register</button>
                         </div>
@@ -131,7 +110,7 @@
                         <p>Our gathering is built upon the foundation of Dharma - the eternal principles that guide righteous living. Through this event, we aim to strengthen the bonds of the global Hindu fraternity while contributing to the well-being of humanity at large.</p>
                     </div>
                 </div>
-                <div class="about-location">
+                <!-- <div class="about-location">
                     <h3>Shibir Location</h3>
                     <div class="about-location-map">
                         <img src="docs/VSS_locations.png" alt="VSS2025 Location Map" loading="lazy" decoding="async" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
@@ -140,7 +119,7 @@
                         </div>
                         <p>Location of Vishwa Sangh Shibir 2025 (Kanha Shanti Vanam, Bhagyanagar, India)</p>
                     </div>
-                </div>
+                </div> -->
             </div>
             </div>
         </section>
@@ -463,14 +442,13 @@
                 <div id="mediaImages" class="media-section" style="display:none;">
                     <div class="image-grid">
                         <img src="docs/logo.png" alt="VSS2025" loading="lazy">
-                        <img src="docs/VSS_locations.png" alt="Location" loading="lazy">
                     </div>
                 </div>
             </div>
         </section>
 
         <!-- Documents Tab -->
-        <section id="documents" class="tab-content">
+        <!-- <section id="documents" class="tab-content">
             <div class="container">
                 <div class="section-header">
                     <h2>Important Documents</h2>
@@ -499,7 +477,7 @@
                     </div>
                 </div>
             </div>
-        </section>
+        </section> -->
 
 
         <!-- My Profile Tab -->
@@ -512,6 +490,42 @@
                 <div class="profile-content">
                     <div id="profileInfo" class="profile-card">
                         <p>Loading profile information...</p>
+                    </div>
+                    
+                    <!-- Tours Section with Horizontal Tabs -->
+                    <div id="profileToursSection" class="profile-tours-section" style="display: none;">
+                        <h3>Post Shibir Tours</h3>
+                        <div class="tours-tabs">
+                            <button class="tour-tab active" onclick="switchTourTab('none')">None</button>
+                            <button class="tour-tab" onclick="switchTourTab('srisailam')">Srisailam</button>
+                            <button class="tour-tab" onclick="switchTourTab('kandakurthi')">Kandakurthi</button>
+                            <button class="tour-tab" onclick="switchTourTab('yadadri')">Yadadri</button>
+                        </div>
+                        <div class="tour-tab-content">
+                            <div id="tourTabNone" class="tour-tab-pane active">
+                                <div class="tour-content">
+                                    <p class="tour-message">Shubh Yatra</p>
+                                    <p class="tour-description">No post shibir tour selected.</p>
+                                </div>
+                            </div>
+                            <div id="tourTabSrisailam" class="tour-tab-pane">
+                                <div class="tour-content">
+                                    <img src="docs/Srisailam.jpg" alt="Srisailam" class="tour-image" onerror="this.style.display='none'">
+                                    <p class="tour-description">Information about the Srisailam tour will be displayed here.</p>
+                                </div>
+                            </div>
+                            <div id="tourTabKandakurthi" class="tour-tab-pane">
+                                <div class="tour-content">
+                                    <img src="docs/Kandakurthi.jpg" alt="Kandakurthi" class="tour-image" onerror="this.style.display='none'">
+                                    <p class="tour-description">Information about the Kandakurthi tour will be displayed here.</p>
+                                </div>
+                            </div>
+                            <div id="tourTabYadadri" class="tour-tab-pane">
+                                <div class="tour-content">
+                                    <p class="tour-description">Information about Yadadri Mandir and local sites in Bhagyanagar tour will be displayed here.</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -527,21 +541,6 @@
                 <div class="transportation-content">
                     <div id="transportationInfo" class="transportation-card">
                         <p>Loading transportation information...</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- My Tours Tab -->
-        <section id="mytours" class="tab-content">
-            <div class="container">
-                <div class="section-header">
-                    <h2>My Tours</h2>
-                    <p>View and update your post shibir tour selection</p>
-                </div>
-                <div class="tours-content">
-                    <div id="toursInfo" class="tours-card">
-                        <p>Loading tour information...</p>
                     </div>
                 </div>
             </div>
@@ -564,22 +563,31 @@
                             <span class="contact-label">Email:</span>
                             <span class="contact-value">info@vss2025.org</span>
                         </div>
-                        <div class="contact-item">
-                            <span class="contact-label">Address:</span>
-                            <span class="contact-value">101, Viswa Residency, Chitra Layout, L. B. Nagar, Hyderabad - 500074</span>
-                        </div>
                     </div>
                     <div class="contact-form">
                         <h3>Send us a Message</h3>
-                        <form>
+                        <form id="contactForm">
                             <div class="form-group">
-                                <input type="text" placeholder="Your Name" required>
+                                <input type="text" id="contactName" name="name" placeholder="Your Name" required>
                             </div>
                             <div class="form-group">
-                                <input type="email" placeholder="Your Email" required>
+                                <input type="email" id="contactEmail" name="email" placeholder="Your Email" required>
                             </div>
                             <div class="form-group">
-                                <textarea placeholder="Your Message" rows="5" required></textarea>
+                                <label for="contactCategory">Category: <span class="required">*</span></label>
+                                <select id="contactCategory" name="category" required>
+                                    <option value="">Select a category</option>
+                                    <option value="Registration">Registration</option>
+                                    <option value="Accommodation">Accommodation</option>
+                                    <option value="Travel / Tour">Travel / Tour</option>
+                                    <option value="Forex">Forex</option>
+                                    <option value="Cloak Room">Cloak Room</option>
+                                    <option value="General Support">General Support</option>
+                                    <option value="Feedback/Suggestion">Feedback/Suggestion</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <textarea id="contactMessage" name="message" placeholder="Your Message" rows="5" required></textarea>
                             </div>
                             <button type="submit" class="btn btn-primary">Send Message</button>
                         </form>
@@ -619,7 +627,7 @@
                 </div>
                 <button type="submit" class="btn btn-primary">Login</button>
             </form>
-            <p class="login-note">Login with your Email or Praveshika ID to access transportation information and registration details.</p>
+            <p class="login-note">Login with your Praveshika ID or registered Email.</p>
             <p class="login-note">Don't have an account? <a href="#" onclick="closeLogin(); openRegister(); return false;">Register</a></p>
         </div>
     </div>
@@ -636,7 +644,7 @@
                     </div>
                     <button type="submit" class="btn btn-primary">Verify & Continue</button>
                 </form>
-                <p class="login-note">Enter your Praveshika ID to verify your registration).</p>
+                <p class="login-note">Enter your Praveshika ID to verify your registration.</p>
             </div>
             <div id="registerPasswordForm" style="display:none;">
                 <form class="password-setup-form">
@@ -648,6 +656,7 @@
                     </div>
                     <button type="submit" class="btn btn-primary">Create Account</button>
                 </form>
+                <div id="registerError" class="register-error" style="display: none;"></div>
                 <p class="login-note">Please set a secure password for your account.</p>
             </div>
         </div>
@@ -657,6 +666,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <!-- EmailJS for contact form emails -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <!-- Barcode Generation Library -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <!-- PDF Generation Library -->

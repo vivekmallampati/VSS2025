@@ -34,7 +34,7 @@ function waitForFirebase(callback, maxRetries = 50) {
 }
 
 // Protected tabs that require authentication
-const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours'];
+const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation'];
 
 // Helper function to check if a tab is protected
 function isProtectedTab(tabName) {
@@ -106,12 +106,10 @@ function activateTab(tabName, skipAuthCheck = false) {
                 switch(tabName) {
                     case 'myprofile':
                         loadUserProfile(user);
+                        loadProfileTours(user);
                         break;
                     case 'mytransportation':
                         loadTransportationInfo(user);
-                        break;
-                    case 'mytours':
-                        loadToursInfo(user);
                         break;
                 }
             }
@@ -211,6 +209,21 @@ function resetRegisterForm() {
     if (pwdForm) {
         pwdForm.reset();
     }
+    // Clear error message
+    const registerError = document.getElementById('registerError');
+    if (registerError) {
+        registerError.style.display = 'none';
+        registerError.textContent = '';
+    }
+}
+
+// Display error in register modal
+function showRegisterError(message) {
+    const registerError = document.getElementById('registerError');
+    if (registerError) {
+        registerError.textContent = message;
+        registerError.style.display = 'block';
+    }
 }
 
 // Register Modal Functionality
@@ -247,6 +260,66 @@ window.addEventListener('click', function(event) {
     if (event.target === regModal) {
         closeRegister();
     }
+});
+
+// Mobile Menu Toggle Functionality
+function toggleMobileMenu() {
+    const navigation = document.getElementById('mainNavigation');
+    const toggleButton = document.querySelector('.mobile-menu-toggle');
+    
+    if (navigation && toggleButton) {
+        navigation.classList.toggle('mobile-menu-open');
+        toggleButton.classList.toggle('active');
+    }
+}
+
+// Close mobile menu when a nav link is clicked (on mobile)
+document.addEventListener('DOMContentLoaded', function() {
+    const navLinks = document.querySelectorAll('.nav-link');
+    const navigation = document.getElementById('mainNavigation');
+    const toggleButton = document.querySelector('.mobile-menu-toggle');
+    
+    navLinks.forEach(link => {
+        link.addEventListener('click', function() {
+            // Check if we're on mobile (menu is open)
+            if (navigation && navigation.classList.contains('mobile-menu-open')) {
+                // Only close menu if it's not a dropdown parent link
+                const parent = this.parentElement;
+                if (!parent.classList.contains('has-dropdown')) {
+                    toggleMobileMenu();
+                }
+            }
+        });
+    });
+    
+    // Handle dropdown menu clicks on mobile
+    const dropdownLinks = document.querySelectorAll('.has-dropdown > .nav-link');
+    dropdownLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            // On mobile, toggle dropdown instead of just navigating
+            if (window.innerWidth <= 768) {
+                e.preventDefault();
+                const parent = this.parentElement;
+                parent.classList.toggle('active');
+                
+                // Also activate the tab if not already active
+                const targetTab = this.getAttribute('data-tab');
+                if (targetTab) {
+                    activateTab(targetTab);
+                }
+            }
+        });
+    });
+    
+    // Close mobile menu when dropdown items are clicked
+    const dropdownItems = document.querySelectorAll('.dropdown-menu a');
+    dropdownItems.forEach(item => {
+        item.addEventListener('click', function() {
+            if (navigation && navigation.classList.contains('mobile-menu-open')) {
+                toggleMobileMenu();
+            }
+        });
+    });
 });
 
 // Close modal with Escape key
@@ -338,22 +411,41 @@ function donate(type) {
     }
 }
 
+// EmailJS Configuration
+// To set up EmailJS:
+// 1. Go to https://www.emailjs.com/ and create a free account
+// 2. Create an email service (Gmail, Outlook, etc.)
+// 3. Create an email template with variables: {{from_name}}, {{from_email}}, {{category}}, {{message}}
+// 4. Get your Public Key, Service ID, and Template ID
+// 5. Update the values below:
+const EMAILJS_CONFIG = {
+    PUBLIC_KEY: '', // Add your EmailJS Public Key here
+    SERVICE_ID: '', // Add your EmailJS Service ID here
+    TEMPLATE_ID: '', // Add your EmailJS Template ID here
+    TO_EMAIL: 'info@vss2025.org' // Recipient email address
+};
+
+// Initialize EmailJS when available
+if (typeof emailjs !== 'undefined' && EMAILJS_CONFIG.PUBLIC_KEY) {
+    emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
+}
+
 // Contact Form Submission
 document.addEventListener('DOMContentLoaded', function() {
-    const contactForm = document.querySelector('.contact-form form');
+    const contactForm = document.getElementById('contactForm');
     if (contactForm) {
         contactForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
             // Get form data
-            const formData = new FormData(this);
-            const name = this.querySelector('input[type="text"]').value;
-            const email = this.querySelector('input[type="email"]').value;
-            const message = this.querySelector('textarea').value;
+            const name = document.getElementById('contactName').value.trim();
+            const email = document.getElementById('contactEmail').value.trim();
+            const category = document.getElementById('contactCategory').value;
+            const message = document.getElementById('contactMessage').value.trim();
             
             // Basic validation
-            if (!name || !email || !message) {
-                showNotification('Please fill in all fields.', 'error');
+            if (!name || !email || !category || !message) {
+                showNotification('Please fill in all fields including category.', 'error');
                 return;
             }
             
@@ -362,9 +454,84 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Simulate form submission
-            showNotification('Thank you for your message! We will get back to you soon.', 'success');
-            this.reset();
+            showNotification('Sending your message...', 'info');
+            
+            // Function to send email via EmailJS
+            const sendEmail = () => {
+                return new Promise((resolve, reject) => {
+                    // Check if EmailJS is configured and available
+                    if (typeof emailjs !== 'undefined' && 
+                        EMAILJS_CONFIG.PUBLIC_KEY && 
+                        EMAILJS_CONFIG.SERVICE_ID && 
+                        EMAILJS_CONFIG.TEMPLATE_ID) {
+                        
+                        const templateParams = {
+                            from_name: name,
+                            from_email: email,
+                            category: category,
+                            message: message,
+                            to_email: EMAILJS_CONFIG.TO_EMAIL,
+                            reply_to: email
+                        };
+                        
+                        emailjs.send(EMAILJS_CONFIG.SERVICE_ID, EMAILJS_CONFIG.TEMPLATE_ID, templateParams)
+                            .then((response) => {
+                                console.log('Email sent successfully:', response.status, response.text);
+                                resolve(response);
+                            })
+                            .catch((emailError) => {
+                                console.error('EmailJS error:', emailError);
+                                reject(emailError);
+                            });
+                    } else {
+                        // EmailJS not configured, resolve anyway (message will be saved to Firestore)
+                        resolve(null);
+                    }
+                });
+            };
+            
+            // Save to Firestore
+            if (window.firebase && firebase.firestore) {
+                const db = firebase.firestore();
+                
+                // Save to Firestore first, then try to send email
+                db.collection('contactMessages').add({
+                    name: name,
+                    email: email,
+                    category: category,
+                    message: message,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    read: false
+                })
+                .then((docRef) => {
+                    // Try to send email via EmailJS
+                    return sendEmail()
+                        .then(() => {
+                            showNotification('Thank you for your message! We will get back to you soon.', 'success');
+                            contactForm.reset();
+                        })
+                        .catch((emailError) => {
+                            // Email failed but message saved to Firestore - still show success
+                            console.warn('Email sending failed, but message saved to database:', emailError);
+                            showNotification('Your message has been received. We will get back to you soon.', 'success');
+                            contactForm.reset();
+                        });
+                })
+                .catch((error) => {
+                    console.error('Error saving contact message:', error);
+                    showNotification('Error sending message. Please try again or contact us directly at info@vss2025.org', 'error');
+                });
+            } else {
+                // If Firebase is not available, try EmailJS only
+                sendEmail()
+                    .then(() => {
+                        showNotification('Thank you for your message! We will get back to you soon.', 'success');
+                        contactForm.reset();
+                    })
+                    .catch((error) => {
+                        showNotification('Error sending message. Please try again or contact us directly at info@vss2025.org', 'error');
+                    });
+            }
         });
     }
 });
@@ -415,43 +582,65 @@ document.addEventListener('DOMContentLoaded', function() {
                     const db = firebase.firestore();
                     const normalizedId = normalizePraveshikaId(identifier);
                     
-                    // First try to find in users collection by normalized uniqueId
-                    db.collection('users').where('uniqueId', '==', identifier).limit(1).get()
-                        .then((querySnapshot) => {
-                            if (!querySnapshot.empty) {
-                                return querySnapshot.docs[0].data().email;
-                            }
-                            // Try checking registrations collection with normalized ID
-                            return db.collection('registrations').where('normalizedId', '==', normalizedId).limit(1).get()
-                                .then((regQuerySnapshot) => {
-                                    if (!regQuerySnapshot.empty) {
-                                        const email = regQuerySnapshot.docs[0].data().email;
-                                        if (email) return email;
+                    // Helper function to find email by normalized Praveshika ID
+                    function findEmailByPraveshikaId(normalizedId) {
+                        // First try to find in users collection
+                        return db.collection('users').get()
+                            .then((allUsers) => {
+                                for (const doc of allUsers.docs) {
+                                    const userData = doc.data();
+                                    const userUniqueId = userData.uniqueId;
+                                    if (userUniqueId && normalizePraveshikaId(userUniqueId) === normalizedId) {
+                                        return userData.email;
                                     }
-                                    // Fallback: try direct lookup and normalize document ID
-                                    return db.collection('registrations').doc(identifier).get()
-                                        .then((doc) => {
-                                            if (doc.exists) {
-                                                const docNormalizedId = normalizePraveshikaId(doc.id);
-                                                if (docNormalizedId === normalizedId && doc.data().email) {
-                                                    return doc.data().email;
-                                                }
+                                }
+                                return null;
+                            })
+                            .then((email) => {
+                                if (email) return email;
+                                // Try checking registrations collection with normalized ID
+                                return db.collection('registrations').where('normalizedId', '==', normalizedId).limit(1).get()
+                                    .then((regQuerySnapshot) => {
+                                        if (!regQuerySnapshot.empty) {
+                                            const email = regQuerySnapshot.docs[0].data().email;
+                                            if (email) return email;
+                                        }
+                                        return null;
+                                    });
+                            })
+                            .then((email) => {
+                                if (email) return email;
+                                // Fallback: try direct lookup and normalize document ID
+                                return db.collection('registrations').doc(identifier).get()
+                                    .then((doc) => {
+                                        if (doc.exists) {
+                                            const docNormalizedId = normalizePraveshikaId(doc.id);
+                                            if (docNormalizedId === normalizedId && doc.data().email) {
+                                                return doc.data().email;
                                             }
-                                            // Last resort: search all documents (for old data)
-                                            return db.collection('registrations').get()
-                                                .then((allDocs) => {
-                                                    for (const doc of allDocs.docs) {
-                                                        const docNormalizedId = normalizePraveshikaId(doc.id);
-                                                        if (docNormalizedId === normalizedId) {
-                                                            const email = doc.data().email;
-                                                            if (email) return email;
-                                                        }
-                                                    }
-                                                    throw { code: 'auth/user-not-found', message: 'Praveshika ID not found.' };
-                                                });
-                                        });
-                                });
-                        })
+                                        }
+                                        return null;
+                                    });
+                            })
+                            .then((email) => {
+                                if (email) return email;
+                                // Last resort: search all registration documents (for old data)
+                                return db.collection('registrations').get()
+                                    .then((allDocs) => {
+                                        for (const doc of allDocs.docs) {
+                                            const docNormalizedId = normalizePraveshikaId(doc.id);
+                                            if (docNormalizedId === normalizedId) {
+                                                const email = doc.data().email;
+                                                if (email) return email;
+                                            }
+                                        }
+                                        return null;
+                                    });
+                            });
+                    }
+                    
+                    // Find email and login
+                    findEmailByPraveshikaId(normalizedId)
                         .then((email) => {
                             if (!email) {
                                 showNotification('No account found for this Praveshika ID. Please register first.', 'error');
@@ -677,15 +866,26 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         if (error.code === 'auth/email-already-in-use') {
                             errorMessage += 'This email is already registered. Please login instead.';
+                            // Display error in modal
+                            showRegisterError(errorMessage);
+                            // Close register modal and open login modal after a short delay
+                            setTimeout(() => {
+                                closeRegister();
+                                setTimeout(() => {
+                                    openLogin();
+                                    showNotification(errorMessage, 'error');
+                                }, 300);
+                            }, 2000); // Give user time to read the error
                         } else if (error.code === 'auth/invalid-email') {
                             errorMessage += 'Invalid email address.';
+                            showRegisterError(errorMessage);
                         } else if (error.code === 'auth/weak-password') {
                             errorMessage += 'Password is too weak.';
+                            showRegisterError(errorMessage);
                         } else {
                             errorMessage += error.message;
+                            showRegisterError(errorMessage);
                         }
-                        
-                        showNotification(errorMessage, 'error');
                     });
             } else {
                 showNotification('Firebase not initialized. Please check your configuration.', 'error');
@@ -700,7 +900,7 @@ function updateAuthUI() {
     waitForFirebase(function() {
         if (window.firebase && firebase.auth) {
             firebase.auth().onAuthStateChanged((user) => {
-                const loginBtn = document.querySelector('.header-actions .login-btn');
+            const loginBtn = document.querySelector('.header-actions .login-btn');
             const homeNavItem = document.getElementById('homeNavItem');
             const aboutNavItem = document.getElementById('aboutNavItem');
             const mediaNavItem = document.getElementById('mediaNavItem');
@@ -746,12 +946,14 @@ function updateAuthUI() {
                 if (myProfileNavItem) {
                     myProfileNavItem.style.display = '';
                     loadUserProfile(user);
+                    loadProfileTours(user);
                 }
                 if (myTransportationNavItem) {
                     myTransportationNavItem.style.display = '';
                     loadTransportationInfo(user);
                 }
-                if (myToursNavItem) {
+                // Tours are now part of My Profile
+                if (false) {
                     myToursNavItem.style.display = '';
                     loadToursInfo(user);
                 }
@@ -783,9 +985,7 @@ function updateAuthUI() {
                 if (myTransportationNavItem) {
                     myTransportationNavItem.style.display = 'none';
                 }
-                if (myToursNavItem) {
-                    myToursNavItem.style.display = 'none';
-                }
+            // Tours are now part of My Profile, no separate nav item needed
                 
                 // If user is on protected tab, redirect to home
                 const currentHash = window.location.hash.substring(1);
@@ -803,15 +1003,13 @@ function updateAuthUI() {
             const shibirarthiNavItem = document.getElementById('shibirarthiNavItem');
             const myProfileNavItem = document.getElementById('myProfileNavItem');
             const myTransportationNavItem = document.getElementById('myTransportationNavItem');
-            const myToursNavItem = document.getElementById('myToursNavItem');
-            
             if (homeNavItem) homeNavItem.style.display = '';
             if (aboutNavItem) aboutNavItem.style.display = '';
             if (mediaNavItem) mediaNavItem.style.display = '';
             if (shibirarthiNavItem) shibirarthiNavItem.style.display = 'none';
             if (myProfileNavItem) myProfileNavItem.style.display = 'none';
             if (myTransportationNavItem) myTransportationNavItem.style.display = 'none';
-            if (myToursNavItem) myToursNavItem.style.display = 'none';
+            // Tours are now part of My Profile
         }
     });
 }
@@ -1228,7 +1426,21 @@ function editTransportationSection(uniqueId, section) {
                                 <p class="form-note">All fields are required.</p>
                                 <div class="form-group">
                                     <label for="pickupLocation">Pickup Location: <span class="required">*</span></label>
-                                    <input type="text" id="pickupLocation" value="${pickupLocation}" placeholder="e.g., Hyderabad Airport, Railway Station" onchange="validateTransportationSection('arrival')" required>
+                                    <select id="pickupLocation" onchange="handlePickupLocationChange(); validateTransportationSection('arrival');" required>
+                                        <option value="">Select pickup location</option>
+                                        <option value="Rajiv Gandhi International Airport (RGIA)" ${pickupLocation === 'Rajiv Gandhi International Airport (RGIA)' ? 'selected' : ''}>Rajiv Gandhi International Airport (RGIA)</option>
+                                        <option value="Secunderabad Railway Station" ${pickupLocation === 'Secunderabad Railway Station' ? 'selected' : ''}>Secunderabad Railway Station</option>
+                                        <option value="Nampally Railway Station" ${pickupLocation === 'Nampally Railway Station' ? 'selected' : ''}>Nampally Railway Station</option>
+                                        <option value="Kacheguda Railway Station" ${pickupLocation === 'Kacheguda Railway Station' ? 'selected' : ''}>Kacheguda Railway Station</option>
+                                        <option value="Cherlapally Railway Station" ${pickupLocation === 'Cherlapally Railway Station' ? 'selected' : ''}>Cherlapally Railway Station</option>
+                                        <option value="Lingampally Railway Station" ${pickupLocation === 'Lingampally Railway Station' ? 'selected' : ''}>Lingampally Railway Station</option>
+                                        <option value="Mahatma Gandhi Bus Station (MGBS)" ${pickupLocation === 'Mahatma Gandhi Bus Station (MGBS)' ? 'selected' : ''}>Mahatma Gandhi Bus Station (MGBS)</option>
+                                        <option value="Jubilee Bus Station (JBS)" ${pickupLocation === 'Jubilee Bus Station (JBS)' ? 'selected' : ''}>Jubilee Bus Station (JBS)</option>
+                                        <option value="Other" ${pickupLocation !== '' && pickupLocation !== 'Rajiv Gandhi International Airport (RGIA)' && pickupLocation !== 'Secunderabad Railway Station' && pickupLocation !== 'Nampally Railway Station' && pickupLocation !== 'Kacheguda Railway Station' && pickupLocation !== 'Cherlapally Railway Station' && pickupLocation !== 'Lingampally Railway Station' && pickupLocation !== 'Mahatma Gandhi Bus Station (MGBS)' && pickupLocation !== 'Jubilee Bus Station (JBS)' ? 'selected' : ''}>Other</option>
+                                    </select>
+                                    <div id="pickupLocationOtherContainer" style="display: none; margin-top: 0.5rem;">
+                                        <input type="text" id="pickupLocationOther" placeholder="Please specify other location" value="${pickupLocation !== '' && pickupLocation !== 'Rajiv Gandhi International Airport (RGIA)' && pickupLocation !== 'Secunderabad Railway Station' && pickupLocation !== 'Nampally Railway Station' && pickupLocation !== 'Kacheguda Railway Station' && pickupLocation !== 'Cherlapally Railway Station' && pickupLocation !== 'Lingampally Railway Station' && pickupLocation !== 'Mahatma Gandhi Bus Station (MGBS)' && pickupLocation !== 'Jubilee Bus Station (JBS)' ? pickupLocation : ''}" onchange="validateTransportationSection('arrival')">
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label for="arrivalDate">Arrival Date: <span class="required">*</span></label>
@@ -1290,7 +1502,9 @@ function editTransportationSection(uniqueId, section) {
                         
                         // Validate all required fields before saving
                         if (section === 'arrival') {
-                            const pickupLocation = document.getElementById('pickupLocation')?.value.trim() || '';
+                            const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
+                            const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
+                            const pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
                             const arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
                             const arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
                             const flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
@@ -1298,6 +1512,11 @@ function editTransportationSection(uniqueId, section) {
                             if (!pickupLocation || !arrivalDate || !arrivalTime || !flightTrainNumber) {
                                 showNotification('Please fill all arrival details: Pickup Location, Date, Time, and Flight/Train Number are required.', 'error');
                                 validateTransportationSection('arrival');
+                                return;
+                            }
+                            
+                            if (pickupLocationSelect === 'Other' && !pickupLocationOther) {
+                                showNotification('Please specify the other pickup location.', 'error');
                                 return;
                             }
                         } else if (section === 'return') {
@@ -1350,7 +1569,21 @@ function editTransportation(uniqueId) {
                             <p class="form-note">If you enter any arrival detail, all arrival fields are required.</p>
                             <div class="form-group">
                                 <label for="pickupLocation">Pickup Location:</label>
-                                <input type="text" id="pickupLocation" value="${pickupLocation}" placeholder="e.g., Hyderabad Airport, Railway Station" onchange="validateTransportationSection('arrival')">
+                                <select id="pickupLocation" onchange="handlePickupLocationChange(); validateTransportationSection('arrival');">
+                                    <option value="">Select pickup location</option>
+                                    <option value="Rajiv Gandhi International Airport (RGIA)" ${pickupLocation === 'Rajiv Gandhi International Airport (RGIA)' ? 'selected' : ''}>Rajiv Gandhi International Airport (RGIA)</option>
+                                    <option value="Secunderabad Railway Station" ${pickupLocation === 'Secunderabad Railway Station' ? 'selected' : ''}>Secunderabad Railway Station</option>
+                                    <option value="Nampally Railway Station" ${pickupLocation === 'Nampally Railway Station' ? 'selected' : ''}>Nampally Railway Station</option>
+                                    <option value="Kacheguda Railway Station" ${pickupLocation === 'Kacheguda Railway Station' ? 'selected' : ''}>Kacheguda Railway Station</option>
+                                    <option value="Cherlapally Railway Station" ${pickupLocation === 'Cherlapally Railway Station' ? 'selected' : ''}>Cherlapally Railway Station</option>
+                                    <option value="Lingampally Railway Station" ${pickupLocation === 'Lingampally Railway Station' ? 'selected' : ''}>Lingampally Railway Station</option>
+                                    <option value="Mahatma Gandhi Bus Station (MGBS)" ${pickupLocation === 'Mahatma Gandhi Bus Station (MGBS)' ? 'selected' : ''}>Mahatma Gandhi Bus Station (MGBS)</option>
+                                    <option value="Jubilee Bus Station (JBS)" ${pickupLocation === 'Jubilee Bus Station (JBS)' ? 'selected' : ''}>Jubilee Bus Station (JBS)</option>
+                                    <option value="Other" ${pickupLocation !== '' && pickupLocation !== 'Rajiv Gandhi International Airport (RGIA)' && pickupLocation !== 'Secunderabad Railway Station' && pickupLocation !== 'Nampally Railway Station' && pickupLocation !== 'Kacheguda Railway Station' && pickupLocation !== 'Cherlapally Railway Station' && pickupLocation !== 'Lingampally Railway Station' && pickupLocation !== 'Mahatma Gandhi Bus Station (MGBS)' && pickupLocation !== 'Jubilee Bus Station (JBS)' ? 'selected' : ''}>Other</option>
+                                </select>
+                                <div id="pickupLocationOtherContainer" style="display: none; margin-top: 0.5rem;">
+                                    <input type="text" id="pickupLocationOther" placeholder="Please specify other location" value="${pickupLocation !== '' && pickupLocation !== 'Rajiv Gandhi International Airport (RGIA)' && pickupLocation !== 'Secunderabad Railway Station' && pickupLocation !== 'Nampally Railway Station' && pickupLocation !== 'Kacheguda Railway Station' && pickupLocation !== 'Cherlapally Railway Station' && pickupLocation !== 'Lingampally Railway Station' && pickupLocation !== 'Mahatma Gandhi Bus Station (MGBS)' && pickupLocation !== 'Jubilee Bus Station (JBS)' ? pickupLocation : ''}" onchange="validateTransportationSection('arrival')">
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="arrivalDate">Arrival Date:</label>
@@ -1401,7 +1634,9 @@ function editTransportation(uniqueId) {
                         e.preventDefault();
                         
                         // Validate before saving
-                        const pickupLocation = document.getElementById('pickupLocation')?.value.trim() || '';
+                        const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
+                        const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
+                        const pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
                         const arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
                         const arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
                         const flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
@@ -1446,7 +1681,9 @@ function saveTransportationInfo(uniqueId) {
         return;
     }
 
-    const pickupLocation = document.getElementById('pickupLocation')?.value.trim() || '';
+    const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
+    const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
+    const pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
     const arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
     const arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
     const flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
@@ -1578,7 +1815,9 @@ function saveTransportationSection(uniqueId, section) {
     let pickupLocation = '';
 
     if (section === 'arrival') {
-        pickupLocation = document.getElementById('pickupLocation')?.value.trim() || '';
+        const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
+        const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
+        pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
         arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
         arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
         flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
@@ -1586,6 +1825,12 @@ function saveTransportationSection(uniqueId, section) {
         // Validate all arrival fields are filled (including pickup location)
         if (!pickupLocation || !arrivalDate || !arrivalTime || !flightTrainNumber) {
             showNotification('Please fill all arrival details: Pickup Location, Date, Time, and Flight/Train Number are required.', 'error');
+            return;
+        }
+        
+        // Validate "Other" option requires text input
+        if (pickupLocationSelect === 'Other' && !pickupLocationOther) {
+            showNotification('Please specify the other pickup location.', 'error');
             return;
         }
     } else if (section === 'return') {
@@ -1694,6 +1939,24 @@ function saveTransportationSection(uniqueId, section) {
     }
 }
 
+// Handle pickup location dropdown change - show/hide "Other" textbox
+function handlePickupLocationChange() {
+    const pickupLocationSelect = document.getElementById('pickupLocation');
+    const otherContainer = document.getElementById('pickupLocationOtherContainer');
+    const otherInput = document.getElementById('pickupLocationOther');
+    
+    if (pickupLocationSelect && otherContainer && otherInput) {
+        if (pickupLocationSelect.value === 'Other') {
+            otherContainer.style.display = 'block';
+            otherInput.required = true;
+        } else {
+            otherContainer.style.display = 'none';
+            otherInput.required = false;
+            otherInput.value = '';
+        }
+    }
+}
+
 // Validate transportation section (helper for onchange)
 function validateTransportationSection(section) {
     let isValid = true;
@@ -1706,7 +1969,9 @@ function validateTransportationSection(section) {
     }
     
     if (section === 'arrival') {
-        const pickupLocation = document.getElementById('pickupLocation')?.value.trim();
+        const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim();
+        const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim();
+        const pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
         const arrivalDate = document.getElementById('arrivalDate')?.value.trim();
         const arrivalTime = document.getElementById('arrivalTime')?.value.trim();
         const flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim();
@@ -1773,7 +2038,9 @@ function validateTransportationSection(section) {
                 isValid = false;
             }
         } else if (section === 'return') {
-            const pickupLocation = document.getElementById('pickupLocation')?.value.trim();
+            const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim();
+            const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim();
+            const pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
             const arrivalDate = document.getElementById('arrivalDate')?.value.trim();
             const arrivalTime = document.getElementById('arrivalTime')?.value.trim();
             const flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim();
@@ -1797,9 +2064,124 @@ function validateTransportationSection(section) {
 }
 
 // Load tours information
+// Load tours into profile section
+function loadProfileTours(user) {
+    const profileToursSection = document.getElementById('profileToursSection');
+    if (!profileToursSection) return;
+    
+    if (window.firebase && firebase.firestore) {
+        const db = firebase.firestore();
+        // First get user's uniqueId
+        db.collection('users').doc(user.uid).get()
+            .then((userDoc) => {
+                if (userDoc.exists && userDoc.data().uniqueId) {
+                    const uniqueId = userDoc.data().uniqueId;
+                    // Get registration details
+                    return db.collection('registrations').doc(uniqueId).get()
+                        .then((regDoc) => {
+                            return { uniqueId, regDoc, user };
+                        })
+                        .catch((error) => {
+                            console.error('Error reading registration for tours:', error);
+                            return { uniqueId, regDoc: null, user };
+                        });
+                }
+                return { uniqueId: null, regDoc: null, user };
+            })
+            .catch((error) => {
+                console.error('Error loading tours info (initial fetch):', error);
+                return { uniqueId: null, regDoc: null, user };
+            })
+            .then((result) => {
+                if (!result || !result.uniqueId) {
+                    profileToursSection.style.display = 'none';
+                    return;
+                }
+                
+                const { regDoc } = result;
+                const data = regDoc && regDoc.exists ? regDoc.data() : {};
+                
+                // Get post shibir tour field
+                let postShibirTour = data.postShibirTour || 
+                                    data['Post Shibir Tour'] || 
+                                    data['Post Shibir Tours'] ||
+                                    data['Please select a post shibir tour option'] ||
+                                    null;
+                
+                // Fallback: try to find any field containing "tour" and "post"/"shibir"
+                if (!postShibirTour) {
+                    const allKeys = Object.keys(data);
+                    const tourKey = allKeys.find(key => {
+                        const lowerKey = key.toLowerCase();
+                        return (lowerKey.includes('tour') && (lowerKey.includes('post') || lowerKey.includes('shibir'))) ||
+                               (lowerKey.includes('post') && lowerKey.includes('shibir'));
+                    });
+                    
+                    if (tourKey) {
+                        postShibirTour = data[tourKey];
+                    }
+                }
+                
+                const tourValue = postShibirTour ? postShibirTour.toString().trim() : '';
+                
+                // Show tours section
+                profileToursSection.style.display = 'block';
+                
+                // Determine which tab to show based on tour selection
+                let activeTab = 'none';
+                if (tourValue) {
+                    const lowerValue = tourValue.toLowerCase();
+                    if (lowerValue.includes('srisailam')) {
+                        activeTab = 'srisailam';
+                    } else if (lowerValue.includes('kandakurthi')) {
+                        activeTab = 'kandakurthi';
+                    } else if (lowerValue.includes('yadadri') || lowerValue.includes('bhagyanagar')) {
+                        activeTab = 'yadadri';
+                    }
+                }
+                
+                // Switch to the appropriate tab
+                switchTourTab(activeTab);
+            })
+            .catch((error) => {
+                console.error('Error loading tours info:', error);
+                profileToursSection.style.display = 'none';
+            });
+    }
+}
+
+// Switch tour tab
+function switchTourTab(tabName) {
+    // Hide all tab panes
+    const tabPanes = document.querySelectorAll('.tour-tab-pane');
+    tabPanes.forEach(pane => pane.classList.remove('active'));
+    
+    // Remove active class from all tabs
+    const tabs = document.querySelectorAll('.tour-tab');
+    tabs.forEach(tab => tab.classList.remove('active'));
+    
+    // Show selected tab pane
+    const selectedPane = document.getElementById(`tourTab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`);
+    if (selectedPane) {
+        selectedPane.classList.add('active');
+    }
+    
+    // Activate selected tab button
+    const tabButtons = document.querySelectorAll('.tour-tab');
+    tabButtons.forEach((btn, index) => {
+        const tabNames = ['none', 'srisailam', 'kandakurthi', 'yadadri'];
+        if (tabNames[index] === tabName) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// Legacy function - kept for compatibility but redirects to profile tours
 function loadToursInfo(user) {
-    const toursInfo = document.getElementById('toursInfo');
-    if (!toursInfo) return;
+    // Tours are now part of My Profile, redirect if needed
+    if (user) {
+        loadProfileTours(user);
+    }
     
     if (window.firebase && firebase.firestore) {
         const db = firebase.firestore();

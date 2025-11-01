@@ -99,7 +99,6 @@ async function importData() {
 
             // Use Praveshika ID as document ID in registrations collection
             // Firestore document IDs can contain "/" but ensure it's a proper string
-            console.log(`Creating document with ID: "${praveshikaIdString}" (normalized: ${normalizedPraveshikaId})`);
             await db.collection('registrations').doc(praveshikaIdString).set(registrationData);
             console.log(`✓ Imported: ${praveshikaId} - ${name || 'N/A'}`);
             successCount++;
