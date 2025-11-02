@@ -476,7 +476,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         emailjs.send(EMAILJS_CONFIG.SERVICE_ID, EMAILJS_CONFIG.TEMPLATE_ID, templateParams)
                             .then((response) => {
-                                console.log('Email sent successfully:', response.status, response.text);
                                 resolve(response);
                             })
                             .catch((emailError) => {
@@ -512,7 +511,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         })
                         .catch((emailError) => {
                             // Email failed but message saved to Firestore - still show success
-                            console.warn('Email sending failed, but message saved to database:', emailError);
                             showNotification('Your message has been received. We will get back to you soon.', 'success');
                             contactForm.reset();
                         });
@@ -684,7 +682,6 @@ function refreshAssociatedRegistrations(user) {
     return db.collection('users').doc(user.uid).get()
         .then((userDoc) => {
             if (!userDoc.exists) {
-                console.log('User document does not exist yet');
                 return null;
             }
             
@@ -700,9 +697,6 @@ function refreshAssociatedRegistrations(user) {
                         const emailToUidsData = emailToUidsDoc.data();
                         const uidsFromEmailToUids = emailToUidsData.uids || [];
                         allUniqueIds = [...uidsFromEmailToUids];
-                        console.log(`Found ${allUniqueIds.length} uniqueIds in emailToUids for ${normalizedEmail}:`, allUniqueIds);
-                    } else {
-                        console.log(`No emailToUids document found for ${normalizedEmail}`);
                     }
                     
                     // Always include primary uniqueId
@@ -753,7 +747,6 @@ function refreshAssociatedRegistrations(user) {
                                         index === self.findIndex(r => r.uniqueId === reg.uniqueId)
                                     );
                                 
-                                console.log(`Updating user document with ${validRegistrations.length} associated registrations:`, validRegistrations);
                                 
                                 // Update user document with refreshed associated registrations
                                 return db.collection('users').doc(user.uid).update({
@@ -802,7 +795,6 @@ function handleLoginSuccess(loginForm) {
         if (user) {
             refreshAssociatedRegistrations(user)
                 .then(() => {
-                    console.log('Associated registrations refreshed after login');
                 })
                 .catch((error) => {
                     console.error('Error refreshing associated registrations after login:', error);
@@ -1513,7 +1505,6 @@ function loadUserProfile(user) {
                 const normalizedEmail = userEmail.toLowerCase().trim();
                 
                 // Check emailToUids collection to see if there are any new uniqueIds
-                console.log(`Loading profile for email: ${normalizedEmail}, primaryUniqueId: ${primaryUniqueId}`);
                 return db.collection('emailToUids').doc(normalizedEmail).get()
                     .then((emailToUidsDoc) => {
                         let allUniqueIds = [];
@@ -1524,20 +1515,11 @@ function loadUserProfile(user) {
                             const emailToUidsData = emailToUidsDoc.data();
                             const uidsFromEmailToUids = emailToUidsData.uids || [];
                             allUniqueIds = [...uidsFromEmailToUids];
-                            console.log(`Found emailToUids document for "${normalizedEmail}" with ${allUniqueIds.length} uniqueIds:`, allUniqueIds);
-                            console.log(`EmailToUids data:`, {
-                                email: emailToUidsData.email,
-                                count: emailToUidsData.count,
-                                uids: uidsFromEmailToUids
-                            });
-                        } else {
-                            console.log(`No emailToUids document found for "${normalizedEmail}"`);
                         }
                         
                         // Always include primary uniqueId
                         if (primaryUniqueId && !allUniqueIds.includes(primaryUniqueId)) {
                             allUniqueIds.push(primaryUniqueId);
-                            console.log(`Added primary uniqueId ${primaryUniqueId} to list`);
                         }
                         
                         // Get current associated registrations
@@ -1553,17 +1535,9 @@ function loadUserProfile(user) {
                         if (emailToUidsDoc.exists && allUniqueIds.length > 0) {
                             // Always update when emailToUids exists to ensure sync
                             needsUpdate = true;
-                            console.log(`emailToUids exists with ${allUniqueIds.length} uniqueIds, associatedRegistrations has ${currentUniqueIds.length} - updating`);
-                            if (newUniqueIds.length > 0) {
-                                console.log(`Found ${newUniqueIds.length} new uniqueIds:`, newUniqueIds);
-                            }
-                            if (missingUniqueIds.length > 0) {
-                                console.log(`Found ${missingUniqueIds.length} uniqueIds in associatedRegistrations but not in emailToUids:`, missingUniqueIds);
-                            }
                         } else if (newUniqueIds.length > 0) {
                             // Even if emailToUids doesn't exist, update if we have new uniqueIds
                             needsUpdate = true;
-                            console.log(`Found ${newUniqueIds.length} new uniqueIds for email:`, newUniqueIds);
                         }
                         
                         // If we need to update, fetch all new registrations and update the user document
@@ -1646,7 +1620,6 @@ function loadUserProfile(user) {
                 // If still no uniqueIds, fall back to associated registrations
                 if (uniqueIdsToFetch.length === 0) {
                     const associatedRegistrations = userData.associatedRegistrations || [];
-                    console.log('No uniqueIds from emailToUids, using associatedRegistrations:', associatedRegistrations);
                     associatedRegistrations.forEach(reg => {
                         if (reg.uniqueId && !uniqueIdsToFetch.includes(reg.uniqueId)) {
                             uniqueIdsToFetch.push(reg.uniqueId);
@@ -1654,7 +1627,6 @@ function loadUserProfile(user) {
                     });
                 }
                 
-                console.log(`Fetching registration data for ${uniqueIdsToFetch.length} uniqueIds:`, uniqueIdsToFetch);
                 
                 // Get userEmail for use in profile extraction
                 const userEmail = userData.email || user.email || '';
@@ -1677,20 +1649,8 @@ function loadUserProfile(user) {
                 
                 // Fetch all registration documents
                 const registrationPromises = uniqueIdsToFetch.map(uid => {
-                    console.log(`Fetching registration document for uniqueId: "${uid}"`);
                     return db.collection('registrations').doc(uid).get()
                         .then(regDoc => {
-                            if (regDoc.exists) {
-                                const regData = regDoc.data();
-                                console.log(`✓ Found registration document for ${uid}:`, {
-                                    exists: true,
-                                    uniqueId: regData.uniqueId,
-                                    name: regData.name || regData['Full Name'],
-                                    email: regData.email || regData['Email address']
-                                });
-                            } else {
-                                console.warn(`✗ Registration document does NOT exist for uniqueId: "${uid}"`);
-                            }
                             return {
                                 uniqueId: uid,
                                 data: regDoc.exists ? regDoc.data() : null,
@@ -1705,10 +1665,6 @@ function loadUserProfile(user) {
                 
                 return Promise.all(registrationPromises)
                     .then(registrationResults => {
-                        console.log(`Registration fetch results:`, registrationResults.map(r => ({
-                            uniqueId: r.uniqueId,
-                            exists: !!r.data
-                        })));
                         
                         // Extract profile data for each registration
                         const profiles = [];
@@ -1728,7 +1684,6 @@ function loadUserProfile(user) {
                             if (result.data) {
                                 // Use registration document data
                                 profileData = extractProfileData(result.data, userData, userEmail);
-                                console.log(`Added profile for uniqueId ${result.uniqueId} from registration document:`, profileData.name);
                             } else {
                                 // Registration document doesn't exist, try to use associated registration data
                                 const associatedReg = associatedRegMap.get(result.uniqueId);
@@ -1764,7 +1719,6 @@ function loadUserProfile(user) {
                                         pickupNeeded: '',
                                         dropoffNeeded: ''
                                     };
-                                    console.log(`Added profile for uniqueId ${result.uniqueId} from associatedRegistrations:`, profileData.name);
                                 } else {
                                     // No registration document and no associatedReg data, create minimal profile
                                     profileData = {
@@ -1797,7 +1751,6 @@ function loadUserProfile(user) {
                                         pickupNeeded: '',
                                         dropoffNeeded: ''
                                     };
-                                    console.warn(`No registration data found for uniqueId ${result.uniqueId}, creating minimal profile`);
                                 }
                             }
                             
@@ -1813,7 +1766,6 @@ function loadUserProfile(user) {
                         
                         // If no profiles found, try primary user data
                         if (profiles.length === 0 && primaryUniqueId) {
-                            console.log('No profiles from registrations, trying user document data');
                             const profileData = extractProfileData(userData, userData, userEmail);
                             if (profileData.name || profileData.email) {
                                 profiles.push(profileData);
@@ -1827,10 +1779,6 @@ function loadUserProfile(user) {
                             return;
                         }
                         
-                        console.log(`Rendering ${profiles.length} profile cards:`, profiles.map(p => ({
-                            uniqueId: p.uniqueId,
-                            name: p.name
-                        })));
                         
                         // Render all profile cards (first one expanded by default)
                         const cardsHTML = profiles.map((profile, index) => 
@@ -1981,7 +1929,6 @@ function loadTransportationInfo(user) {
                 const normalizedEmail = userEmail.toLowerCase().trim();
                 
                 // Check emailToUids collection to get all uniqueIds for this email
-                console.log(`Loading transportation for email: ${normalizedEmail}, primaryUniqueId: ${primaryUniqueId}`);
                 return db.collection('emailToUids').doc(normalizedEmail).get()
                     .then((emailToUidsDoc) => {
                         let allUniqueIds = [];
@@ -1991,21 +1938,16 @@ function loadTransportationInfo(user) {
                             const emailToUidsData = emailToUidsDoc.data();
                             const uidsFromEmailToUids = emailToUidsData.uids || [];
                             allUniqueIds = [...uidsFromEmailToUids];
-                            console.log(`Found emailToUids document for "${normalizedEmail}" with ${allUniqueIds.length} uniqueIds:`, allUniqueIds);
-                        } else {
-                            console.log(`No emailToUids document found for "${normalizedEmail}"`);
                         }
                         
                         // Always include primary uniqueId
                         if (primaryUniqueId && !allUniqueIds.includes(primaryUniqueId)) {
                             allUniqueIds.push(primaryUniqueId);
-                            console.log(`Added primary uniqueId ${primaryUniqueId} to list`);
                         }
                         
                         // If still no uniqueIds, fall back to associated registrations
                         if (allUniqueIds.length === 0) {
                             const associatedRegistrations = userData.associatedRegistrations || [];
-                            console.log('No uniqueIds from emailToUids, using associatedRegistrations:', associatedRegistrations);
                             associatedRegistrations.forEach(reg => {
                                 if (reg.uniqueId && !allUniqueIds.includes(reg.uniqueId)) {
                                     allUniqueIds.push(reg.uniqueId);
@@ -2045,8 +1987,6 @@ function loadTransportationInfo(user) {
                     return;
                 }
                 
-                console.log(`Fetching transportation data for ${uniqueIdsToFetch.length} uniqueIds:`, uniqueIdsToFetch);
-                
                 // Get associated registrations for name lookup fallback
                 const associatedRegistrations = userData.associatedRegistrations || [];
                 const nameLookup = {};
@@ -2058,7 +1998,6 @@ function loadTransportationInfo(user) {
                 
                 // Fetch all registration documents for transportation info
                 const registrationPromises = uniqueIdsToFetch.map(uid => {
-                    console.log(`Fetching registration document for uniqueId: "${uid}"`);
                     return db.collection('registrations').doc(uid).get()
                         .then(regDoc => {
                             if (regDoc.exists) {
@@ -2087,7 +2026,6 @@ function loadTransportationInfo(user) {
                                     returnFlightTrainNumber
                                 };
                             } else {
-                                console.warn(`✗ Registration document does NOT exist for uniqueId: "${uid}"`);
                                 // Use name from associatedRegistrations if available, otherwise use uniqueId as identifier
                                 const name = nameLookup[uid] || `User ${uid}`;
                                 return {
