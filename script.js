@@ -34,7 +34,7 @@ function waitForFirebase(callback, maxRetries = 50) {
 }
 
 // Protected tabs that require authentication
-const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation'];
+const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours'];
 
 // Helper function to check if a tab is protected
 function isProtectedTab(tabName) {
@@ -106,10 +106,12 @@ function activateTab(tabName, skipAuthCheck = false) {
                 switch(tabName) {
                     case 'myprofile':
                         loadUserProfile(user);
-                        loadProfileTours(user);
                         break;
                     case 'mytransportation':
                         loadTransportationInfo(user);
+                        break;
+                    case 'mytours':
+                        loadToursInfo(user);
                         break;
                 }
             }
@@ -143,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (hash) {
             // activateTab function will handle authentication check
             activateTab(hash);
-        } else {
+        } else {image.png
             activateTab('home');
         }
     });
@@ -192,6 +194,8 @@ function closeLogin() {
     const modal = document.getElementById('loginModal');
     modal.style.display = 'none';
     document.body.style.overflow = 'auto'; // Restore scrolling
+    // Reset to login form when closing
+    showLoginForm();
 }
 
 // Reset register form (defined early so it can be called elsewhere)
@@ -534,9 +538,81 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Forgot Password Functions
+function showForgotPassword() {
+    const loginContainer = document.getElementById('loginFormContainer');
+    const forgotContainer = document.getElementById('forgotPasswordFormContainer');
+    if (loginContainer && forgotContainer) {
+        loginContainer.style.display = 'none';
+        forgotContainer.style.display = 'block';
+    }
+}
+
+function showLoginForm() {
+    const loginContainer = document.getElementById('loginFormContainer');
+    const forgotContainer = document.getElementById('forgotPasswordFormContainer');
+    if (loginContainer && forgotContainer) {
+        loginContainer.style.display = 'block';
+        forgotContainer.style.display = 'none';
+    }
+}
+
+// Forgot Password Form Submission
+document.addEventListener('DOMContentLoaded', function() {
+    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+    if (forgotPasswordForm) {
+        forgotPasswordForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('forgotPasswordEmail').value.trim();
+            
+            if (!email) {
+                showNotification('Please enter your email address.', 'error');
+                return;
+            }
+            
+            if (!isValidEmail(email)) {
+                showNotification('Please enter a valid email address.', 'error');
+                return;
+            }
+            
+            // Firebase password reset
+            if (window.firebase && firebase.auth) {
+                showNotification('Sending password reset email...', 'info');
+                
+                firebase.auth().sendPasswordResetEmail(email)
+                    .then(() => {
+                        showNotification('Password reset email sent! Please check your inbox.', 'success');
+                        setTimeout(() => {
+                            closeLogin();
+                            showLoginForm(); // Reset to login form
+                        }, 2000);
+                    })
+                    .catch((error) => {
+                        let errorMessage = 'Error sending password reset email. ';
+                        
+                        if (error.code === 'auth/user-not-found') {
+                            errorMessage = 'No account found with this email address.';
+                        } else if (error.code === 'auth/invalid-email') {
+                            errorMessage = 'Invalid email address.';
+                        } else if (error.code === 'auth/too-many-requests') {
+                            errorMessage = 'Too many requests. Please try again later.';
+                        } else {
+                            errorMessage += error.message || 'Please try again.';
+                        }
+                        
+                        showNotification(errorMessage, 'error');
+                    });
+            } else {
+                showNotification('Firebase not initialized. Please check your configuration.', 'error');
+            }
+        });
+    }
+});
+
 // Login Form Submission - Supports Email or UniqueID
 document.addEventListener('DOMContentLoaded', function() {
-    const loginForm = document.querySelector('.login-form');
+    const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -845,20 +921,35 @@ document.addEventListener('DOMContentLoaded', function() {
         registerForm.addEventListener('submit', function(e) {
             e.preventDefault();
             const uniqueId = document.getElementById('regUniqueId').value.trim(); // This is Praveshika ID
+            const email = document.getElementById('regEmail').value.trim();
 
+            // Validate both fields are provided
             if (!uniqueId) {
                 showNotification('Please enter your Praveshika ID.', 'error');
                 return;
             }
 
+            if (!email) {
+                showNotification('Please enter your email address.', 'error');
+                return;
+            }
+
+            // Basic email format validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showNotification('Please enter a valid email address.', 'error');
+                return;
+            }
+
             // Normalize the input Praveshika ID
             const normalizedId = normalizePraveshikaId(uniqueId);
+            const normalizedEmail = email.toLowerCase().trim();
 
             // Verify with Firestore using normalized Praveshika ID
             if (window.firebase && firebase.firestore) {
                 const db = firebase.firestore();
                 
-                showNotification('Verifying your Praveshika ID...', 'info');
+                showNotification('Verifying your Praveshika ID and email...', 'info');
                 
                 // Strategy: Get all registrations and search for matching normalized ID
                 // This works even without indexes and handles both normalizedId field and document ID normalization
@@ -893,24 +984,56 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         
                         const data = matchingDoc.data();
+                        const storedEmail = data.email ? data.email.toLowerCase().trim() : '';
                         
-                        // Verification successful - show password setup
-                        pendingRegistration = {
-                            name: data.name || '',
-                            uniqueId: actualPraveshikaId, // Use actual document ID
-                            email: data.email || ''
-                        };
+                        // Validate that the email matches the one stored for this Praveshika ID
+                        if (!storedEmail || storedEmail !== normalizedEmail) {
+                            showNotification('Email does not match the one associated with this Praveshika ID.', 'error');
+                            return;
+                        }
                         
-                        // Switch to password setup form
-                        document.getElementById('registerVerifyForm').style.display = 'none';
-                        document.getElementById('registerPasswordForm').style.display = 'block';
-                        showNotification('Verification successful! Please set a password.', 'success');
+                        // Check if Firebase Auth account already exists for this email
+                        return firebase.auth().fetchSignInMethodsForEmail(data.email || email)
+                            .then((signInMethods) => {
+                                if (signInMethods && signInMethods.length > 0) {
+                                    // Account already exists
+                                    showNotification('An account with this email already exists. Please login instead.', 'error');
+                                    // Close register modal and open login modal
+                                    closeRegister();
+                                    setTimeout(() => {
+                                        // Pre-fill the login form with the email
+                                        const loginIdentifier = document.getElementById('loginIdentifier');
+                                        if (loginIdentifier) {
+                                            loginIdentifier.value = data.email || email;
+                                        }
+                                        openLogin();
+                                    }, 300);
+                                    return;
+                                }
+                                
+                                // Account doesn't exist - proceed with registration
+                                // Verification successful - show password setup
+                                pendingRegistration = {
+                                    name: data.name || '',
+                                    uniqueId: actualPraveshikaId, // Use actual document ID
+                                    email: data.email || email // Use stored email to preserve exact format
+                                };
+                                
+                                // Switch to password setup form
+                                document.getElementById('registerVerifyForm').style.display = 'none';
+                                document.getElementById('registerPasswordForm').style.display = 'block';
+                                showNotification('Verification successful! Please set a password.', 'success');
+                            });
                     })
                     .catch(err => {
-                        console.error('Firestore error:', err);
+                        console.error('Verification error:', err);
                         let errorMsg = 'Verification error. Please try again.';
                         if (err.code === 'permission-denied') {
                             errorMsg = 'Permission denied. Please check Firestore security rules.';
+                        } else if (err.code === 'auth/invalid-email') {
+                            errorMsg = 'Invalid email address.';
+                        } else if (err.code === 'auth/too-many-requests') {
+                            errorMsg = 'Too many requests. Please try again later.';
                         } else if (err.message) {
                             errorMsg = err.message;
                         }
@@ -1166,14 +1289,12 @@ function updateAuthUI() {
                 if (myProfileNavItem) {
                     myProfileNavItem.style.display = '';
                     loadUserProfile(user);
-                    loadProfileTours(user);
                 }
                 if (myTransportationNavItem) {
                     myTransportationNavItem.style.display = '';
                     loadTransportationInfo(user);
                 }
-                // Tours are now part of My Profile
-                if (false) {
+                if (myToursNavItem) {
                     myToursNavItem.style.display = '';
                     loadToursInfo(user);
                 }
@@ -1205,7 +1326,9 @@ function updateAuthUI() {
                 if (myTransportationNavItem) {
                     myTransportationNavItem.style.display = 'none';
                 }
-            // Tours are now part of My Profile, no separate nav item needed
+                if (myToursNavItem) {
+                    myToursNavItem.style.display = 'none';
+                }
                 
                 // If user is on protected tab, redirect to home
                 const currentHash = window.location.hash.substring(1);
@@ -1223,13 +1346,14 @@ function updateAuthUI() {
             const shibirarthiNavItem = document.getElementById('shibirarthiNavItem');
             const myProfileNavItem = document.getElementById('myProfileNavItem');
             const myTransportationNavItem = document.getElementById('myTransportationNavItem');
+            const myToursNavItem = document.getElementById('myToursNavItem');
             if (homeNavItem) homeNavItem.style.display = '';
             if (aboutNavItem) aboutNavItem.style.display = '';
             if (mediaNavItem) mediaNavItem.style.display = '';
             if (shibirarthiNavItem) shibirarthiNavItem.style.display = 'none';
             if (myProfileNavItem) myProfileNavItem.style.display = 'none';
             if (myTransportationNavItem) myTransportationNavItem.style.display = 'none';
-            // Tours are now part of My Profile
+            if (myToursNavItem) myToursNavItem.style.display = 'none';
         }
     });
 }
@@ -1276,7 +1400,7 @@ function extractProfileData(data, userData = null, userEmail = '') {
                     return escapeHtml(str);
                 }
                 
-// Helper function to create profile card HTML for a single person
+// Helper function to create profile card HTML for a single person (for tabs - no collapse)
 function createProfileCardHTML(profileData, index, isExpanded = false) {
     const { name, email, uniqueId, country, shreni, barcode, phone, whatsapp, address, city, state, postalCode,
             gender, age, occupation, educationalQual, zone, ganveshSize, sanghYears, hssResponsibility,
@@ -1290,23 +1414,7 @@ function createProfileCardHTML(profileData, index, isExpanded = false) {
                 const safeBarcode = escapeHtml(barcode || uniqueId || '');
                 
     return `
-        <div class="user-profile-card ${isExpanded ? 'expanded' : ''}" data-card-index="${index}">
-            <div class="user-profile-card-header" onclick="toggleProfileCard(${index})">
-                <div class="user-profile-card-summary">
-                    <div class="user-profile-name">
-                        <strong>${formatValue(name)}</strong>
-                        ${uniqueId ? `<span class="user-profile-id">ID: ${formatValue(uniqueId)}</span>` : ''}
-                    </div>
-                    <div class="user-profile-basic-info">
-                        ${country ? `<span class="user-profile-badge">${formatValue(country)}</span>` : ''}
-                        ${shreni ? `<span class="user-profile-badge">${formatValue(shreni)}</span>` : ''}
-                    </div>
-                </div>
-                <div class="user-profile-card-toggle">
-                    <span class="toggle-icon">${isExpanded ? '▼' : '▶'}</span>
-                </div>
-            </div>
-            <div class="user-profile-card-content" style="display: ${isExpanded ? 'block' : 'none'};">
+        <div class="profile-tab-pane ${isExpanded ? 'active' : ''}" id="profileTab${index}" style="display: ${isExpanded ? 'block' : 'none'};">
                 <div class="user-profile-card-actions">
                     <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); showBadge('${safeName}', '${safeCountry}', '${safeShreni}', '${safeBarcode}', '${safeUniqueId}');">
                             📇 View Badge
@@ -1459,27 +1567,54 @@ function createProfileCardHTML(profileData, index, isExpanded = false) {
                         </div>` : ''}
                 </div>
             </div>
-                    </div>
-                `;
+        </div>
+    `;
 }
 
-// Global function to toggle profile card expand/collapse
-function toggleProfileCard(index) {
-    const card = document.querySelector(`.user-profile-card[data-card-index="${index}"]`);
-    if (!card) return;
+// Helper function to create profile tab button HTML - similar to tour tabs
+function createProfileTabHTML(profileData, index, isActive = false) {
+    const { name, uniqueId } = profileData;
+    const displayName = name && name.trim() ? name : (uniqueId || 'Unknown User');
     
-    const content = card.querySelector('.user-profile-card-content');
-    const toggleIcon = card.querySelector('.toggle-icon');
-    const isExpanded = card.classList.contains('expanded');
+    return `
+        <button class="profile-tab-btn ${isActive ? 'active' : ''}" onclick="switchProfileTab(${index})" data-tab-index="${index}">
+            ${escapeHtml(displayName)}
+        </button>
+    `;
+}
+
+// Function to switch profile tabs
+function switchProfileTab(index) {
+    // Remove active class from all tab buttons first
+    const tabButtons = document.querySelectorAll('.profile-tab-btn');
+    tabButtons.forEach(btn => btn.classList.remove('active'));
     
-    if (isExpanded) {
-        card.classList.remove('expanded');
-        content.style.display = 'none';
-        if (toggleIcon) toggleIcon.textContent = '▶';
-    } else {
-        card.classList.add('expanded');
-        content.style.display = 'block';
-        if (toggleIcon) toggleIcon.textContent = '▼';
+    // Hide all tab panes immediately
+    const tabPanes = document.querySelectorAll('.profile-tab-pane');
+    tabPanes.forEach(pane => {
+        pane.classList.remove('active');
+        pane.style.display = 'none';
+        // Ensure no residual styling
+        pane.style.height = '';
+        pane.style.overflow = '';
+    });
+    
+    // Show selected tab pane
+    const selectedPane = document.getElementById(`profileTab${index}`);
+    if (selectedPane) {
+        selectedPane.classList.add('active');
+        selectedPane.style.display = 'block';
+    }
+    
+    // Activate selected tab button
+    const selectedButton = document.querySelector(`.profile-tab-btn[data-tab-index="${index}"]`);
+    if (selectedButton) {
+        selectedButton.classList.add('active');
+    }
+    
+    // Force a reflow to ensure layout updates immediately
+    if (selectedPane) {
+        selectedPane.offsetHeight;
     }
 }
 
@@ -1780,14 +1915,23 @@ function loadUserProfile(user) {
                         }
                         
                         
-                        // Render all profile cards (first one expanded by default)
-                        const cardsHTML = profiles.map((profile, index) => 
+                        // Create tabs and tab panes
+                        const tabsHTML = profiles.map((profile, index) => 
+                            createProfileTabHTML(profile, index, index === 0)
+                        ).join('');
+                        
+                        const panesHTML = profiles.map((profile, index) => 
                             createProfileCardHTML(profile, index, index === 0)
                         ).join('');
                         
                         profileInfo.innerHTML = `
-                            <div class="user-profiles-container">
-                                ${cardsHTML}
+                            <div class="profile-tabs-container">
+                                <div class="profile-tabs">
+                                    ${tabsHTML}
+                                </div>
+                                <div class="profile-tab-content">
+                                    ${panesHTML}
+                                </div>
                             </div>
                         `;
                     });
@@ -2794,11 +2938,10 @@ function validateTransportationSection(section) {
     }
 }
 
-// Load tours information
-// Load tours into profile section
-function loadProfileTours(user) {
-    const profileToursSection = document.getElementById('profileToursSection');
-    if (!profileToursSection) return;
+// Load tours information - now in separate tab
+function loadToursInfo(user) {
+    const toursInfo = document.getElementById('toursInfo');
+    if (!toursInfo) return;
     
     if (window.firebase && firebase.firestore) {
         const db = firebase.firestore();
@@ -2855,231 +2998,103 @@ function loadProfileTours(user) {
                 
                 const tourValue = postShibirTour ? postShibirTour.toString().trim() : '';
                 
-                // Show tours section
-                profileToursSection.style.display = 'block';
-                
-                // Determine which tab to show based on tour selection
+                // Display tour information
+                const tourValueLower = tourValue.toLowerCase();
                 let activeTab = 'none';
-                if (tourValue) {
-                    const lowerValue = tourValue.toLowerCase();
-                    if (lowerValue.includes('srisailam')) {
-                        activeTab = 'srisailam';
-                    } else if (lowerValue.includes('kandakurthi')) {
-                        activeTab = 'kandakurthi';
-                    } else if (lowerValue.includes('yadadri') || lowerValue.includes('bhagyanagar')) {
-                        activeTab = 'yadadri';
-                    }
+                if (tourValueLower.includes('srisailam')) {
+                    activeTab = 'srisailam';
+                } else if (tourValueLower.includes('kandakurthi')) {
+                    activeTab = 'kandakurthi';
+                } else if (tourValueLower.includes('yadadri') || tourValueLower.includes('bhagyanagar')) {
+                    activeTab = 'yadadri';
                 }
                 
-                // Switch to the appropriate tab
-                switchTourTab(activeTab);
+                // Display tours with tabs
+                toursInfo.innerHTML = `
+                    <div class="tours-tabs">
+                        <button class="tour-tab ${activeTab === 'none' ? 'active' : ''}" onclick="switchTourTab('none')">None</button>
+                        <button class="tour-tab ${activeTab === 'srisailam' ? 'active' : ''}" onclick="switchTourTab('srisailam')">Srisailam</button>
+                        <button class="tour-tab ${activeTab === 'kandakurthi' ? 'active' : ''}" onclick="switchTourTab('kandakurthi')">Kandakurthi</button>
+                        <button class="tour-tab ${activeTab === 'yadadri' ? 'active' : ''}" onclick="switchTourTab('yadadri')">Yadadri</button>
+                    </div>
+                    <div class="tour-tab-content">
+                        <div id="tourTabNone" class="tour-tab-pane ${activeTab === 'none' ? 'active' : ''}" style="display: ${activeTab === 'none' ? 'block' : 'none'};">
+                            <div class="tour-content">
+                                <p class="tour-message">Shubh Yatra</p>
+                                <p class="tour-description">No post shibir tour selected.</p>
+                            </div>
+                        </div>
+                        <div id="tourTabSrisailam" class="tour-tab-pane ${activeTab === 'srisailam' ? 'active' : ''}" style="display: ${activeTab === 'srisailam' ? 'block' : 'none'};">
+                            <div class="tour-content">
+                                <img src="docs/Srisailam.jpg" alt="Srisailam" class="tour-image" onerror="this.style.display='none'">
+                                <p class="tour-description">Information about the Srisailam tour will be displayed here.</p>
+                                ${tourValue ? `<p class="tour-description">Selected: ${escapeHtml(tourValue)}</p>` : ''}
+                            </div>
+                        </div>
+                        <div id="tourTabKandakurthi" class="tour-tab-pane ${activeTab === 'kandakurthi' ? 'active' : ''}" style="display: ${activeTab === 'kandakurthi' ? 'block' : 'none'};">
+                            <div class="tour-content">
+                                <img src="docs/Kandakurthi.jpg" alt="Kandakurthi" class="tour-image" onerror="this.style.display='none'">
+                                <p class="tour-description">Information about the Kandakurthi tour will be displayed here.</p>
+                                ${tourValue ? `<p class="tour-description">Selected: ${escapeHtml(tourValue)}</p>` : ''}
+                            </div>
+                        </div>
+                        <div id="tourTabYadadri" class="tour-tab-pane ${activeTab === 'yadadri' ? 'active' : ''}" style="display: ${activeTab === 'yadadri' ? 'block' : 'none'};">
+                            <div class="tour-content">
+                                <p class="tour-description">Information about Yadadri Mandir and local sites in Bhagyanagar tour will be displayed here.</p>
+                                ${tourValue ? `<p class="tour-description">Selected: ${escapeHtml(tourValue)}</p>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
             })
             .catch((error) => {
                 console.error('Error loading tours info:', error);
-                profileToursSection.style.display = 'none';
+                toursInfo.innerHTML = '<p>Error loading tour information.</p>';
             });
     }
+}
+
+// Legacy function - kept for compatibility
+function loadProfileTours(user) {
+    // Tours are now in a separate tab, redirect to that functionality
+    loadToursInfo(user);
 }
 
 // Switch tour tab
 function switchTourTab(tabName) {
     // Hide all tab panes
     const tabPanes = document.querySelectorAll('.tour-tab-pane');
-    tabPanes.forEach(pane => pane.classList.remove('active'));
+    tabPanes.forEach(pane => {
+        pane.classList.remove('active');
+        pane.style.display = 'none';
+    });
     
     // Remove active class from all tabs
     const tabs = document.querySelectorAll('.tour-tab');
     tabs.forEach(tab => tab.classList.remove('active'));
     
     // Show selected tab pane
-    const selectedPane = document.getElementById(`tourTab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`);
+    const tabNameCapitalized = tabName.charAt(0).toUpperCase() + tabName.slice(1);
+    const selectedPane = document.getElementById(`tourTab${tabNameCapitalized}`);
     if (selectedPane) {
         selectedPane.classList.add('active');
+        selectedPane.style.display = 'block';
     }
     
     // Activate selected tab button
     const tabButtons = document.querySelectorAll('.tour-tab');
-    tabButtons.forEach((btn, index) => {
-        const tabNames = ['none', 'srisailam', 'kandakurthi', 'yadadri'];
-        if (tabNames[index] === tabName) {
+    tabButtons.forEach((btn) => {
+        const btnOnClick = btn.getAttribute('onclick');
+        if (btnOnClick && btnOnClick.includes(`'${tabName}'`)) {
             btn.classList.add('active');
         }
     });
 }
 
-// Legacy function - kept for compatibility but redirects to profile tours
-function loadToursInfo(user) {
-    // Tours are now part of My Profile, redirect if needed
-    if (user) {
-        loadProfileTours(user);
-    }
-    
-    if (window.firebase && firebase.firestore) {
-        const db = firebase.firestore();
-        // First get user's uniqueId
-        db.collection('users').doc(user.uid).get()
-            .then((userDoc) => {
-                if (userDoc.exists && userDoc.data().uniqueId) {
-                    const uniqueId = userDoc.data().uniqueId;
-                    // Get registration details
-                    return db.collection('registrations').doc(uniqueId).get()
-                        .then((regDoc) => {
-                            return { uniqueId, regDoc, user };
-                        })
-                        .catch((error) => {
-                            console.error('Error reading registration for tours:', error);
-                            // Still return with user data even if registration fails
-                            return { uniqueId, regDoc: null, user };
-                        });
-                }
-                return { uniqueId: null, regDoc: null, user };
-            })
-            .catch((error) => {
-                console.error('Error loading tours info (initial fetch):', error);
-                // Return null data so we can still show "None" state
-                return { uniqueId: null, regDoc: null, user };
-            })
-            .then((result) => {
-                if (!result) {
-                    if (toursInfo) {
-                        toursInfo.innerHTML = '<p>Error loading tour information.</p>';
-                    }
-                    return;
-                }
-                
-                const { uniqueId, regDoc, user: userObj } = result;
-                
-                // If no uniqueId, show error
-                if (!uniqueId) {
-                    if (toursInfo) {
-                        toursInfo.innerHTML = '<p>Error: User unique ID not found. Please complete your registration first.</p>';
-                    }
-                    return;
-                }
-
-                const data = regDoc && regDoc.exists ? regDoc.data() : {};
-                
-                // Get post shibir tour field - check multiple possible field names
-                let postShibirTour = data.postShibirTour || 
-                                    data['Post Shibir Tour'] || 
-                                    data['Post Shibir Tours'] ||
-                                    data['Please select a post shibir tour option'] ||
-                                    null;
-                
-                // Fallback: try to find any field containing "tour" and "post"/"shibir"
-                if (!postShibirTour) {
-                    const allKeys = Object.keys(data);
-                    const tourKey = allKeys.find(key => {
-                        const lowerKey = key.toLowerCase();
-                        return (lowerKey.includes('tour') && (lowerKey.includes('post') || lowerKey.includes('shibir'))) ||
-                               (lowerKey.includes('post') && lowerKey.includes('shibir'));
-                    });
-                    
-                    if (tourKey) {
-                        postShibirTour = data[tourKey];
-                    }
-                }
-                
-                const tourValue = postShibirTour ? postShibirTour.toString().trim() : '';
-                
-                const isNone = !tourValue || tourValue === '' || tourValue.toLowerCase() === 'none' || 
-                              tourValue === 'N/A' || tourValue === 'null' || tourValue === 'undefined';
-                const isSrisailam = tourValue && tourValue.toLowerCase().includes('srisailam');
-                const isKandakurthi = tourValue && tourValue.toLowerCase().includes('kandakurthi');
-
-                const isEditMode = toursInfo && toursInfo.dataset && toursInfo.dataset.editMode === 'true';
-
-                if (!isEditMode) {
-                    // Display mode
-                    if (isNone) {
-                        toursInfo.innerHTML = `
-                            <div class="tours-display">
-                                <h3>Post Shibir Tour</h3>
-                                <div class="tours-content-display">
-                                    <p class="tour-message">Shubh Yatra</p>
-                                    <p class="tour-description">No post shibir tour selected.</p>
-                                </div>
-                                <div class="tours-actions">
-                                    <button class="btn btn-primary" onclick="editToursInfo('${uniqueId}')">
-                                        ✏️ Change Tour Selection
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    } else if (isSrisailam) {
-                        toursInfo.innerHTML = `
-                            <div class="tours-display">
-                                <h3>Post Shibir Tour: Srisailam</h3>
-                                <div class="tours-content-display">
-                                    <img src="docs/Srisailam.jpg" alt="Srisailam" class="tour-image" onerror="this.style.display='none'">
-                                    <p class="tour-description">Selected: ${escapeHtml(tourValue)}</p>
-                                </div>
-                                <div class="tours-actions">
-                                    <button class="btn btn-primary" onclick="editToursInfo('${uniqueId}')">
-                                        ✏️ Change Tour Selection
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    } else if (isKandakurthi) {
-                        toursInfo.innerHTML = `
-                            <div class="tours-display">
-                                <h3>Post Shibir Tour: Kandakurthi</h3>
-                                <div class="tours-content-display">
-                                    <img src="docs/Kandakurthi.jpg" alt="Kandakurthi" class="tour-image" onerror="this.style.display='none'">
-                                    <p class="tour-description">Selected: ${escapeHtml(tourValue)}</p>
-                                </div>
-                                <div class="tours-actions">
-                                    <button class="btn btn-primary" onclick="editToursInfo('${uniqueId}')">
-                                        ✏️ Change Tour Selection
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    } else {
-                        toursInfo.innerHTML = `
-                            <div class="tours-display">
-                                <h3>Post Shibir Tour</h3>
-                                <div class="tours-content-display">
-                                    <p class="tour-description">Selected: ${escapeHtml(tourValue)}</p>
-                                </div>
-                                <div class="tours-actions">
-                                    <button class="btn btn-primary" onclick="editToursInfo('${uniqueId}')">
-                                        ✏️ Change Tour Selection
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    }
-                }
-            })
-            .catch((error) => {
-                console.error('Error loading tours info:', error);
-                if (toursInfo) {
-                    // Show default "None" state on error
-                    toursInfo.innerHTML = `
-                        <div class="tours-display">
-                            <h3>Post Shibir Tour</h3>
-                            <div class="tours-content-display">
-                                <p class="tour-message">Shubh Yatra</p>
-                                <p class="tour-description">No post shibir tour selected.</p>
-                                <p style="color: #999; font-size: 0.9rem; margin-top: 1rem;">Note: Unable to load saved tour information. You can still select a tour.</p>
-                            </div>
-                            <div class="tours-actions">
-                                <button class="btn btn-primary" onclick="editToursInfo('')">
-                                    ✏️ Change Tour Selection
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }
-            });
-    } else {
-        // Firebase not available
-        if (toursInfo) {
-            toursInfo.innerHTML = '<p>Firebase not initialized. Please refresh the page.</p>';
-        }
-    }
+// Legacy function - kept for compatibility
+function loadProfileTours(user) {
+    // Tours are now in a separate tab, redirect to that functionality
+    loadToursInfo(user);
 }
 
 // Edit tours information

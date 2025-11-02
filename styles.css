@@ -818,6 +818,17 @@ body {
     text-align: center;
 }
 
+.login-note a {
+    color: var(--primary-brown);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.login-note a:hover {
+    color: var(--accent-orange);
+    text-decoration: underline;
+}
+
 .register-error {
     margin-top: 1rem;
     padding: 0.75rem 1rem;
@@ -1996,6 +2007,59 @@ body {
     font-weight: 600;
 }
 
+/* Profile Tabs Container - Similar to Tours Tabs */
+.profile-tabs-container {
+    margin-top: 2rem;
+}
+
+.profile-tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--light-cream);
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.profile-tab-btn {
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-dark);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+}
+
+.profile-tab-btn:hover {
+    color: var(--primary-brown);
+    background: var(--light-cream);
+}
+
+.profile-tab-btn.active {
+    color: var(--primary-brown);
+    border-bottom-color: var(--primary-brown);
+    background: var(--light-cream);
+}
+
+.profile-tab-content {
+    position: relative;
+    min-height: 0;
+}
+
+.profile-tab-pane {
+    display: none;
+    width: 100%;
+    overflow: hidden;
+}
+
+.profile-tab-pane.active {
+    display: block;
+    animation: fadeIn 0.3s ease-in;
+}
+
 /* User Profile Cards Container */
 .user-profiles-container {
     display: flex;
@@ -2125,7 +2189,7 @@ body {
 }
 
 .user-profile-card-actions {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     padding-bottom: 1rem;
     border-bottom: 2px solid var(--light-cream);
 }

@@ -52,6 +52,7 @@
                     </ul>
                 </li>
                 <li id="myTransportationNavItem" style="display: none;"><a href="#mytransportation" class="nav-link" data-tab="mytransportation">My Transportation</a></li>
+                <li id="myToursNavItem" style="display: none;"><a href="#mytours" class="nav-link" data-tab="mytours">My Tours</a></li>
                 <!-- <li><a href="#documents" class="nav-link" data-tab="documents">Documents</a></li> -->
                 <li id="mediaNavItem"><a href="#media" class="nav-link" data-tab="media">Media</a></li>
                 <!-- <li><a href="#donate" class="nav-link" data-tab="donate">Donate</a></li> -->
@@ -492,41 +493,6 @@
                         <p>Loading profile information...</p>
                     </div>
                     
-                    <!-- Tours Section with Horizontal Tabs -->
-                    <div id="profileToursSection" class="profile-tours-section" style="display: none;">
-                        <h3>Post Shibir Tours</h3>
-                        <div class="tours-tabs">
-                            <button class="tour-tab active" onclick="switchTourTab('none')">None</button>
-                            <button class="tour-tab" onclick="switchTourTab('srisailam')">Srisailam</button>
-                            <button class="tour-tab" onclick="switchTourTab('kandakurthi')">Kandakurthi</button>
-                            <button class="tour-tab" onclick="switchTourTab('yadadri')">Yadadri</button>
-                        </div>
-                        <div class="tour-tab-content">
-                            <div id="tourTabNone" class="tour-tab-pane active">
-                                <div class="tour-content">
-                                    <p class="tour-message">Shubh Yatra</p>
-                                    <p class="tour-description">No post shibir tour selected.</p>
-                                </div>
-                            </div>
-                            <div id="tourTabSrisailam" class="tour-tab-pane">
-                                <div class="tour-content">
-                                    <img src="docs/Srisailam.jpg" alt="Srisailam" class="tour-image" onerror="this.style.display='none'">
-                                    <p class="tour-description">Information about the Srisailam tour will be displayed here.</p>
-                                </div>
-                            </div>
-                            <div id="tourTabKandakurthi" class="tour-tab-pane">
-                                <div class="tour-content">
-                                    <img src="docs/Kandakurthi.jpg" alt="Kandakurthi" class="tour-image" onerror="this.style.display='none'">
-                                    <p class="tour-description">Information about the Kandakurthi tour will be displayed here.</p>
-                                </div>
-                            </div>
-                            <div id="tourTabYadadri" class="tour-tab-pane">
-                                <div class="tour-content">
-                                    <p class="tour-description">Information about Yadadri Mandir and local sites in Bhagyanagar tour will be displayed here.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </section>
@@ -541,6 +507,21 @@
                 <div class="transportation-content">
                     <div id="transportationInfo" class="transportation-card">
                         <p>Loading transportation information...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- My Tours Tab -->
+        <section id="mytours" class="tab-content">
+            <div class="container">
+                <div class="section-header">
+                    <h2>My Tours</h2>
+                    <p>View and manage your post shibir tour information</p>
+                </div>
+                <div class="tours-content">
+                    <div id="toursInfo" class="profile-tours-section">
+                        <p>Loading tour information...</p>
                     </div>
                 </div>
             </div>
@@ -618,17 +599,34 @@
         <div class="modal-content">
             <span class="close" onclick="closeLogin()">&times;</span>
             <h2>Login</h2>
-            <form class="login-form">
-                <div class="form-group">
-                    <input type="text" id="loginIdentifier" placeholder="Email or Praveshika ID" required>
-                </div>
-                <div class="form-group">
-                    <input type="password" id="loginPassword" placeholder="Password" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Login</button>
-            </form>
-            <p class="login-note">Login with your Praveshika ID or registered Email.</p>
-            <p class="login-note">Don't have an account? <a href="#" onclick="closeLogin(); openRegister(); return false;">Register</a></p>
+            <div id="loginFormContainer">
+                <form class="login-form" id="loginForm">
+                    <div class="form-group">
+                        <input type="text" id="loginIdentifier" placeholder="Email or Praveshika ID" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="loginPassword" placeholder="Password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+                <p class="login-note">Login with your Praveshika ID or registered Email.</p>
+                <p class="login-note">
+                    <a href="#" onclick="showForgotPassword(); return false;">Forgot Password?</a>
+                    <span style="margin: 0 0.5rem;">|</span>
+                    <a href="#" onclick="closeLogin(); openRegister(); return false;">Register</a>
+                </p>
+            </div>
+            <div id="forgotPasswordFormContainer" style="display: none;">
+                <form class="login-form" id="forgotPasswordForm">
+                    <div class="form-group">
+                        <input type="email" id="forgotPasswordEmail" placeholder="Enter your email address" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Send Reset Link</button>
+                </form>
+                <p class="login-note">
+                    <a href="#" onclick="showLoginForm(); return false;">Back to Login</a>
+                </p>
+            </div>
         </div>
     </div>
 
@@ -642,9 +640,12 @@
                     <div class="form-group">
                         <input type="text" id="regUniqueId" placeholder="Praveshika ID (e.g., AABB0000)" required>
                     </div>
+                    <div class="form-group">
+                        <input type="email" id="regEmail" placeholder="Email address" required>
+                    </div>
                     <button type="submit" class="btn btn-primary">Verify & Continue</button>
                 </form>
-                <p class="login-note">Enter your Praveshika ID to verify your registration.</p>
+                <p class="login-note">Enter your Praveshika ID and email to verify your registration.</p>
             </div>
             <div id="registerPasswordForm" style="display:none;">
                 <form class="password-setup-form">
