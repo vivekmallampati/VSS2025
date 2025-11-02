@@ -1858,108 +1858,297 @@ function loadUserProfile(user) {
     }
 }
 
+// Helper function to create transportation card HTML for a single person
+function createTransportationCardHTML(transportationData, index, isExpanded = false) {
+    const { name, uniqueId, pickupLocation, arrivalDate, arrivalTime, flightTrainNumber,
+            returnDate, returnTime, returnFlightTrainNumber } = transportationData;
+    
+    const safeName = escapeHtml(name || '');
+    const safeUniqueId = escapeHtml(uniqueId || '');
+    
+    const hasArrivalInfo = pickupLocation || arrivalDate || arrivalTime || flightTrainNumber;
+    const hasReturnInfo = returnDate || returnTime || returnFlightTrainNumber;
+    const hasAnyInfo = hasArrivalInfo || hasReturnInfo;
+    
+    // Display name - use uniqueId if name is missing or just "User {uniqueId}"
+    const displayName = name && !name.startsWith('User ') ? name : (uniqueId || 'Unknown User');
+    
+    return `
+        <div class="user-profile-card ${isExpanded ? 'expanded' : ''}" data-card-index="${index}">
+            <div class="user-profile-card-header" onclick="toggleTransportationCard(${index})">
+                <div class="user-profile-card-summary">
+                    <div class="user-profile-name">
+                        <strong>${formatValue(displayName)}</strong>
+                        ${uniqueId ? `<span class="user-profile-id">ID: ${formatValue(uniqueId)}</span>` : ''}
+                    </div>
+                    <div class="user-profile-basic-info">
+                        ${hasArrivalInfo ? `<span class="user-profile-badge">Arrival Info</span>` : ''}
+                        ${hasReturnInfo ? `<span class="user-profile-badge">Return Info</span>` : ''}
+                        ${!hasAnyInfo ? `<span class="user-profile-badge" style="background: #dc3545;">Missing Info</span>` : ''}
+                    </div>
+                </div>
+                <div class="user-profile-card-toggle">
+                    <span class="toggle-icon">${isExpanded ? '▼' : '▶'}</span>
+                </div>
+            </div>
+            <div class="user-profile-card-content" style="display: ${isExpanded ? 'block' : 'none'};">
+                <div class="user-profile-card-actions">
+                    ${hasArrivalInfo ? `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); editTransportationArrival('${safeUniqueId}');">✏️ Edit Arrival</button>` : ''}
+                    ${hasReturnInfo ? `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); editTransportationReturn('${safeUniqueId}');">✏️ Edit Return</button>` : ''}
+                    ${!hasArrivalInfo ? `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); editTransportationArrival('${safeUniqueId}');">✏️ Add Arrival</button>` : ''}
+                    ${!hasReturnInfo ? `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); editTransportationReturn('${safeUniqueId}');">✏️ Add Return</button>` : ''}
+                </div>
+                <div class="transportation-display">
+                    <div class="transportation-section">
+                        <h4 class="section-title">🛬 Arrival Information</h4>
+                        ${hasArrivalInfo ? `
+                        <div class="info-item">
+                            <span class="info-label">Pickup Location:</span>
+                            <span class="info-value">${formatValue(pickupLocation) || 'Not specified'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Date:</span>
+                            <span class="info-value">${formatValue(arrivalDate) || 'Not specified'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Time:</span>
+                            <span class="info-value">${formatValue(arrivalTime) || 'Not specified'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Flight/Train Number:</span>
+                            <span class="info-value">${formatValue(flightTrainNumber) || 'Not specified'}</span>
+                        </div>
+                        ` : '<p class="no-info">No arrival information provided</p>'}
+                    </div>
+                    <div class="transportation-section">
+                        <h4 class="section-title">🛫 Return Information</h4>
+                        ${hasReturnInfo ? `
+                        <div class="info-item">
+                            <span class="info-label">Date:</span>
+                            <span class="info-value">${formatValue(returnDate) || 'Not specified'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Time:</span>
+                            <span class="info-value">${formatValue(returnTime) || 'Not specified'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Flight/Train Number:</span>
+                            <span class="info-value">${formatValue(returnFlightTrainNumber) || 'Not specified'}</span>
+                        </div>
+                        ` : '<p class="no-info">No return information provided</p>'}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Global function to toggle transportation card expand/collapse
+function toggleTransportationCard(index) {
+    const card = document.querySelector(`.user-profile-card[data-card-index="${index}"]`);
+    if (!card) return;
+    
+    const content = card.querySelector('.user-profile-card-content');
+    const toggleIcon = card.querySelector('.toggle-icon');
+    const isExpanded = card.classList.contains('expanded');
+    
+    if (isExpanded) {
+        card.classList.remove('expanded');
+        content.style.display = 'none';
+        if (toggleIcon) toggleIcon.textContent = '▶';
+    } else {
+        card.classList.add('expanded');
+        content.style.display = 'block';
+        if (toggleIcon) toggleIcon.textContent = '▼';
+    }
+}
+
 // Load transportation information
 function loadTransportationInfo(user) {
     const transportationInfo = document.getElementById('transportationInfo');
     if (!transportationInfo) return;
     
+    // Reset edit mode
+    transportationInfo.dataset.editMode = 'false';
+    
     if (window.firebase && firebase.firestore) {
         const db = firebase.firestore();
-        // First get user's uniqueId
+        
+        // First get user document
         db.collection('users').doc(user.uid).get()
             .then((userDoc) => {
-                if (userDoc.exists && userDoc.data().uniqueId) {
-                    const uniqueId = userDoc.data().uniqueId;
-                    // Get registration details which may contain transportation info
-                    return db.collection('registrations').doc(uniqueId).get()
-                        .then((regDoc) => {
-                            return { uniqueId, regDoc, user };
-                        })
-                        .catch((error) => {
-                            console.error('Error reading registration for transportation:', error);
-                            return { uniqueId: userDoc.data().uniqueId, regDoc: null, user };
-                        });
+                if (!userDoc.exists) {
+                    transportationInfo.innerHTML = '<p>Transportation information not found.</p>';
+                    return;
                 }
-                return { uniqueId: null, regDoc: null, user };
+                
+                const userData = userDoc.data();
+                const primaryUniqueId = userData.uniqueId;
+                const userEmail = userData.email || user.email || '';
+                const normalizedEmail = userEmail.toLowerCase().trim();
+                
+                // Check emailToUids collection to get all uniqueIds for this email
+                console.log(`Loading transportation for email: ${normalizedEmail}, primaryUniqueId: ${primaryUniqueId}`);
+                return db.collection('emailToUids').doc(normalizedEmail).get()
+                    .then((emailToUidsDoc) => {
+                        let allUniqueIds = [];
+                        
+                        // Get uniqueIds from emailToUids if it exists
+                        if (emailToUidsDoc.exists) {
+                            const emailToUidsData = emailToUidsDoc.data();
+                            const uidsFromEmailToUids = emailToUidsData.uids || [];
+                            allUniqueIds = [...uidsFromEmailToUids];
+                            console.log(`Found emailToUids document for "${normalizedEmail}" with ${allUniqueIds.length} uniqueIds:`, allUniqueIds);
+                        } else {
+                            console.log(`No emailToUids document found for "${normalizedEmail}"`);
+                        }
+                        
+                        // Always include primary uniqueId
+                        if (primaryUniqueId && !allUniqueIds.includes(primaryUniqueId)) {
+                            allUniqueIds.push(primaryUniqueId);
+                            console.log(`Added primary uniqueId ${primaryUniqueId} to list`);
+                        }
+                        
+                        // If still no uniqueIds, fall back to associated registrations
+                        if (allUniqueIds.length === 0) {
+                            const associatedRegistrations = userData.associatedRegistrations || [];
+                            console.log('No uniqueIds from emailToUids, using associatedRegistrations:', associatedRegistrations);
+                            associatedRegistrations.forEach(reg => {
+                                if (reg.uniqueId && !allUniqueIds.includes(reg.uniqueId)) {
+                                    allUniqueIds.push(reg.uniqueId);
+                                }
+                            });
+                        }
+                        
+                        return { userData, allUniqueIds };
+                    })
+                    .catch((error) => {
+                        console.error('Error checking emailToUids in loadTransportationInfo:', error);
+                        // Continue with existing associatedRegistrations if emailToUids check fails
+                        const associatedRegistrations = userData.associatedRegistrations || [];
+                        const currentUniqueIds = associatedRegistrations.map(reg => reg.uniqueId).filter(Boolean);
+                        if (primaryUniqueId && !currentUniqueIds.includes(primaryUniqueId)) {
+                            currentUniqueIds.push(primaryUniqueId);
+                        }
+                        return { userData, allUniqueIds: currentUniqueIds };
+                    });
             })
-            .catch((error) => {
-                console.error('Error reading user document for transportation:', error);
-                return { uniqueId: null, regDoc: null, user };
-            })
-            .then(({ uniqueId, regDoc, user }) => {
-                if (!uniqueId) {
+            .then(({ userData, allUniqueIds }) => {
+                if (!userData) {
+                    transportationInfo.innerHTML = '<p>Transportation information not found.</p>';
+                    return;
+                }
+                
+                // Collect all uniqueIds to fetch
+                const uniqueIdsToFetch = allUniqueIds.length > 0 ? [...allUniqueIds] : [];
+                const primaryUniqueId = userData.uniqueId;
+                if (primaryUniqueId && !uniqueIdsToFetch.includes(primaryUniqueId)) {
+                    uniqueIdsToFetch.push(primaryUniqueId);
+                }
+                
+                // If still no uniqueIds, show error
+                if (uniqueIdsToFetch.length === 0) {
                     transportationInfo.innerHTML = '<p>Error: User unique ID not found.</p>';
                     return;
                 }
-
-                const data = regDoc && regDoc.exists ? regDoc.data() : {};
                 
-                // Map Excel field names to display names (handle various possible field names)
-                const pickupLocation = data.pickupLocation || data['Pickup Location'] || data['PickupLocation'] || '';
-                const arrivalDate = data.arrivalDate || data['Arrival Date'] || data['ArrivalDate'] || '';
-                const arrivalTime = data.arrivalTime || data['Arrival Time'] || data['ArrivalTime'] || '';
-                const flightTrainNumber = data.flightTrainNumber || data['Flight/Train Number'] || data['FlightTrainNumber'] || data['Flight Number'] || '';
-                const returnDate = data.returnDate || data['Return Date'] || data['ReturnDate'] || '';
-                const returnTime = data.returnTime || data['Return Time'] || data['ReturnTime'] || '';
-                const returnFlightTrainNumber = data.returnFlightTrainNumber || data['Return Flight/Train Number'] || data['ReturnFlightTrainNumber'] || '';
-
-                const isEditMode = transportationInfo.dataset.editMode === 'true';
-
-                if (!isEditMode) {
-                    // Display mode with separate sections
-                    const hasArrivalInfo = pickupLocation || arrivalDate || arrivalTime || flightTrainNumber;
-                    const hasReturnInfo = returnDate || returnTime || returnFlightTrainNumber;
-                    
-                    transportationInfo.innerHTML = `
-                        <h3>Transportation Details</h3>
-                        <div class="transportation-display">
-                            <div class="transportation-section">
-                                <h4 class="section-title">🛬 Arrival Information</h4>
-                                ${hasArrivalInfo ? `
-                                <div class="info-item">
-                                    <span class="info-label">Pickup Location:</span>
-                                    <span class="info-value">${pickupLocation || 'Not specified'}</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-label">Date:</span>
-                                    <span class="info-value">${arrivalDate || 'Not specified'}</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-label">Time:</span>
-                                    <span class="info-value">${arrivalTime || 'Not specified'}</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-label">Flight/Train Number:</span>
-                                    <span class="info-value">${flightTrainNumber || 'Not specified'}</span>
-                                </div>
-                                ` : '<p class="no-info">No arrival information provided</p>'}
-                            </div>
-                            <div class="transportation-section">
-                                <h4 class="section-title">🛫 Return Information</h4>
-                                ${hasReturnInfo ? `
-                                <div class="info-item">
-                                    <span class="info-label">Date:</span>
-                                    <span class="info-value">${returnDate || 'Not specified'}</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-label">Time:</span>
-                                    <span class="info-value">${returnTime || 'Not specified'}</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-label">Flight/Train Number:</span>
-                                    <span class="info-value">${returnFlightTrainNumber || 'Not specified'}</span>
-                                </div>
-                                ` : '<p class="no-info">No return information provided</p>'}
-                            </div>
-                        </div>
-                        <div class="transportation-actions">
-                            ${hasArrivalInfo ? `<button class="btn btn-primary" onclick="editTransportationArrival('${uniqueId}')">✏️ Edit Arrival</button>` : ''}
-                            ${hasReturnInfo ? `<button class="btn btn-primary" onclick="editTransportationReturn('${uniqueId}')">✏️ Edit Return</button>` : ''}
-                            ${!hasArrivalInfo ? `<button class="btn btn-primary" onclick="editTransportationArrival('${uniqueId}')">✏️ Add Arrival Information</button>` : ''}
-                            ${!hasReturnInfo ? `<button class="btn btn-primary" onclick="editTransportationReturn('${uniqueId}')">✏️ Add Return Information</button>` : ''}
-                        </div>
-                    `;
+                console.log(`Fetching transportation data for ${uniqueIdsToFetch.length} uniqueIds:`, uniqueIdsToFetch);
+                
+                // Get associated registrations for name lookup fallback
+                const associatedRegistrations = userData.associatedRegistrations || [];
+                const nameLookup = {};
+                associatedRegistrations.forEach(reg => {
+                    if (reg.uniqueId && reg.name) {
+                        nameLookup[reg.uniqueId] = reg.name;
+                    }
+                });
+                
+                // Fetch all registration documents for transportation info
+                const registrationPromises = uniqueIdsToFetch.map(uid => {
+                    console.log(`Fetching registration document for uniqueId: "${uid}"`);
+                    return db.collection('registrations').doc(uid).get()
+                        .then(regDoc => {
+                            if (regDoc.exists) {
+                                const regData = regDoc.data();
+                                // Try to get name from registration, then from associatedRegistrations, then use uniqueId as fallback
+                                const name = regData.name || regData['Full Name'] || nameLookup[uid] || `User ${uid}`;
+                                
+                                // Map Excel field names to display names (handle various possible field names)
+                                const pickupLocation = regData.pickupLocation || regData['Pickup Location'] || regData['PickupLocation'] || '';
+                                const arrivalDate = regData.arrivalDate || regData['Arrival Date'] || regData['ArrivalDate'] || '';
+                                const arrivalTime = regData.arrivalTime || regData['Arrival Time'] || regData['ArrivalTime'] || '';
+                                const flightTrainNumber = regData.flightTrainNumber || regData['Flight/Train Number'] || regData['FlightTrainNumber'] || regData['Flight Number'] || '';
+                                const returnDate = regData.returnDate || regData['Return Date'] || regData['ReturnDate'] || '';
+                                const returnTime = regData.returnTime || regData['Return Time'] || regData['ReturnTime'] || '';
+                                const returnFlightTrainNumber = regData.returnFlightTrainNumber || regData['Return Flight/Train Number'] || regData['ReturnFlightTrainNumber'] || '';
+                                
+                                return {
+                                    uniqueId: uid,
+                                    name: name,
+                                    pickupLocation,
+                                    arrivalDate,
+                                    arrivalTime,
+                                    flightTrainNumber,
+                                    returnDate,
+                                    returnTime,
+                                    returnFlightTrainNumber
+                                };
+                            } else {
+                                console.warn(`✗ Registration document does NOT exist for uniqueId: "${uid}"`);
+                                // Use name from associatedRegistrations if available, otherwise use uniqueId as identifier
+                                const name = nameLookup[uid] || `User ${uid}`;
+                                return {
+                                    uniqueId: uid,
+                                    name: name,
+                                    pickupLocation: '',
+                                    arrivalDate: '',
+                                    arrivalTime: '',
+                                    flightTrainNumber: '',
+                                    returnDate: '',
+                                    returnTime: '',
+                                    returnFlightTrainNumber: ''
+                                };
+                            }
+                        })
+                        .catch(error => {
+                            console.error(`Error fetching registration for ${uid}:`, error);
+                            // Use name from associatedRegistrations if available, otherwise use uniqueId as identifier
+                            const name = nameLookup[uid] || `User ${uid}`;
+                            return {
+                                uniqueId: uid,
+                                name: name,
+                                pickupLocation: '',
+                                arrivalDate: '',
+                                arrivalTime: '',
+                                flightTrainNumber: '',
+                                returnDate: '',
+                                returnTime: '',
+                                returnFlightTrainNumber: ''
+                            };
+                        });
+                });
+                
+                return Promise.all(registrationPromises);
+            })
+            .then((transportationDataArray) => {
+                // Filter out null results and ensure we have valid data with uniqueId
+                const validData = transportationDataArray.filter(data => data && data.uniqueId);
+                
+                if (validData.length === 0) {
+                    transportationInfo.innerHTML = '<p>No users found associated with this account.</p>';
+                    return;
                 }
+                
+                // Create cards for each person - always show all cards even if no transportation info
+                const cardsHTML = validData.map((data, index) => 
+                    createTransportationCardHTML(data, index, index === 0)
+                ).join('');
+                
+                transportationInfo.innerHTML = `
+                    <div class="user-profiles-container">
+                        ${cardsHTML}
+                    </div>
+                `;
             })
             .catch((error) => {
                 console.error('Error loading transportation info:', error);
@@ -2430,7 +2619,7 @@ function saveTransportationSection(uniqueId, section) {
         
         showNotification('Saving transportation details...', 'info');
 
-        // First verify the user's uniqueId matches (security check)
+        // First verify the user's uniqueId matches (security check - allow any uniqueId associated with this email)
         db.collection('users').doc(user.uid).get()
             .then((userDoc) => {
                 if (!userDoc.exists) {
@@ -2438,14 +2627,45 @@ function saveTransportationSection(uniqueId, section) {
                 }
                 const userData = userDoc.data();
                 const userUniqueId = userData.uniqueId;
+                const userEmail = userData.email || user.email || '';
+                const normalizedEmail = userEmail.toLowerCase().trim();
                 
-                // Verify the uniqueId matches (normalized comparison)
-                if (normalizePraveshikaId(userUniqueId) !== normalizePraveshikaId(uniqueId)) {
-                    throw new Error('You can only update your own transportation information.');
+                // Check if the uniqueId is associated with this user's email
+                // First check if it's the primary uniqueId
+                let isAuthorized = false;
+                if (userUniqueId && normalizePraveshikaId(userUniqueId) === normalizePraveshikaId(uniqueId)) {
+                    isAuthorized = true;
                 }
-
+                
+                // If not primary, check emailToUids collection and associated registrations
+                const checkAuthPromise = !isAuthorized 
+                    ? db.collection('emailToUids').doc(normalizedEmail).get()
+                        .then((emailToUidsDoc) => {
+                            if (emailToUidsDoc.exists) {
+                                const emailToUidsData = emailToUidsDoc.data();
+                                const uidsFromEmailToUids = emailToUidsData.uids || [];
+                                isAuthorized = uidsFromEmailToUids.some(uid => 
+                                    normalizePraveshikaId(uid) === normalizePraveshikaId(uniqueId)
+                                );
+                            }
+                            
+                            // Also check associated registrations
+                            if (!isAuthorized) {
+                                const associatedRegistrations = userData.associatedRegistrations || [];
+                                isAuthorized = associatedRegistrations.some(reg => 
+                                    reg.uniqueId && normalizePraveshikaId(reg.uniqueId) === normalizePraveshikaId(uniqueId)
+                                );
+                            }
+                            
+                            if (!isAuthorized) {
+                                throw new Error('You can only update transportation information for accounts associated with your email.');
+                            }
+                            return isAuthorized;
+                        })
+                    : Promise.resolve(true);
+                
                 // Get the existing document to preserve all fields
-                return db.collection('registrations').doc(uniqueId).get()
+                return checkAuthPromise.then(() => db.collection('registrations').doc(uniqueId).get())
                     .then((doc) => {
                         if (!doc.exists) {
                             throw new Error('Registration not found');
