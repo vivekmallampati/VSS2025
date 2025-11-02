@@ -848,6 +848,75 @@ document.addEventListener('DOMContentLoaded', function() {
                             name: pendingRegistration.name,
                             uniqueId: pendingRegistration.uniqueId,
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }).then(() => {
+                            // Check if email has already been processed
+                            return db.collection('users').doc(user.uid).get()
+                                .then((userDoc) => {
+                                    if (userDoc.exists && userDoc.data().emailProcessed === true) {
+                                        // Email already processed, skip
+                                        return null;
+                                    }
+
+                                    // Check emailToUids collection for associated uniqueIds
+                                    const normalizedEmail = pendingRegistration.email.toLowerCase().trim();
+                                    return db.collection('emailToUids').doc(normalizedEmail).get()
+                                        .then((emailToUidsDoc) => {
+                                            if (!emailToUidsDoc.exists) {
+                                                // No emailToUids entry found, skip processing
+                                                return null;
+                                            }
+
+                                            const emailToUidsData = emailToUidsDoc.data();
+                                            const uids = emailToUidsData.uids || [];
+                                            
+                                            if (uids.length === 0) {
+                                                return null;
+                                            }
+
+                                            // Fetch registration documents for all uids
+                                            const registrationPromises = uids.map(uid => 
+                                                db.collection('registrations').doc(uid).get()
+                                                    .then((regDoc) => {
+                                                        if (regDoc.exists) {
+                                                            const regData = regDoc.data();
+                                                            return {
+                                                                uniqueId: regData.uniqueId || uid,
+                                                                name: regData.name || '',
+                                                                email: regData.email || pendingRegistration.email
+                                                            };
+                                                        }
+                                                        return null;
+                                                    })
+                                                    .catch((error) => {
+                                                        console.error(`Error fetching registration for uid ${uid}:`, error);
+                                                        return null;
+                                                    })
+                                            );
+
+                                            return Promise.all(registrationPromises)
+                                                .then((associatedRegistrations) => {
+                                                    // Filter out null values (failed fetches)
+                                                    const validRegistrations = associatedRegistrations.filter(reg => reg !== null);
+                                                    
+                                                    // Update user document with associated registrations
+                                                    return db.collection('users').doc(user.uid).update({
+                                                        associatedRegistrations: validRegistrations,
+                                                        emailProcessed: true,
+                                                        emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                                    });
+                                                })
+                                                .catch((error) => {
+                                                    console.error('Error processing associated registrations:', error);
+                                                    // Don't throw - user creation should still succeed
+                                                    return null;
+                                                });
+                                        })
+                                        .catch((error) => {
+                                            console.error('Error checking emailToUids collection:', error);
+                                            // Don't throw - user creation should still succeed
+                                            return null;
+                                        });
+                                });
                         });
                     })
                     .then(() => {
