@@ -583,40 +583,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     const normalizedId = normalizePraveshikaId(identifier);
                     
                     // Helper function to find email by normalized Praveshika ID
+                    // Prioritizes registrations collection (publicly readable) to avoid security issues
                     function findEmailByPraveshikaId(normalizedId) {
-                        // First try to find in users collection
-                        return db.collection('users').get()
-                            .then((allUsers) => {
-                                for (const doc of allUsers.docs) {
-                                    const userData = doc.data();
-                                    const userUniqueId = userData.uniqueId;
-                                    if (userUniqueId && normalizePraveshikaId(userUniqueId) === normalizedId) {
-                                        return userData.email;
-                                    }
+                        // First: Try checking registrations collection with normalizedId field (most efficient)
+                        return db.collection('registrations').where('normalizedId', '==', normalizedId).limit(1).get()
+                            .then((regQuerySnapshot) => {
+                                if (!regQuerySnapshot.empty) {
+                                    const email = regQuerySnapshot.docs[0].data().email;
+                                    if (email) return email;
                                 }
                                 return null;
                             })
                             .then((email) => {
                                 if (email) return email;
-                                // Try checking registrations collection with normalized ID
-                                return db.collection('registrations').where('normalizedId', '==', normalizedId).limit(1).get()
-                                    .then((regQuerySnapshot) => {
-                                        if (!regQuerySnapshot.empty) {
-                                            const email = regQuerySnapshot.docs[0].data().email;
-                                            if (email) return email;
-                                        }
-                                        return null;
-                                    });
-                            })
-                            .then((email) => {
-                                if (email) return email;
-                                // Fallback: try direct lookup and normalize document ID
+                                // Second: Try direct document lookup and normalize document ID
                                 return db.collection('registrations').doc(identifier).get()
                                     .then((doc) => {
                                         if (doc.exists) {
                                             const docNormalizedId = normalizePraveshikaId(doc.id);
                                             if (docNormalizedId === normalizedId && doc.data().email) {
-                                                return doc.data().email;
+                                                const email = doc.data().email;
+                                                if (email) return email;
                                             }
                                         }
                                         return null;
@@ -624,13 +611,19 @@ document.addEventListener('DOMContentLoaded', function() {
                             })
                             .then((email) => {
                                 if (email) return email;
-                                // Last resort: search all registration documents (for old data)
+                                // Third: Search all registration documents by normalizing document IDs (fallback for old data)
                                 return db.collection('registrations').get()
                                     .then((allDocs) => {
                                         for (const doc of allDocs.docs) {
                                             const docNormalizedId = normalizePraveshikaId(doc.id);
                                             if (docNormalizedId === normalizedId) {
                                                 const email = doc.data().email;
+                                                if (email) return email;
+                                            }
+                                            // Also check normalizedId field in case document ID doesn't match
+                                            const regData = doc.data();
+                                            if (regData.normalizedId && normalizePraveshikaId(regData.normalizedId) === normalizedId) {
+                                                const email = regData.email;
                                                 if (email) return email;
                                             }
                                         }
