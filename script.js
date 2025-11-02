@@ -678,12 +678,145 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Helper function to refresh associated registrations for a user
+function refreshAssociatedRegistrations(user) {
+    if (!window.firebase || !firebase.firestore) return Promise.resolve();
+    
+    const db = firebase.firestore();
+    const userEmail = user.email || '';
+    const normalizedEmail = userEmail.toLowerCase().trim();
+    
+    if (!normalizedEmail) return Promise.resolve();
+    
+    return db.collection('users').doc(user.uid).get()
+        .then((userDoc) => {
+            if (!userDoc.exists) {
+                console.log('User document does not exist yet');
+                return null;
+            }
+            
+            const userData = userDoc.data();
+            const primaryUniqueId = userData.uniqueId;
+            
+            // Check emailToUids collection for all uniqueIds
+            return db.collection('emailToUids').doc(normalizedEmail).get()
+                .then((emailToUidsDoc) => {
+                    let allUniqueIds = [];
+                    
+                    if (emailToUidsDoc.exists) {
+                        const emailToUidsData = emailToUidsDoc.data();
+                        const uidsFromEmailToUids = emailToUidsData.uids || [];
+                        allUniqueIds = [...uidsFromEmailToUids];
+                        console.log(`Found ${allUniqueIds.length} uniqueIds in emailToUids for ${normalizedEmail}:`, allUniqueIds);
+                    } else {
+                        console.log(`No emailToUids document found for ${normalizedEmail}`);
+                    }
+                    
+                    // Always include primary uniqueId
+                    if (primaryUniqueId && !allUniqueIds.includes(primaryUniqueId)) {
+                        allUniqueIds.push(primaryUniqueId);
+                    }
+                    
+                    // Get current associated registrations
+                    const associatedRegistrations = userData.associatedRegistrations || [];
+                    const currentUniqueIds = associatedRegistrations.map(reg => reg.uniqueId).filter(Boolean);
+                    
+                    // Always update if emailToUids exists and has uniqueIds
+                    if (emailToUidsDoc.exists && allUniqueIds.length > 0) {
+                        // Fetch all registration documents
+                        const updatePromises = allUniqueIds.map(uid => 
+                            db.collection('registrations').doc(uid).get()
+                                .then(regDoc => {
+                                    if (regDoc.exists) {
+                                        const regData = regDoc.data();
+                                        return {
+                                            uniqueId: regData.uniqueId || uid,
+                                            name: regData.name || regData['Full Name'] || '',
+                                            email: regData.email || regData['Email address'] || userEmail
+                                        };
+                                    } else {
+                                        return {
+                                            uniqueId: uid,
+                                            name: userData.name || '',
+                                            email: userEmail
+                                        };
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error(`Error fetching registration for ${uid}:`, error);
+                                    return {
+                                        uniqueId: uid,
+                                        name: userData.name || '',
+                                        email: userEmail
+                                    };
+                                })
+                        );
+                        
+                        return Promise.all(updatePromises)
+                            .then((updatedRegistrations) => {
+                                const validRegistrations = updatedRegistrations
+                                    .filter(reg => reg !== null && reg.uniqueId)
+                                    .filter((reg, index, self) => 
+                                        index === self.findIndex(r => r.uniqueId === reg.uniqueId)
+                                    );
+                                
+                                console.log(`Updating user document with ${validRegistrations.length} associated registrations:`, validRegistrations);
+                                
+                                // Update user document with refreshed associated registrations
+                                return db.collection('users').doc(user.uid).update({
+                                    associatedRegistrations: validRegistrations,
+                                    emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                            });
+                    } else if (allUniqueIds.length === 0 && primaryUniqueId) {
+                        // No emailToUids but we have a primary uniqueId, ensure it's in associatedRegistrations
+                        const hasPrimary = currentUniqueIds.includes(primaryUniqueId);
+                        if (!hasPrimary) {
+                            return db.collection('users').doc(user.uid).update({
+                                associatedRegistrations: [{
+                                    uniqueId: primaryUniqueId,
+                                    name: userData.name || '',
+                                    email: userEmail
+                                }],
+                                emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        }
+                    }
+                    
+                    return null;
+                })
+                .catch((error) => {
+                    console.error('Error refreshing associated registrations:', error);
+                    return null;
+                });
+        })
+        .catch((error) => {
+            console.error('Error refreshing associated registrations:', error);
+            return null;
+        });
+}
+
 // Helper function for successful login
 function handleLoginSuccess(loginForm) {
     showNotification('Logged in successfully!', 'success');
     closeLogin();
     loginForm.reset();
     updateAuthUI();
+    
+    // Refresh associated registrations after login
+    if (window.firebase && firebase.auth) {
+        const user = firebase.auth().currentUser;
+        if (user) {
+            refreshAssociatedRegistrations(user)
+                .then(() => {
+                    console.log('Associated registrations refreshed after login');
+                })
+                .catch((error) => {
+                    console.error('Error refreshing associated registrations after login:', error);
+                });
+        }
+    }
+    
     // Redirect to Shibirarthi Info tab after login
     setTimeout(() => {
         activateTab('shibirarthi');
@@ -843,60 +976,86 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Save additional user data to Firestore
                         const db = firebase.firestore();
+                        const normalizedEmail = pendingRegistration.email.toLowerCase().trim();
+                        const primaryUniqueId = pendingRegistration.uniqueId;
+                        
                         return db.collection('users').doc(user.uid).set({
                             email: pendingRegistration.email,
                             name: pendingRegistration.name,
-                            uniqueId: pendingRegistration.uniqueId,
+                            uniqueId: primaryUniqueId,
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         }).then(() => {
-                            // Check if email has already been processed
-                            return db.collection('users').doc(user.uid).get()
-                                .then((userDoc) => {
-                                    if (userDoc.exists && userDoc.data().emailProcessed === true) {
-                                        // Email already processed, skip
-                                        return null;
-                                    }
-
-                                    // Check emailToUids collection for associated uniqueIds
-                                    const normalizedEmail = pendingRegistration.email.toLowerCase().trim();
+                            // Always check emailToUids collection for associated uniqueIds
+                            // This ensures we pick up all uniqueIds associated with this email
                                     return db.collection('emailToUids').doc(normalizedEmail).get()
                                         .then((emailToUidsDoc) => {
-                                            if (!emailToUidsDoc.exists) {
-                                                // No emailToUids entry found, skip processing
-                                                return null;
-                                            }
-
+                                    // Collect all uniqueIds to process
+                                    let allUniqueIds = [];
+                                    
+                                    if (emailToUidsDoc.exists) {
                                             const emailToUidsData = emailToUidsDoc.data();
                                             const uids = emailToUidsData.uids || [];
-                                            
-                                            if (uids.length === 0) {
-                                                return null;
+                                        allUniqueIds = [...uids];
+                                    }
+                                    
+                                    // Always include the primary uniqueId if not already in the list
+                                    if (primaryUniqueId && !allUniqueIds.includes(primaryUniqueId)) {
+                                        allUniqueIds.push(primaryUniqueId);
+                                    }
+                                    
+                                    // If no uniqueIds found, create a minimal associatedRegistrations with just the primary one
+                                    if (allUniqueIds.length === 0 && primaryUniqueId) {
+                                        allUniqueIds = [primaryUniqueId];
+                                    }
+                                    
+                                    if (allUniqueIds.length === 0) {
+                                        // No uniqueIds to process, mark as processed
+                                        return db.collection('users').doc(user.uid).update({
+                                            emailProcessed: true,
+                                            emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                        });
                                             }
 
                                             // Fetch registration documents for all uids
-                                            const registrationPromises = uids.map(uid => 
+                                    const registrationPromises = allUniqueIds.map(uid => 
                                                 db.collection('registrations').doc(uid).get()
                                                     .then((regDoc) => {
                                                         if (regDoc.exists) {
                                                             const regData = regDoc.data();
                                                             return {
                                                                 uniqueId: regData.uniqueId || uid,
-                                                                name: regData.name || '',
-                                                                email: regData.email || pendingRegistration.email
-                                                            };
-                                                        }
-                                                        return null;
+                                                        name: regData.name || regData['Full Name'] || '',
+                                                        email: regData.email || regData['Email address'] || pendingRegistration.email
+                                                    };
+                                                } else {
+                                                    // If registration doesn't exist, still create a basic entry from user data
+                                                    return {
+                                                        uniqueId: uid,
+                                                        name: pendingRegistration.name || '',
+                                                        email: pendingRegistration.email
+                                                    };
+                                                }
                                                     })
                                                     .catch((error) => {
                                                         console.error(`Error fetching registration for uid ${uid}:`, error);
-                                                        return null;
+                                                // Return basic entry even if fetch fails
+                                                return {
+                                                    uniqueId: uid,
+                                                    name: pendingRegistration.name || '',
+                                                    email: pendingRegistration.email
+                                                };
                                                     })
                                             );
 
                                             return Promise.all(registrationPromises)
                                                 .then((associatedRegistrations) => {
-                                                    // Filter out null values (failed fetches)
-                                                    const validRegistrations = associatedRegistrations.filter(reg => reg !== null);
+                                            // Filter out null values and ensure we have valid data
+                                            const validRegistrations = associatedRegistrations
+                                                .filter(reg => reg !== null && reg.uniqueId)
+                                                // Remove duplicates based on uniqueId
+                                                .filter((reg, index, self) => 
+                                                    index === self.findIndex(r => r.uniqueId === reg.uniqueId)
+                                                );
                                                     
                                                     // Update user document with associated registrations
                                                     return db.collection('users').doc(user.uid).update({
@@ -913,8 +1072,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                         })
                                         .catch((error) => {
                                             console.error('Error checking emailToUids collection:', error);
-                                            // Don't throw - user creation should still succeed
-                                            return null;
+                                    // Even if emailToUids check fails, ensure we have at least the primary uniqueId
+                                    return db.collection('users').doc(user.uid).update({
+                                        associatedRegistrations: [{
+                                            uniqueId: primaryUniqueId,
+                                            name: pendingRegistration.name || '',
+                                            email: pendingRegistration.email
+                                        }],
+                                        emailProcessed: true,
+                                        emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
                                         });
                                 });
                         });
@@ -1083,74 +1249,41 @@ function updateAuthUI() {
     });
 }
 
-// Load user profile information
-function loadUserProfile(user) {
-    const profileInfo = document.getElementById('profileInfo');
-    if (!profileInfo) return;
-    
-    if (window.firebase && firebase.firestore) {
-        const db = firebase.firestore();
-        // First get user's uniqueId from users collection
-        db.collection('users').doc(user.uid).get()
-            .then((userDoc) => {
-                if (userDoc.exists && userDoc.data().uniqueId) {
-                    const uniqueId = userDoc.data().uniqueId;
-                    // Get full registration details
-                    return db.collection('registrations').doc(uniqueId).get()
-                        .then((regDoc) => {
-                            return { userData: userDoc.data(), regData: regDoc.exists ? regDoc.data() : null };
-                        })
-                        .catch((error) => {
-                            console.error('Error reading registration:', error);
-                            // If registration read fails, still return user data
-                            return { userData: userDoc.data(), regData: null };
-                        });
-                }
-                return { userData: userDoc.exists ? userDoc.data() : null, regData: null };
-            })
-            .catch((error) => {
-                console.error('Error reading user document:', error);
-                // Return empty data if user document read fails
-                return { userData: null, regData: null };
-            })
-            .then(({ userData, regData }) => {
-                const data = regData || userData;
-                if (!data) {
-                    profileInfo.innerHTML = '<p>Profile information not found.</p>';
-                    return;
-                }
+// Helper function to extract profile data from registration document
+function extractProfileData(data, userData = null, userEmail = '') {
+    return {
+        name: data.name || data['Full Name'] || userData?.name || '',
+        email: data.email || data['Email address'] || userData?.email || userEmail || '',
+        uniqueId: data.uniqueId || data['Praveshika ID'] || userData?.uniqueId || '',
+        country: data.Country || data.country || data['Country of Current Residence'] || '',
+        shreni: data.Shreni || data.shreni || data['Corrected Shreni'] || data['Default Shreni'] || data['Shreni for Sorting'] || '',
+        barcode: data.Barcode || data.barcode || data.BarCode || data.uniqueId || data['Praveshika ID'] || '',
+        phone: data.phone || data.Phone || data['Phone number on which you can be contacted in Bharat (by call or WhatsApp)'] || '',
+        whatsapp: data['Whatsapp Number'] || data.whatsapp || '',
+        address: data.address || data.Address || data['Current Address'] || '',
+        city: data.city || data.City || data['City of Current Residence'] || '',
+        state: data.state || data.State || data['State/Province'] || '',
+        postalCode: data.postalCode || data['Postal Code'] || data.zipcode || '',
+        gender: data.gender || data.Gender || '',
+        age: data.age || data.Age || '',
+        occupation: data.occupation || data['Occupation (e.g. Engineer/Business/Homemaker/Student)'] || '',
+        educationalQual: data['Educational Qualification'] || data.educationalQualification || '',
+        zone: data.Zone || data['Zone/Shreni'] || '',
+        ganveshSize: data['Ganvesh Kurta Shoulder Size in cm (for swayamevaks and sevikas)'] || '',
+        sanghYears: data['Associated with sangh for how many years/months'] || '',
+        hssResponsibility: data['Do you have any responsibility in Hindu Swayamsevak Sangh?'] || '',
+        currentResponsibility: data['What is your current responsibility in HSS or other organisation?'] || '',
+        otherOrgResponsibility: data['Do you have any responsibility in any other organisation (e.g. VHP, Sewa International etc)?'] || '',
+        shikshaVarg: data['Which Sangh Shiksha Varg have you completed'] || '',
+        emergencyContactName: data['Emergency Contact Name'] || '',
+        emergencyContactNumber: data['Emergency Contact Number'] || '',
+        emergencyContactRelation: data['Relationship of Emergency Contact Person'] || '',
+        pickupNeeded: data['Do you need a pickup on arrival?'] || '',
+        dropoffNeeded: data['Do you need a drop off for departure?'] || ''
+    };
+}
 
-                // Get all profile fields from registration data (excluding transportation)
-                const name = data.name || data['Full Name'] || userData?.name || '';
-                const email = data.email || data['Email address'] || userData?.email || user.email || '';
-                const uniqueId = data.uniqueId || data['Praveshika ID'] || userData?.uniqueId || '';
-                const country = data.Country || data.country || data['Country of Current Residence'] || '';
-                const shreni = data.Shreni || data.shreni || data['Corrected Shreni'] || data['Default Shreni'] || data['Shreni for Sorting'] || '';
-                const barcode = data.Barcode || data.barcode || data.BarCode || uniqueId;
-                const phone = data.phone || data.Phone || data['Phone number on which you can be contacted in Bharat (by call or WhatsApp)'] || '';
-                const whatsapp = data['Whatsapp Number'] || data.whatsapp || '';
-                const address = data.address || data.Address || data['Current Address'] || '';
-                const city = data.city || data.City || data['City of Current Residence'] || '';
-                const state = data.state || data.State || data['State/Province'] || '';
-                const postalCode = data.postalCode || data['Postal Code'] || data.zipcode || '';
-                const gender = data.gender || data.Gender || '';
-                const age = data.age || data.Age || '';
-                const occupation = data.occupation || data['Occupation (e.g. Engineer/Business/Homemaker/Student)'] || '';
-                const educationalQual = data['Educational Qualification'] || data.educationalQualification || '';
-                const zone = data.Zone || data['Zone/Shreni'] || '';
-                const ganveshSize = data['Ganvesh Kurta Shoulder Size in cm (for swayamevaks and sevikas)'] || '';
-                const sanghYears = data['Associated with sangh for how many years/months'] || '';
-                const hssResponsibility = data['Do you have any responsibility in Hindu Swayamsevak Sangh?'] || '';
-                const currentResponsibility = data['What is your current responsibility in HSS or other organisation?'] || '';
-                const otherOrgResponsibility = data['Do you have any responsibility in any other organisation (e.g. VHP, Sewa International etc)?'] || '';
-                const shikshaVarg = data['Which Sangh Shiksha Varg have you completed'] || '';
-                const emergencyContactName = data['Emergency Contact Name'] || '';
-                const emergencyContactNumber = data['Emergency Contact Number'] || '';
-                const emergencyContactRelation = data['Relationship of Emergency Contact Person'] || '';
-                const pickupNeeded = data['Do you need a pickup on arrival?'] || '';
-                const dropoffNeeded = data['Do you need a drop off for departure?'] || '';
-                
-                // Helper function to escape and format display value
+// Helper function to format display value
                 function formatValue(value) {
                     if (!value || value === '' || value === null || value === undefined) return 'Not provided';
                     const str = String(value).trim();
@@ -1158,23 +1291,39 @@ function loadUserProfile(user) {
                     return escapeHtml(str);
                 }
                 
-                // Escape HTML to prevent XSS for badge data attributes (use actual values, not "Not provided")
+// Helper function to create profile card HTML for a single person
+function createProfileCardHTML(profileData, index, isExpanded = false) {
+    const { name, email, uniqueId, country, shreni, barcode, phone, whatsapp, address, city, state, postalCode,
+            gender, age, occupation, educationalQual, zone, ganveshSize, sanghYears, hssResponsibility,
+            currentResponsibility, otherOrgResponsibility, shikshaVarg, emergencyContactName,
+            emergencyContactNumber, emergencyContactRelation, pickupNeeded, dropoffNeeded } = profileData;
+    
                 const safeName = escapeHtml(name || '');
-                const safeEmail = escapeHtml(email || '');
                 const safeUniqueId = escapeHtml(uniqueId || '');
                 const safeCountry = escapeHtml(country || '');
                 const safeShreni = escapeHtml(shreni || '');
                 const safeBarcode = escapeHtml(barcode || uniqueId || '');
                 
-                // Store values for badge function (using data attributes)
-                profileInfo.innerHTML = `
-                    <div class="profile-header-actions">
-                        <button class="btn btn-primary" id="showBadgeBtn" 
-                            data-name="${safeName}" 
-                            data-country="${safeCountry}" 
-                            data-shreni="${safeShreni}" 
-                            data-barcode="${safeBarcode}" 
-                            data-uniqueid="${safeUniqueId}">
+    return `
+        <div class="user-profile-card ${isExpanded ? 'expanded' : ''}" data-card-index="${index}">
+            <div class="user-profile-card-header" onclick="toggleProfileCard(${index})">
+                <div class="user-profile-card-summary">
+                    <div class="user-profile-name">
+                        <strong>${formatValue(name)}</strong>
+                        ${uniqueId ? `<span class="user-profile-id">ID: ${formatValue(uniqueId)}</span>` : ''}
+                    </div>
+                    <div class="user-profile-basic-info">
+                        ${country ? `<span class="user-profile-badge">${formatValue(country)}</span>` : ''}
+                        ${shreni ? `<span class="user-profile-badge">${formatValue(shreni)}</span>` : ''}
+                    </div>
+                </div>
+                <div class="user-profile-card-toggle">
+                    <span class="toggle-icon">${isExpanded ? '▼' : '▶'}</span>
+                </div>
+            </div>
+            <div class="user-profile-card-content" style="display: ${isExpanded ? 'block' : 'none'};">
+                <div class="user-profile-card-actions">
+                    <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); showBadge('${safeName}', '${safeCountry}', '${safeShreni}', '${safeBarcode}', '${safeUniqueId}');">
                             📇 View Badge
                         </button>
                     </div>
@@ -1323,22 +1472,384 @@ function loadUserProfile(user) {
                                 </div>` : ''}
                             </div>
                         </div>` : ''}
+                </div>
+            </div>
                     </div>
                 `;
+}
+
+// Global function to toggle profile card expand/collapse
+function toggleProfileCard(index) {
+    const card = document.querySelector(`.user-profile-card[data-card-index="${index}"]`);
+    if (!card) return;
+    
+    const content = card.querySelector('.user-profile-card-content');
+    const toggleIcon = card.querySelector('.toggle-icon');
+    const isExpanded = card.classList.contains('expanded');
+    
+    if (isExpanded) {
+        card.classList.remove('expanded');
+        content.style.display = 'none';
+        if (toggleIcon) toggleIcon.textContent = '▶';
+    } else {
+        card.classList.add('expanded');
+        content.style.display = 'block';
+        if (toggleIcon) toggleIcon.textContent = '▼';
+    }
+}
+
+// Load user profile information
+function loadUserProfile(user) {
+    const profileInfo = document.getElementById('profileInfo');
+    if (!profileInfo) return;
+    
+    if (window.firebase && firebase.firestore) {
+        const db = firebase.firestore();
+        
+        // First get user document
+        db.collection('users').doc(user.uid).get()
+            .then((userDoc) => {
+                if (!userDoc.exists) {
+                    profileInfo.innerHTML = '<p>Profile information not found.</p>';
+                    return;
+                }
                 
-                // Add click handler after creating button
-                const badgeBtn = document.getElementById('showBadgeBtn');
-                if (badgeBtn) {
-                    badgeBtn.addEventListener('click', function() {
-                        showBadge(
-                            this.dataset.name,
-                            this.dataset.country,
-                            this.dataset.shreni,
-                            this.dataset.barcode,
-                            this.dataset.uniqueid
-                        );
+                const userData = userDoc.data();
+                const primaryUniqueId = userData.uniqueId;
+                const userEmail = userData.email || user.email || '';
+                const normalizedEmail = userEmail.toLowerCase().trim();
+                
+                // Check emailToUids collection to see if there are any new uniqueIds
+                console.log(`Loading profile for email: ${normalizedEmail}, primaryUniqueId: ${primaryUniqueId}`);
+                return db.collection('emailToUids').doc(normalizedEmail).get()
+                    .then((emailToUidsDoc) => {
+                        let allUniqueIds = [];
+                        let needsUpdate = false;
+                        
+                        // Get uniqueIds from emailToUids if it exists
+                        if (emailToUidsDoc.exists) {
+                            const emailToUidsData = emailToUidsDoc.data();
+                            const uidsFromEmailToUids = emailToUidsData.uids || [];
+                            allUniqueIds = [...uidsFromEmailToUids];
+                            console.log(`Found emailToUids document for "${normalizedEmail}" with ${allUniqueIds.length} uniqueIds:`, allUniqueIds);
+                            console.log(`EmailToUids data:`, {
+                                email: emailToUidsData.email,
+                                count: emailToUidsData.count,
+                                uids: uidsFromEmailToUids
+                            });
+                        } else {
+                            console.log(`No emailToUids document found for "${normalizedEmail}"`);
+                        }
+                        
+                        // Always include primary uniqueId
+                        if (primaryUniqueId && !allUniqueIds.includes(primaryUniqueId)) {
+                            allUniqueIds.push(primaryUniqueId);
+                            console.log(`Added primary uniqueId ${primaryUniqueId} to list`);
+                        }
+                        
+                        // Get current associated registrations
+                        const associatedRegistrations = userData.associatedRegistrations || [];
+                        const currentUniqueIds = associatedRegistrations.map(reg => reg.uniqueId).filter(Boolean);
+                        
+                        // Check if there are new uniqueIds that aren't in associatedRegistrations
+                        const newUniqueIds = allUniqueIds.filter(uid => !currentUniqueIds.includes(uid));
+                        const missingUniqueIds = currentUniqueIds.filter(uid => !allUniqueIds.includes(uid));
+                        
+                        // Always update if emailToUids exists and has uniqueIds (to use emailToUids as source of truth)
+                        // Also update if there are new uniqueIds even if emailToUids doesn't exist
+                        if (emailToUidsDoc.exists && allUniqueIds.length > 0) {
+                            // Always update when emailToUids exists to ensure sync
+                            needsUpdate = true;
+                            console.log(`emailToUids exists with ${allUniqueIds.length} uniqueIds, associatedRegistrations has ${currentUniqueIds.length} - updating`);
+                            if (newUniqueIds.length > 0) {
+                                console.log(`Found ${newUniqueIds.length} new uniqueIds:`, newUniqueIds);
+                            }
+                            if (missingUniqueIds.length > 0) {
+                                console.log(`Found ${missingUniqueIds.length} uniqueIds in associatedRegistrations but not in emailToUids:`, missingUniqueIds);
+                            }
+                        } else if (newUniqueIds.length > 0) {
+                            // Even if emailToUids doesn't exist, update if we have new uniqueIds
+                            needsUpdate = true;
+                            console.log(`Found ${newUniqueIds.length} new uniqueIds for email:`, newUniqueIds);
+                        }
+                        
+                        // If we need to update, fetch all new registrations and update the user document
+                        if (needsUpdate && allUniqueIds.length > 0) {
+                            const updatePromises = allUniqueIds.map(uid => 
+                                db.collection('registrations').doc(uid).get()
+                                    .then(regDoc => {
+                                        if (regDoc.exists) {
+                                            const regData = regDoc.data();
+                                            return {
+                                                uniqueId: regData.uniqueId || uid,
+                                                name: regData.name || regData['Full Name'] || '',
+                                                email: regData.email || regData['Email address'] || userEmail
+                                            };
+                                        } else {
+                                            return {
+                                                uniqueId: uid,
+                                                name: userData.name || '',
+                                                email: userEmail
+                                            };
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error(`Error fetching registration for ${uid}:`, error);
+                                        return {
+                                            uniqueId: uid,
+                                            name: userData.name || '',
+                                            email: userEmail
+                                        };
+                                    })
+                            );
+                            
+                            return Promise.all(updatePromises)
+                                .then((updatedRegistrations) => {
+                                    const validRegistrations = updatedRegistrations
+                                        .filter(reg => reg !== null && reg.uniqueId)
+                                        .filter((reg, index, self) => 
+                                            index === self.findIndex(r => r.uniqueId === reg.uniqueId)
+                                        );
+                                    
+                                    // Update user document with refreshed associated registrations
+                                    return db.collection('users').doc(user.uid).update({
+                                        associatedRegistrations: validRegistrations,
+                                        emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                    }).then(() => {
+                                        // Return updated user data
+                                        return { userData: { ...userData, associatedRegistrations: validRegistrations }, allUniqueIds };
+                                    });
+                                });
+                        }
+                        
+                        // No update needed, use existing data
+                        return { userData, allUniqueIds: allUniqueIds.length > 0 ? allUniqueIds : currentUniqueIds };
+                    })
+                    .catch((error) => {
+                        console.error('Error checking emailToUids in loadUserProfile:', error);
+                        // Continue with existing associatedRegistrations if emailToUids check fails
+                        const associatedRegistrations = userData.associatedRegistrations || [];
+                        const currentUniqueIds = associatedRegistrations.map(reg => reg.uniqueId).filter(Boolean);
+                        if (primaryUniqueId && !currentUniqueIds.includes(primaryUniqueId)) {
+                            currentUniqueIds.push(primaryUniqueId);
+                        }
+                        return { userData, allUniqueIds: currentUniqueIds };
+                    });
+            })
+            .then(({ userData, allUniqueIds }) => {
+                if (!userData) {
+                    profileInfo.innerHTML = '<p>Profile information not found.</p>';
+                    return;
+                }
+                
+                const primaryUniqueId = userData.uniqueId;
+                
+                // Collect all uniqueIds to fetch (use allUniqueIds from emailToUids if available)
+                const uniqueIdsToFetch = allUniqueIds.length > 0 ? [...allUniqueIds] : [];
+                if (primaryUniqueId && !uniqueIdsToFetch.includes(primaryUniqueId)) {
+                    uniqueIdsToFetch.push(primaryUniqueId);
+                }
+                
+                // If still no uniqueIds, fall back to associated registrations
+                if (uniqueIdsToFetch.length === 0) {
+                    const associatedRegistrations = userData.associatedRegistrations || [];
+                    console.log('No uniqueIds from emailToUids, using associatedRegistrations:', associatedRegistrations);
+                    associatedRegistrations.forEach(reg => {
+                        if (reg.uniqueId && !uniqueIdsToFetch.includes(reg.uniqueId)) {
+                            uniqueIdsToFetch.push(reg.uniqueId);
+                        }
                     });
                 }
+                
+                console.log(`Fetching registration data for ${uniqueIdsToFetch.length} uniqueIds:`, uniqueIdsToFetch);
+                
+                // Get userEmail for use in profile extraction
+                const userEmail = userData.email || user.email || '';
+                
+                // If no uniqueIds found, try to use the user document itself
+                if (uniqueIdsToFetch.length === 0) {
+                    const profileData = extractProfileData(userData, userData, userEmail);
+                    if (profileData.name || profileData.email) {
+                        profileInfo.innerHTML = `
+                            <div class="user-profiles-container">
+                                ${createProfileCardHTML(profileData, 0, true)}
+                            </div>
+                        `;
+                        return;
+                    } else {
+                        profileInfo.innerHTML = '<p>Profile information not found.</p>';
+                        return;
+                    }
+                }
+                
+                // Fetch all registration documents
+                const registrationPromises = uniqueIdsToFetch.map(uid => {
+                    console.log(`Fetching registration document for uniqueId: "${uid}"`);
+                    return db.collection('registrations').doc(uid).get()
+                        .then(regDoc => {
+                            if (regDoc.exists) {
+                                const regData = regDoc.data();
+                                console.log(`✓ Found registration document for ${uid}:`, {
+                                    exists: true,
+                                    uniqueId: regData.uniqueId,
+                                    name: regData.name || regData['Full Name'],
+                                    email: regData.email || regData['Email address']
+                                });
+                            } else {
+                                console.warn(`✗ Registration document does NOT exist for uniqueId: "${uid}"`);
+                            }
+                            return {
+                                uniqueId: uid,
+                                data: regDoc.exists ? regDoc.data() : null,
+                                docId: regDoc.id
+                            };
+                        })
+                        .catch(error => {
+                            console.error(`Error fetching registration for "${uid}":`, error);
+                            return { uniqueId: uid, data: null, docId: null };
+                        });
+                });
+                
+                return Promise.all(registrationPromises)
+                    .then(registrationResults => {
+                        console.log(`Registration fetch results:`, registrationResults.map(r => ({
+                            uniqueId: r.uniqueId,
+                            exists: !!r.data
+                        })));
+                        
+                        // Extract profile data for each registration
+                        const profiles = [];
+                        
+                        // Get associated registrations data to use as fallback
+                        const associatedRegistrations = userData.associatedRegistrations || [];
+                        const associatedRegMap = new Map();
+                        associatedRegistrations.forEach(reg => {
+                            if (reg.uniqueId) {
+                                associatedRegMap.set(reg.uniqueId, reg);
+                            }
+                        });
+                        
+                        registrationResults.forEach((result, index) => {
+                            let profileData = null;
+                            
+                            if (result.data) {
+                                // Use registration document data
+                                profileData = extractProfileData(result.data, userData, userEmail);
+                                console.log(`Added profile for uniqueId ${result.uniqueId} from registration document:`, profileData.name);
+                            } else {
+                                // Registration document doesn't exist, try to use associated registration data
+                                const associatedReg = associatedRegMap.get(result.uniqueId);
+                                if (associatedReg) {
+                                    // Create profile data from associated registration
+                                    profileData = {
+                                        uniqueId: result.uniqueId,
+                                        name: associatedReg.name || userData.name || '',
+                                        email: associatedReg.email || userEmail,
+                                        country: '',
+                                        shreni: '',
+                                        barcode: result.uniqueId,
+                                        phone: '',
+                                        whatsapp: '',
+                                        address: '',
+                                        city: '',
+                                        state: '',
+                                        postalCode: '',
+                                        gender: '',
+                                        age: '',
+                                        occupation: '',
+                                        educationalQual: '',
+                                        zone: '',
+                                        ganveshSize: '',
+                                        sanghYears: '',
+                                        hssResponsibility: '',
+                                        currentResponsibility: '',
+                                        otherOrgResponsibility: '',
+                                        shikshaVarg: '',
+                                        emergencyContactName: '',
+                                        emergencyContactNumber: '',
+                                        emergencyContactRelation: '',
+                                        pickupNeeded: '',
+                                        dropoffNeeded: ''
+                                    };
+                                    console.log(`Added profile for uniqueId ${result.uniqueId} from associatedRegistrations:`, profileData.name);
+                                } else {
+                                    // No registration document and no associatedReg data, create minimal profile
+                                    profileData = {
+                                        uniqueId: result.uniqueId,
+                                        name: userData.name || '',
+                                        email: userEmail,
+                                        country: '',
+                                        shreni: '',
+                                        barcode: result.uniqueId,
+                                        phone: '',
+                                        whatsapp: '',
+                                        address: '',
+                                        city: '',
+                                        state: '',
+                                        postalCode: '',
+                                        gender: '',
+                                        age: '',
+                                        occupation: '',
+                                        educationalQual: '',
+                                        zone: '',
+                                        ganveshSize: '',
+                                        sanghYears: '',
+                                        hssResponsibility: '',
+                                        currentResponsibility: '',
+                                        otherOrgResponsibility: '',
+                                        shikshaVarg: '',
+                                        emergencyContactName: '',
+                                        emergencyContactNumber: '',
+                                        emergencyContactRelation: '',
+                                        pickupNeeded: '',
+                                        dropoffNeeded: ''
+                                    };
+                                    console.warn(`No registration data found for uniqueId ${result.uniqueId}, creating minimal profile`);
+                                }
+                            }
+                            
+                            // Ensure uniqueId is set
+                            if (!profileData.uniqueId && result.uniqueId) {
+                                profileData.uniqueId = result.uniqueId;
+                            }
+                            
+                            if (profileData && profileData.uniqueId) {
+                                profiles.push(profileData);
+                            }
+                        });
+                        
+                        // If no profiles found, try primary user data
+                        if (profiles.length === 0 && primaryUniqueId) {
+                            console.log('No profiles from registrations, trying user document data');
+                            const profileData = extractProfileData(userData, userData, userEmail);
+                            if (profileData.name || profileData.email) {
+                                profiles.push(profileData);
+                            }
+                        }
+                        
+                        // If still no profiles, show error
+                        if (profiles.length === 0) {
+                            console.error('No profiles found after all attempts');
+                            profileInfo.innerHTML = '<p>Profile information not found.</p>';
+                            return;
+                        }
+                        
+                        console.log(`Rendering ${profiles.length} profile cards:`, profiles.map(p => ({
+                            uniqueId: p.uniqueId,
+                            name: p.name
+                        })));
+                        
+                        // Render all profile cards (first one expanded by default)
+                        const cardsHTML = profiles.map((profile, index) => 
+                            createProfileCardHTML(profile, index, index === 0)
+                        ).join('');
+                        
+                        profileInfo.innerHTML = `
+                            <div class="user-profiles-container">
+                                ${cardsHTML}
+                            </div>
+                        `;
+                    });
             })
             .catch((error) => {
                 console.error('Error loading profile:', error);

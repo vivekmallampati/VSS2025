@@ -51,6 +51,19 @@ service cloud.firestore {
       // Users cannot delete their own data (admin only)
       allow delete: if false;
     }
+    
+    // EmailToUids collection - maps emails to associated uniqueIds
+    // Document ID is normalized email (lowercase)
+    match /emailToUids/{normalizedEmail} {
+      // Authenticated users can read their own email mapping
+      // The document ID is the normalized email (lowercase), compare with normalized user email
+      allow read: if request.auth != null && 
+                    (normalizedEmail == request.auth.token.email.lower() ||
+                     (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email.lower() == normalizedEmail));
+      // Only admin can create/update/delete (handled via Admin SDK)
+      allow create, update, delete: if false;
+    }
   }
 }
 

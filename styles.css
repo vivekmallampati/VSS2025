@@ -1996,6 +1996,145 @@ body {
     font-weight: 600;
 }
 
+/* User Profile Cards Container */
+.user-profiles-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+/* Expandable User Profile Card */
+.user-profile-card {
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px var(--shadow);
+    border: 1px solid var(--light-cream);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.user-profile-card:hover {
+    box-shadow: 0 4px 15px var(--shadow-dark);
+    border-color: var(--primary-brown);
+}
+
+.user-profile-card.expanded {
+    border-color: var(--primary-brown);
+    border-width: 2px;
+}
+
+/* Card Header - Clickable */
+.user-profile-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--light-cream), var(--white));
+    transition: background 0.3s ease;
+    user-select: none;
+}
+
+.user-profile-card-header:hover {
+    background: linear-gradient(135deg, var(--light-cream), #faf9f5);
+}
+
+.user-profile-card-summary {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.user-profile-name {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.user-profile-name strong {
+    color: var(--primary-brown);
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.user-profile-id {
+    color: var(--text-dark);
+    font-size: 0.95rem;
+    font-weight: 500;
+    background: var(--light-cream);
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+}
+
+.user-profile-basic-info {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.user-profile-badge {
+    background: var(--primary-brown);
+    color: var(--white);
+    padding: 0.4rem 0.8rem;
+    border-radius: 15px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.user-profile-card-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary-brown);
+    color: var(--white);
+    transition: transform 0.3s ease;
+}
+
+.user-profile-card.expanded .user-profile-card-toggle {
+    transform: rotate(0deg);
+}
+
+.toggle-icon {
+    font-size: 0.9rem;
+    font-weight: bold;
+    transition: transform 0.3s ease;
+}
+
+/* Card Content - Expandable Section */
+.user-profile-card-content {
+    padding: 1.5rem;
+    background: var(--white);
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 5000px;
+    }
+}
+
+.user-profile-card-actions {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--light-cream);
+}
+
+.btn-sm {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+}
+
 .tours-tabs {
     display: flex;
     gap: 0.5rem;
