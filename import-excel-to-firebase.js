@@ -56,6 +56,8 @@ console.log(`Found ${data.length} records in Excel file`);
 async function importData() {
     let successCount = 0;
     let errorCount = 0;
+    // Map to track email -> array of UIDs
+    const emailToUidsMap = new Map();
 
     for (const row of data) {
         try {
@@ -79,6 +81,19 @@ async function importData() {
             
             // Ensure praveshikaId is a string (Firestore document IDs must be strings)
             const praveshikaIdString = String(praveshikaId).trim();
+
+            // Track email -> UID mapping (only if email exists)
+            if (email && email.trim()) {
+                const normalizedEmail = email.toLowerCase().trim();
+                if (!emailToUidsMap.has(normalizedEmail)) {
+                    emailToUidsMap.set(normalizedEmail, []);
+                }
+                // Add UID to the array if not already present (avoid duplicates)
+                const existingUids = emailToUidsMap.get(normalizedEmail);
+                if (!existingUids.includes(praveshikaIdString)) {
+                    existingUids.push(praveshikaIdString);
+                }
+            }
 
             // Create registration document with normalized field names
             const registrationData = {
@@ -109,9 +124,31 @@ async function importData() {
         }
     }
 
+    // Write email -> UIDs mappings to Firebase
+    console.log(`\nCreating email to UIDs mappings...`);
+    let emailMappingCount = 0;
+    let emailMappingErrors = 0;
+
+    for (const [normalizedEmail, uids] of emailToUidsMap.entries()) {
+        try {
+            await db.collection('emailToUids').doc(normalizedEmail).set({
+                email: normalizedEmail,
+                uids: uids,
+                count: uids.length,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            emailMappingCount++;
+        } catch (error) {
+            console.error(`✗ Error creating email mapping for ${normalizedEmail}:`, error.message);
+            emailMappingErrors++;
+        }
+    }
+
     console.log(`\nImport completed!`);
     console.log(`Success: ${successCount}`);
     console.log(`Errors: ${errorCount}`);
+    console.log(`Email mappings created: ${emailMappingCount}`);
+    console.log(`Email mapping errors: ${emailMappingErrors}`);
 }
 
 // Run import
