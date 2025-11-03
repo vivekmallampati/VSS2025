@@ -12,6 +12,37 @@
     --shadow-dark: rgba(0, 0, 0, 0.2);
 }
 
+.shibir-nav {
+  background-color: #fff8dc; /* soft yellow tone like your screenshot */
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 15px;
+  border-radius: 10px;
+}
+
+.shibir-nav button {
+  background-color: #d18b47; /* warm brown tone for harmony */
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  transition: background-color 0.3s, transform 0.1s;
+}
+
+.shibir-nav button:hover {
+  background-color: #b36d30;
+  transform: translateY(-2px);
+}
+
+.shibir-nav button:active {
+  transform: translateY(0);
+}
+
+
 /* Reset and Base Styles */
 * {
     margin: 0;
