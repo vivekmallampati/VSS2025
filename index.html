@@ -920,5 +920,17 @@
     <!-- Load external config (will be ignored if inline fallback already initialized) -->
     <script src="firebase-config.js"></script>
     <script src="script.js"></script>
+    <script>
+function openSubTab(tabName) {
+  const subTabs = document.querySelectorAll('.subtab-content');
+  const subButtons = document.querySelectorAll('.subtab-button');
+
+  subTabs.forEach(tab => tab.style.display = 'none');
+  subButtons.forEach(btn => btn.classList.remove('active'));
+
+  document.getElementById(tabName).style.display = 'block';
+  event.currentTarget.classList.add('active');
+}
+</script>
 </body>
 </html>
