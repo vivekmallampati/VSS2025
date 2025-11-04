@@ -43,6 +43,7 @@
                 </li>
                 <li id="myTransportationNavItem" style="display: none;"><a href="#mytransportation" class="nav-link" data-tab="mytransportation">My Transportation</a></li>
                 <li id="myToursNavItem" style="display: none;"><a href="#mytours" class="nav-link" data-tab="mytours">My Tours</a></li>
+                <li id="adminDashboardNavItem" style="display: none;"><a href="#admin-dashboard" class="nav-link" data-tab="admin-dashboard">Admin Dashboard</a></li>
                 <!-- <li><a href="#documents" class="nav-link" data-tab="documents">Documents</a></li> -->
                 <li id="mediaNavItem"><a href="#media" class="nav-link" data-tab="media">Media</a></li>
                 <!-- <li><a href="#donate" class="nav-link" data-tab="donate">Donate</a></li> -->
@@ -522,6 +523,133 @@
                 <div class="tours-content">
                     <div id="toursInfo" class="profile-tours-section">
                         <p>Loading tour information...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Dashboard Tab -->
+        <section id="admin-dashboard" class="tab-content">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Admin Dashboard</h2>
+                    <p>Registration statistics and analytics</p>
+                </div>
+                <div class="admin-dashboard-content">
+                    <div id="adminDashboardLoading" style="text-align: center; padding: 2rem;">
+                        <p>Loading dashboard data...</p>
+                    </div>
+                    
+                    <div id="adminDashboardData" style="display: none;">
+                        <!-- Key Metrics Cards -->
+                        <div class="metrics-cards">
+                            <div class="metric-card">
+                                <h3>Total Registrations</h3>
+                                <p class="metric-value" id="totalRegistrations">0</p>
+                            </div>
+                            <div class="metric-card">
+                                <h3>Users with Accounts</h3>
+                                <p class="metric-value" id="totalUsers">0</p>
+                            </div>
+                            <div class="metric-card">
+                                <h3>Countries Represented</h3>
+                                <p class="metric-value" id="totalCountries">0</p>
+                            </div>
+                            <div class="metric-card">
+                                <h3>Shreni Groups</h3>
+                                <p class="metric-value" id="totalShrenis">0</p>
+                            </div>
+                        </div>
+
+                        <!-- Country Breakdown -->
+                        <div class="analytics-section">
+                            <h3>Registrations by Country</h3>
+                            <div id="countryBreakdown" class="data-table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Country</th>
+                                            <th>Count</th>
+                                            <th>Percentage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="countryTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Shreni Breakdown -->
+                        <div class="analytics-section">
+                            <h3>Registrations by Shreni</h3>
+                            <div id="shreniBreakdown" class="data-table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Shreni</th>
+                                            <th>Count</th>
+                                            <th>Percentage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="shreniTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Tour Selections -->
+                        <div class="analytics-section">
+                            <h3>Post-Shibir Tour Selections</h3>
+                            <div id="tourBreakdown" class="data-table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Tour Option</th>
+                                            <th>Count</th>
+                                            <th>Percentage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tourTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Pickup Locations -->
+                        <div class="analytics-section">
+                            <h3>Pickup Locations</h3>
+                            <div id="pickupBreakdown" class="data-table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Pickup Location</th>
+                                            <th>Count</th>
+                                            <th>Percentage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pickupTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Gender Breakdown -->
+                        <div class="analytics-section">
+                            <h3>Gender Distribution</h3>
+                            <div id="genderBreakdown" class="data-table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Gender</th>
+                                            <th>Count</th>
+                                            <th>Percentage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="genderTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

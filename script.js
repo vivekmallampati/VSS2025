@@ -34,11 +34,48 @@ function waitForFirebase(callback, maxRetries = 50) {
 }
 
 // Protected tabs that require authentication
-const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours'];
+const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours', 'admin-dashboard'];
 
 // Helper function to check if a tab is protected
 function isProtectedTab(tabName) {
     return PROTECTED_TABS.includes(tabName);
+}
+
+// Helper function to check if user is a superadmin
+// 
+// TO SETUP INITIAL SUPERADMIN:
+// 1. User must first register an account through the normal registration flow
+// 2. Once registered, go to Firebase Console > Firestore Database
+// 3. Navigate to the 'users' collection
+// 4. Find the user document by their UID (you can find this in Firebase Authentication)
+// 5. Edit the document and add a field: role = "superadmin" (type: string)
+// 6. Save the document
+// 7. The user will now have access to the Admin Dashboard on next login
+//
+// ALTERNATIVE: Use Firebase Admin SDK to set role programmatically:
+//   const admin = require('firebase-admin');
+//   const db = admin.firestore();
+//   await db.collection('users').doc(USER_UID).update({ role: 'superadmin' });
+//
+async function isSuperadmin(user) {
+    if (!user || !window.firebase || !firebase.firestore) {
+        return false;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        
+        if (!userDoc.exists) {
+            return false;
+        }
+        
+        const userData = userDoc.data();
+        return userData.role === 'superadmin';
+    } catch (error) {
+        console.error('Error checking superadmin status:', error);
+        return false;
+    }
 }
 
 // Helper function to check if user can access a protected tab
@@ -112,6 +149,9 @@ function activateTab(tabName, skipAuthCheck = false) {
                         break;
                     case 'mytours':
                         loadToursInfo(user);
+                        break;
+                    case 'admin-dashboard':
+                        loadAdminDashboard(user);
                         break;
                 }
             }
@@ -1275,7 +1315,7 @@ function updateAuthUI() {
     // Wait for Firebase to be initialized
     waitForFirebase(function() {
         if (window.firebase && firebase.auth) {
-            firebase.auth().onAuthStateChanged((user) => {
+            firebase.auth().onAuthStateChanged(async (user) => {
             const loginBtn = document.querySelector('.header-actions .login-btn');
             const homeNavItem = document.getElementById('homeNavItem');
             const aboutNavItem = document.getElementById('aboutNavItem');
@@ -1284,8 +1324,12 @@ function updateAuthUI() {
             const myProfileNavItem = document.getElementById('myProfileNavItem');
             const myTransportationNavItem = document.getElementById('myTransportationNavItem');
             const myToursNavItem = document.getElementById('myToursNavItem');
+            const adminDashboardNavItem = document.getElementById('adminDashboardNavItem');
             
             if (user) {
+                // Check if user is superadmin
+                const isAdmin = await isSuperadmin(user);
+                
                 // User is logged in
                 if (loginBtn) {
                     loginBtn.textContent = 'Logout';
@@ -1331,6 +1375,15 @@ function updateAuthUI() {
                     myToursNavItem.style.display = '';
                     loadToursInfo(user);
                 }
+                
+                // Show admin dashboard only for superadmins
+                if (adminDashboardNavItem) {
+                    if (isAdmin) {
+                        adminDashboardNavItem.style.display = '';
+                    } else {
+                        adminDashboardNavItem.style.display = 'none';
+                    }
+                }
             } else {
                 // User is logged out
                 if (loginBtn) {
@@ -1362,6 +1415,9 @@ function updateAuthUI() {
                 if (myToursNavItem) {
                     myToursNavItem.style.display = 'none';
                 }
+                if (adminDashboardNavItem) {
+                    adminDashboardNavItem.style.display = 'none';
+                }
                 
                 // If user is on protected tab, redirect to home
                 const currentHash = window.location.hash.substring(1);
@@ -1380,6 +1436,7 @@ function updateAuthUI() {
             const myProfileNavItem = document.getElementById('myProfileNavItem');
             const myTransportationNavItem = document.getElementById('myTransportationNavItem');
             const myToursNavItem = document.getElementById('myToursNavItem');
+            const adminDashboardNavItem = document.getElementById('adminDashboardNavItem');
             if (homeNavItem) homeNavItem.style.display = '';
             if (aboutNavItem) aboutNavItem.style.display = '';
             if (mediaNavItem) mediaNavItem.style.display = '';
@@ -1387,6 +1444,7 @@ function updateAuthUI() {
             if (myProfileNavItem) myProfileNavItem.style.display = 'none';
             if (myTransportationNavItem) myTransportationNavItem.style.display = 'none';
             if (myToursNavItem) myToursNavItem.style.display = 'none';
+            if (adminDashboardNavItem) adminDashboardNavItem.style.display = 'none';
         }
     });
 }
@@ -3293,6 +3351,156 @@ function saveToursInfo(uniqueId) {
                 showNotification(errorMsg, 'error');
             });
     }
+}
+
+// Admin Dashboard Functions
+async function loadAdminDashboard(user) {
+    // Verify user is superadmin
+    const isAdmin = await isSuperadmin(user);
+    if (!isAdmin) {
+        const loadingDiv = document.getElementById('adminDashboardLoading');
+        if (loadingDiv) {
+            loadingDiv.innerHTML = '<p style="color: red;">Access denied. You do not have permission to view this dashboard.</p>';
+        }
+        return;
+    }
+    
+    const loadingDiv = document.getElementById('adminDashboardLoading');
+    const dataDiv = document.getElementById('adminDashboardData');
+    
+    if (!loadingDiv || !dataDiv) return;
+    
+    loadingDiv.style.display = 'block';
+    dataDiv.style.display = 'none';
+    
+    if (!window.firebase || !firebase.firestore) {
+        loadingDiv.innerHTML = '<p style="color: red;">Firebase not initialized.</p>';
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Fetch all registrations
+        const registrationsSnapshot = await db.collection('registrations').get();
+        const registrations = [];
+        registrationsSnapshot.forEach(doc => {
+            registrations.push(doc.data());
+        });
+        
+        // Fetch all users
+        const usersSnapshot = await db.collection('users').get();
+        const users = [];
+        usersSnapshot.forEach(doc => {
+            users.push(doc.data());
+        });
+        
+        // Calculate statistics
+        const stats = calculateStatistics(registrations, users);
+        
+        // Display statistics
+        displayAdminStatistics(stats);
+        
+        // Show data div, hide loading
+        loadingDiv.style.display = 'none';
+        dataDiv.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error loading admin dashboard:', error);
+        loadingDiv.innerHTML = '<p style="color: red;">Error loading dashboard data. Please try again.</p>';
+    }
+}
+
+function calculateStatistics(registrations, users) {
+    const stats = {
+        totalRegistrations: registrations.length,
+        totalUsers: users.length,
+        countryBreakdown: {},
+        shreniBreakdown: {},
+        tourBreakdown: {},
+        pickupBreakdown: {},
+        genderBreakdown: {}
+    };
+    
+    // Process each registration
+    registrations.forEach(reg => {
+        // Country breakdown
+        const country = reg.Country || reg.country || reg['Country of Current Residence'] || 'Unknown';
+        stats.countryBreakdown[country] = (stats.countryBreakdown[country] || 0) + 1;
+        
+        // Shreni breakdown
+        const shreni = reg.Shreni || reg.shreni || reg['Corrected Shreni'] || reg['Default Shreni'] || 'Unknown';
+        stats.shreniBreakdown[shreni] = (stats.shreniBreakdown[shreni] || 0) + 1;
+        
+        // Tour breakdown
+        const tour = reg.postShibirTour || reg['Post Shibir Tour'] || reg['Post Shibir Tours'] || 
+                    reg['Please select a post shibir tour option'] || 'Not Selected';
+        stats.tourBreakdown[tour] = (stats.tourBreakdown[tour] || 0) + 1;
+        
+        // Pickup location breakdown
+        const pickup = reg.pickupLocation || reg['Pickup Location'] || 
+                      reg['Do you need a pickup on arrival?'] || 'Not Specified';
+        stats.pickupBreakdown[pickup] = (stats.pickupBreakdown[pickup] || 0) + 1;
+        
+        // Gender breakdown
+        const gender = reg.gender || reg.Gender || 'Not Specified';
+        stats.genderBreakdown[gender] = (stats.genderBreakdown[gender] || 0) + 1;
+    });
+    
+    // Calculate totals for percentages
+    stats.totalCountries = Object.keys(stats.countryBreakdown).length;
+    stats.totalShrenis = Object.keys(stats.shreniBreakdown).length;
+    
+    return stats;
+}
+
+function displayAdminStatistics(stats) {
+    // Update metric cards
+    document.getElementById('totalRegistrations').textContent = stats.totalRegistrations;
+    document.getElementById('totalUsers').textContent = stats.totalUsers;
+    document.getElementById('totalCountries').textContent = stats.totalCountries;
+    document.getElementById('totalShrenis').textContent = stats.totalShrenis;
+    
+    // Display country breakdown
+    displayBreakdownTable('countryTableBody', stats.countryBreakdown, stats.totalRegistrations);
+    
+    // Display shreni breakdown
+    displayBreakdownTable('shreniTableBody', stats.shreniBreakdown, stats.totalRegistrations);
+    
+    // Display tour breakdown
+    displayBreakdownTable('tourTableBody', stats.tourBreakdown, stats.totalRegistrations);
+    
+    // Display pickup breakdown
+    displayBreakdownTable('pickupTableBody', stats.pickupBreakdown, stats.totalRegistrations);
+    
+    // Display gender breakdown
+    displayBreakdownTable('genderTableBody', stats.genderBreakdown, stats.totalRegistrations);
+}
+
+function displayBreakdownTable(tableBodyId, breakdown, total) {
+    const tbody = document.getElementById(tableBodyId);
+    if (!tbody) return;
+    
+    // Sort by count descending
+    const sortedEntries = Object.entries(breakdown).sort((a, b) => b[1] - a[1]);
+    
+    let html = '';
+    sortedEntries.forEach(([key, count]) => {
+        const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+        html += `
+            <tr>
+                <td>${escapeHtml(key)}</td>
+                <td>${count}</td>
+                <td>${percentage}%</td>
+            </tr>
+        `;
+    });
+    
+    if (sortedEntries.length === 0) {
+        html = '<tr><td colspan="3" style="text-align: center;">No data available</td></tr>';
+    }
+    
+    tbody.innerHTML = html;
 }
 
 // Badge Feature Functions

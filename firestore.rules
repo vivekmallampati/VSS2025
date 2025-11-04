@@ -1,6 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to check if user is a superadmin
+    function isSuperadmin() {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
+    }
+    
     // Helper function to check if user owns the registration
     function isOwnerOfRegistration(registrationId) {
       return request.auth != null && 
@@ -44,8 +51,8 @@ service cloud.firestore {
     
     // Users collection
     match /users/{userId} {
-      // Users can read their own data (needed for profile loading)
-      allow read: if request.auth != null && request.auth.uid == userId;
+      // Users can read their own data, superadmins can read all user data
+      allow read: if request.auth != null && (request.auth.uid == userId || isSuperadmin());
       // Users can create/update their own data
       allow create, update: if request.auth != null && request.auth.uid == userId;
       // Users cannot delete their own data (admin only)
@@ -55,10 +62,11 @@ service cloud.firestore {
     // EmailToUids collection - maps emails to associated uniqueIds
     // Document ID is normalized email (lowercase)
     match /emailToUids/{normalizedEmail} {
-      // Authenticated users can read their own email mapping
+      // Authenticated users can read their own email mapping, superadmins can read all
       // The document ID is the normalized email (lowercase), compare with normalized user email
       allow read: if request.auth != null && 
-                    (normalizedEmail == request.auth.token.email.lower() ||
+                    (isSuperadmin() ||
+                     normalizedEmail == request.auth.token.email.lower() ||
                      (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email.lower() == normalizedEmail));
       // Only admin can create/update/delete (handled via Admin SDK)
