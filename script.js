@@ -460,8 +460,32 @@ document.addEventListener('DOMContentLoaded', function() {
             
             showNotification('Sending your message...', 'info');
             
-            // Function to send email via EmailJS
-            const sendEmail = () => {
+            // Function to send email via API endpoint
+            const sendEmailViaAPI = () => {
+                return fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        email: email,
+                        category: category,
+                        message: message
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => {
+                            throw new Error(err.error || 'Failed to send email');
+                        });
+                    }
+                    return response.json();
+                });
+            };
+            
+            // Function to send email via EmailJS (fallback)
+            const sendEmailViaEmailJS = () => {
                 return new Promise((resolve, reject) => {
                     // Check if EmailJS is configured and available
                     if (typeof emailjs !== 'undefined' && 
@@ -491,6 +515,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         resolve(null);
                     }
                 });
+            };
+            
+            // Try API endpoint first, fallback to EmailJS if API fails
+            const sendEmail = () => {
+                return sendEmailViaAPI()
+                    .catch((apiError) => {
+                        console.warn('API email failed, trying EmailJS fallback:', apiError);
+                        return sendEmailViaEmailJS();
+                    });
             };
             
             // Save to Firestore
