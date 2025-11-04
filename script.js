@@ -3419,6 +3419,7 @@ function calculateStatistics(registrations, users) {
         shreniBreakdown: {},
         tourBreakdown: {},
         pickupBreakdown: {},
+        dropoffBreakdown: {},
         genderBreakdown: {}
     };
     
@@ -3441,6 +3442,11 @@ function calculateStatistics(registrations, users) {
         const pickup = reg.pickupLocation || reg['Pickup Location'] || 
                       reg['Do you need a pickup on arrival?'] || 'Not Specified';
         stats.pickupBreakdown[pickup] = (stats.pickupBreakdown[pickup] || 0) + 1;
+        
+        // Dropoff location breakdown
+        const dropoff = reg.dropoffLocation || reg['Dropoff Location'] || 
+                       reg['Drop-off Location'] || reg['Return Location'] || 'Not Specified';
+        stats.dropoffBreakdown[dropoff] = (stats.dropoffBreakdown[dropoff] || 0) + 1;
         
         // Gender breakdown
         const gender = reg.gender || reg.Gender || 'Not Specified';
@@ -3472,6 +3478,9 @@ function displayAdminStatistics(stats) {
     
     // Display pickup breakdown
     displayBreakdownTable('pickupTableBody', stats.pickupBreakdown, stats.totalRegistrations);
+    
+    // Display dropoff breakdown
+    displayBreakdownTable('dropoffTableBody', stats.dropoffBreakdown, stats.totalRegistrations);
     
     // Display gender breakdown
     displayBreakdownTable('genderTableBody', stats.genderBreakdown, stats.totalRegistrations);
