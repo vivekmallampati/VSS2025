@@ -24,3 +24,6 @@ Thumbs.db
 
 *.xlsx
 *.xlsx
+
+.env.*
+.env

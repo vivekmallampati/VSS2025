@@ -502,7 +502,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Function to send email via API endpoint
             const sendEmailViaAPI = () => {
-                return fetch('/api/send-email', {
+                // Use full URL to work in all environments
+                const apiUrl = window.location.origin + '/api/send-email';
+                return fetch(apiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

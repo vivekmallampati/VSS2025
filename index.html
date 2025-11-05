@@ -828,56 +828,57 @@
             configScript.src = 'firebase-config.js';
             configScript.onerror = function() {
                 // Fallback: Initialize Firebase inline if external file fails
-                
-                // Firebase Configuration
-                const firebaseConfig = {
-                    apiKey: "AIzaSyCe-asXYBrIwlaL1V4-WaX598R1H9B_E_Y",
-                    authDomain: "vss2025-a8b47.firebaseapp.com",
-                    projectId: "vss2025-a8b47",
-                    storageBucket: "vss2025-a8b47.firebasestorage.app",
-                    messagingSenderId: "145421955139",
-                    appId: "1:145421955139:web:982246aec184de7f3264f6",
-                    measurementId: "G-FQ9MSQ4890"
-                };
+                // Only initialize if firebaseConfig hasn't been declared already
+                if (typeof window.firebaseConfigFallback === 'undefined') {
+                    window.firebaseConfigFallback = {
+                        apiKey: "AIzaSyCe-asXYBrIwlaL1V4-WaX598R1H9B_E_Y",
+                        authDomain: "vss2025-a8b47.firebaseapp.com",
+                        projectId: "vss2025-a8b47",
+                        storageBucket: "vss2025-a8b47.firebasestorage.app",
+                        messagingSenderId: "145421955139",
+                        appId: "1:145421955139:web:982246aec184de7f3264f6",
+                        measurementId: "G-FQ9MSQ4890"
+                    };
 
-                // Initialize Firebase with retry logic
-                function initializeFirebase() {
-                    if (typeof firebase === 'undefined') {
-                        setTimeout(initializeFirebase, 100);
-                        return;
-                    }
-
-                    try {
-                        if (firebase.apps && firebase.apps.length > 0) {
-                            if (typeof window !== 'undefined') {
-                                window.firebaseInitialized = true;
-                            }
+                    // Initialize Firebase with retry logic
+                    function initializeFirebase() {
+                        if (typeof firebase === 'undefined') {
+                            setTimeout(initializeFirebase, 100);
                             return;
                         }
 
-                        firebase.initializeApp(firebaseConfig);
-                        if (typeof window !== 'undefined') {
-                            window.firebaseInitialized = true;
-                        }
-                    } catch (error) {
-                        if (error.code !== 'app/duplicate-app') {
-                            setTimeout(initializeFirebase, 500);
+                        try {
+                            if (firebase.apps && firebase.apps.length > 0) {
+                                if (typeof window !== 'undefined') {
+                                    window.firebaseInitialized = true;
+                                }
+                                return;
+                            }
+
+                            firebase.initializeApp(window.firebaseConfigFallback);
+                            if (typeof window !== 'undefined') {
+                                window.firebaseInitialized = true;
+                            }
+                        } catch (error) {
+                            if (error.code !== 'app/duplicate-app') {
+                                setTimeout(initializeFirebase, 500);
+                            }
                         }
                     }
-                }
 
-                setTimeout(function() {
-                    initializeFirebase();
-                }, 50);
+                    setTimeout(function() {
+                        initializeFirebase();
+                    }, 50);
 
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', function() {
-                        setTimeout(function() {
-                            if (!window.firebase || !window.firebase.apps || window.firebase.apps.length === 0) {
-                                initializeFirebase();
-                            }
-                        }, 100);
-                    });
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', function() {
+                            setTimeout(function() {
+                                if (!window.firebase || !window.firebase.apps || window.firebase.apps.length === 0) {
+                                    initializeFirebase();
+                                }
+                            }, 100);
+                        });
+                    }
                 }
             };
             document.head.appendChild(configScript);

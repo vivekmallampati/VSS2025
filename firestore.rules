@@ -72,6 +72,16 @@ service cloud.firestore {
       // Only admin can create/update/delete (handled via Admin SDK)
       allow create, update, delete: if false;
     }
+    
+    // ContactMessages collection - public contact form submissions
+    match /contactMessages/{messageId} {
+      // Anyone can create contact messages (contact form is public)
+      allow create: if true;
+      // Only superadmins can read contact messages
+      allow read: if isSuperadmin();
+      // No updates or deletes allowed (contact messages are immutable)
+      allow update, delete: if false;
+    }
   }
 }
 
