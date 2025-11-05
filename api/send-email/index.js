@@ -50,9 +50,18 @@ module.exports = async (req, res) => {
 
     // Check if SMTP is configured
     if (!smtpHost || !smtpUser || !smtpPass) {
-      console.error('SMTP configuration missing. Required: SMTP_HOST, SMTP_USER, SMTP_PASS');
+      const missing = [];
+      if (!smtpHost) missing.push('SMTP_HOST');
+      if (!smtpUser) missing.push('SMTP_USER');
+      if (!smtpPass) missing.push('SMTP_PASS');
+      
+      console.error('SMTP configuration missing:', missing.join(', '));
+      console.error('Required environment variables: SMTP_HOST, SMTP_USER, SMTP_PASS');
+      console.error('Optional: SMTP_PORT (default: 587), TO_EMAIL (default: info@vss2025.org)');
+      
       return res.status(500).json({ 
-        error: 'Email service not configured. Please contact the administrator.' 
+        error: 'Email service not configured. Please contact the administrator.',
+        details: `Missing: ${missing.join(', ')}`
       });
     }
 
