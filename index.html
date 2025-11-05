@@ -123,14 +123,48 @@
                     <h2>Shibirarthi Information</h2>
                     <p>Important information and guidelines for approved participants</p>
                     <div class="shibir-nav">
-  <button onclick="navigateToShibirSection('general')">General Guidelines</button>
-  <button onclick="navigateToShibirSection('ganvesh')">Ganvesh</button>
-  <button onclick="navigateToShibirSection('accommodation')">Accommodation</button>
-  <button onclick="navigateToShibirSection('pickup')">Pickup</button>
-  <button onclick="navigateToShibirSection('return-journey')">Return Journey</button>
-  <button onclick="navigateToShibirSection('things-to-carry')">Things to Carry</button>
-  <button onclick="navigateToShibirSection('contact-points')">Contact</button>
+  <!-- Sub Tabs -->
+  <div class="subtab-container">
+    <button class="subtab-button active" onclick="openSubTab('general')">General Guidelines</button>
+    <button class="subtab-button" onclick="openSubTab('particulars')">Particulars</button>
+    <button class="subtab-button" onclick="openSubTab('forms')">Forms</button>
+    <button class="subtab-button" onclick="openSubTab('accommodation')">Accommodation</button>
+    <button class="subtab-button" onclick="openSubTab('food')">Food</button>
+    <button class="subtab-button" onclick="openSubTab('transport')">Transport</button>
+  </div>
+
+  <!-- Sub Tab Content -->
+  <div id="general" class="subtab-content" style="display:block;">
+    <h3>General Guidelines</h3>
+    <p>All general guidelines for Shibirarthis will be displayed here...</p>
+  </div>
+
+  <div id="particulars" class="subtab-content">
+    <h3>Particulars</h3>
+    <p>Enter or view particulars of participants here...</p>
+  </div>
+
+  <div id="forms" class="subtab-content">
+    <h3>Forms</h3>
+    <p>Form submissions, downloads, and registration links will go here...</p>
+  </div>
+
+  <div id="accommodation" class="subtab-content">
+    <h3>Accommodation</h3>
+    <p>Accommodation details for Shibirarthis go here...</p>
+  </div>
+
+  <div id="food" class="subtab-content">
+    <h3>Food Arrangements</h3>
+    <p>Details regarding meals and food services will be provided here...</p>
+  </div>
+
+  <div id="transport" class="subtab-content">
+    <h3>Transport</h3>
+    <p>Transport schedules and pickup/drop arrangements will appear here...</p>
+  </div>
 </div>
+
 
                 </div>
                 
@@ -989,5 +1023,17 @@
     <!-- Load external config (will be ignored if inline fallback already initialized) -->
     <script src="firebase-config.js"></script>
     <script src="script.js"></script>
+    <script>
+function openSubTab(tabName) {
+  const subTabs = document.querySelectorAll('.subtab-content');
+  const subButtons = document.querySelectorAll('.subtab-button');
+
+  subTabs.forEach(tab => tab.style.display = 'none');
+  subButtons.forEach(btn => btn.classList.remove('active'));
+
+  document.getElementById(tabName).style.display = 'block';
+  event.currentTarget.classList.add('active');
+}
+</script>
 </body>
 </html>
