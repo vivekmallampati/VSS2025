@@ -548,8 +548,13 @@
                                 <p class="metric-value" id="totalRegistrations">0</p>
                             </div>
                             <div class="metric-card">
-                                <h3>Users with Accounts</h3>
-                                <p class="metric-value" id="totalUsers">0</p>
+                                <h3>Users Accounts Created</h3>
+                                <p class="metric-value" id="totalUserAccounts">0</p>
+                                <p class="metric-subtitle">Unique email addresses</p>
+                            </div>
+                            <div class="metric-card">
+                                <h3>Praveshika IDs Registered</h3>
+                                <p class="metric-value" id="totalPraveshikaIds">0</p>
                             </div>
                             <div class="metric-card">
                                 <h3>Countries Represented</h3>
@@ -558,6 +563,43 @@
                             <div class="metric-card">
                                 <h3>Shreni Groups</h3>
                                 <p class="metric-value" id="totalShrenis">0</p>
+                            </div>
+                        </div>
+
+                        <!-- Zone Breakdown -->
+                        <div class="analytics-section">
+                            <h3>Registrations by Zone</h3>
+                            <p class="section-description">Click on a zone to see country-wise breakdown</p>
+                            <div id="zoneBreakdown" class="data-table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Zone</th>
+                                            <th>Count</th>
+                                            <th>Percentage</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="zoneTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="zoneCountryDetails" style="display: none; margin-top: 2rem;">
+                                <h4 id="zoneCountryTitle">Countries in Zone</h4>
+                                <button class="btn btn-secondary" onclick="closeZoneCountryDetails()" style="margin-bottom: 1rem;">← Back to Zones</button>
+                                <div class="data-table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Country</th>
+                                                <th>Count</th>
+                                                <th>Percentage</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="zoneCountryTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
 
@@ -666,6 +708,82 @@
                                     <tbody id="genderTableBody">
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+
+                        <!-- Transportation Analytics Section -->
+                        <div class="analytics-section" style="border-top: 2px solid #e0e0e0; margin-top: 3rem; padding-top: 2rem;">
+                            <h2 style="margin-bottom: 1.5rem;">Transportation Analytics</h2>
+                            
+                            <!-- Transportation Change Tracking -->
+                            <div class="transportation-changes-section">
+                                <h3>Transportation Changes</h3>
+                                <div class="change-filters" style="margin-bottom: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+                                    <button class="btn btn-primary" onclick="loadTransportationChanges('day')">Last Day</button>
+                                    <button class="btn btn-primary" onclick="loadTransportationChanges('week')">Last Week</button>
+                                    <button class="btn btn-primary" onclick="loadTransportationChanges('all')">Anytime</button>
+                                </div>
+                                <div class="change-stats" style="margin-bottom: 1.5rem;">
+                                    <p><strong>Total Changes:</strong> <span id="totalTransportationChanges">0</span></p>
+                                </div>
+                                <div id="transportationChangesList" class="data-table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Praveshika ID</th>
+                                                <th>Email</th>
+                                                <th>Pickup Location</th>
+                                                <th>Arrival Date</th>
+                                                <th>Arrival Time</th>
+                                                <th>Last Updated</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="transportationChangesTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Pickup Location Summary -->
+                            <div class="pickup-location-summary" style="margin-top: 2rem;">
+                                <h3>Pickup Location Summary</h3>
+                                <div id="pickupLocationSummary" class="data-table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Pickup Location</th>
+                                                <th>Count</th>
+                                                <th>Percentage</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="pickupLocationSummaryTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Complex Transportation View: Users by Location, Date, Time -->
+                            <div class="complex-transportation-view" style="margin-top: 2rem;">
+                                <h3>Transportation Details by Location, Date & Time</h3>
+                                <p class="section-description">Users sorted by pickup location, then by date, then by time</p>
+                                <div id="complexTransportationView" class="data-table-container" style="max-height: 600px; overflow-y: auto;">
+                                    <table class="data-table">
+                                        <thead style="position: sticky; top: 0; background: white; z-index: 10;">
+                                            <tr>
+                                                <th>Pickup Location</th>
+                                                <th>Arrival Date</th>
+                                                <th>Arrival Time</th>
+                                                <th>Name</th>
+                                                <th>Praveshika ID</th>
+                                                <th>Flight/Train Number</th>
+                                                <th>Email</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="complexTransportationTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>

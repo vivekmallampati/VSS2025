@@ -3401,7 +3401,13 @@ async function loadAdminDashboard(user) {
         const stats = calculateStatistics(registrations, users);
         
         // Display statistics
-        displayAdminStatistics(stats);
+        displayAdminStatistics(stats, registrations);
+        
+        // Load transportation analytics
+        loadTransportationAnalytics(registrations);
+        
+        // Load transportation changes (default to "all")
+        loadTransportationChanges('all');
         
         // Show data div, hide loading
         loadingDiv.style.display = 'none';
@@ -3417,7 +3423,11 @@ function calculateStatistics(registrations, users) {
     const stats = {
         totalRegistrations: registrations.length,
         totalUsers: users.length,
+        totalUserAccounts: 0, // Unique email addresses
+        totalPraveshikaIds: registrations.length,
         countryBreakdown: {},
+        zoneBreakdown: {},
+        zoneCountryMap: {}, // Map of zone -> {country: count}
         shreniBreakdown: {},
         tourBreakdown: {},
         pickupBreakdown: {},
@@ -3425,11 +3435,30 @@ function calculateStatistics(registrations, users) {
         genderBreakdown: {}
     };
     
+    // Count unique email addresses
+    const uniqueEmails = new Set();
+    users.forEach(user => {
+        if (user.email) {
+            uniqueEmails.add(user.email.toLowerCase().trim());
+        }
+    });
+    stats.totalUserAccounts = uniqueEmails.size;
+    
     // Process each registration
     registrations.forEach(reg => {
         // Country breakdown
         const country = reg.Country || reg.country || reg['Country of Current Residence'] || 'Unknown';
         stats.countryBreakdown[country] = (stats.countryBreakdown[country] || 0) + 1;
+        
+        // Zone breakdown (zone can be in various fields)
+        const zone = reg.Zone || reg.zone || reg['Zone/Shreni'] || reg['Zone'] || 'Unknown';
+        stats.zoneBreakdown[zone] = (stats.zoneBreakdown[zone] || 0) + 1;
+        
+        // Build zone -> country mapping
+        if (!stats.zoneCountryMap[zone]) {
+            stats.zoneCountryMap[zone] = {};
+        }
+        stats.zoneCountryMap[zone][country] = (stats.zoneCountryMap[zone][country] || 0) + 1;
         
         // Shreni breakdown
         const shreni = reg.Shreni || reg.shreni || reg['Corrected Shreni'] || reg['Default Shreni'] || 'Unknown';
@@ -3462,12 +3491,40 @@ function calculateStatistics(registrations, users) {
     return stats;
 }
 
-function displayAdminStatistics(stats) {
-    // Update metric cards
-    document.getElementById('totalRegistrations').textContent = stats.totalRegistrations;
-    document.getElementById('totalUsers').textContent = stats.totalUsers;
-    document.getElementById('totalCountries').textContent = stats.totalCountries;
-    document.getElementById('totalShrenis').textContent = stats.totalShrenis;
+function displayAdminStatistics(stats, registrations) {
+    // Update metric cards with null checks
+    const totalRegistrationsEl = document.getElementById('totalRegistrations');
+    if (totalRegistrationsEl) {
+        totalRegistrationsEl.textContent = stats.totalRegistrations;
+    }
+    
+    const totalUsersEl = document.getElementById('totalUsers');
+    if (totalUsersEl) {
+        totalUsersEl.textContent = stats.totalUsers;
+    }
+    
+    const totalUserAccountsEl = document.getElementById('totalUserAccounts');
+    if (totalUserAccountsEl) {
+        totalUserAccountsEl.textContent = stats.totalUserAccounts;
+    }
+    
+    const totalPraveshikaIdsEl = document.getElementById('totalPraveshikaIds');
+    if (totalPraveshikaIdsEl) {
+        totalPraveshikaIdsEl.textContent = stats.totalPraveshikaIds;
+    }
+    
+    const totalCountriesEl = document.getElementById('totalCountries');
+    if (totalCountriesEl) {
+        totalCountriesEl.textContent = stats.totalCountries;
+    }
+    
+    const totalShrenisEl = document.getElementById('totalShrenis');
+    if (totalShrenisEl) {
+        totalShrenisEl.textContent = stats.totalShrenis;
+    }
+    
+    // Display zone breakdown with clickable rows
+    displayZoneBreakdownTable(stats.zoneBreakdown, stats.zoneCountryMap, stats.totalRegistrations);
     
     // Display country breakdown
     displayBreakdownTable('countryTableBody', stats.countryBreakdown, stats.totalRegistrations);
@@ -3509,6 +3566,325 @@ function displayBreakdownTable(tableBodyId, breakdown, total) {
     
     if (sortedEntries.length === 0) {
         html = '<tr><td colspan="3" style="text-align: center;">No data available</td></tr>';
+    }
+    
+    tbody.innerHTML = html;
+}
+
+// Zone breakdown table with clickable rows
+function displayZoneBreakdownTable(zoneBreakdown, zoneCountryMap, total) {
+    const tbody = document.getElementById('zoneTableBody');
+    if (!tbody) return;
+    
+    // Sort by count descending
+    const sortedEntries = Object.entries(zoneBreakdown).sort((a, b) => b[1] - a[1]);
+    
+    let html = '';
+    sortedEntries.forEach(([zone, count]) => {
+        const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+        const zoneEscaped = escapeHtml(zone);
+        const countryMapJson = JSON.stringify(zoneCountryMap[zone] || {}).replace(/"/g, '&quot;');
+        html += `
+            <tr style="cursor: pointer;" onclick="showZoneCountryDetails('${zoneEscaped}', '${countryMapJson}', ${total})">
+                <td>${zoneEscaped}</td>
+                <td>${count}</td>
+                <td>${percentage}%</td>
+                <td><button class="btn btn-small btn-secondary">View Countries</button></td>
+            </tr>
+        `;
+    });
+    
+    if (sortedEntries.length === 0) {
+        html = '<tr><td colspan="4" style="text-align: center;">No data available</td></tr>';
+    }
+    
+    tbody.innerHTML = html;
+}
+
+// Show country breakdown for a specific zone
+function showZoneCountryDetails(zone, countryBreakdownJson, total) {
+    const zoneBreakdownDiv = document.getElementById('zoneBreakdown');
+    const zoneCountryDetailsDiv = document.getElementById('zoneCountryDetails');
+    const zoneCountryTitle = document.getElementById('zoneCountryTitle');
+    const tbody = document.getElementById('zoneCountryTableBody');
+    
+    if (!zoneBreakdownDiv || !zoneCountryDetailsDiv || !zoneCountryTitle || !tbody) return;
+    
+    // Parse the country breakdown JSON
+    let countryBreakdown;
+    try {
+        countryBreakdown = JSON.parse(countryBreakdownJson.replace(/&quot;/g, '"'));
+    } catch (e) {
+        console.error('Error parsing country breakdown:', e);
+        countryBreakdown = {};
+    }
+    
+    // Hide zone breakdown, show country details
+    zoneBreakdownDiv.style.display = 'none';
+    zoneCountryDetailsDiv.style.display = 'block';
+    zoneCountryTitle.textContent = `Countries in Zone: ${zone}`;
+    
+    // Sort by count descending
+    const sortedEntries = Object.entries(countryBreakdown).sort((a, b) => b[1] - a[1]);
+    
+    let html = '';
+    sortedEntries.forEach(([country, count]) => {
+        const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+        html += `
+            <tr>
+                <td>${escapeHtml(country)}</td>
+                <td>${count}</td>
+                <td>${percentage}%</td>
+            </tr>
+        `;
+    });
+    
+    if (sortedEntries.length === 0) {
+        html = '<tr><td colspan="3" style="text-align: center;">No data available</td></tr>';
+    }
+    
+    tbody.innerHTML = html;
+}
+
+// Close zone country details view
+function closeZoneCountryDetails() {
+    const zoneBreakdownDiv = document.getElementById('zoneBreakdown');
+    const zoneCountryDetailsDiv = document.getElementById('zoneCountryDetails');
+    
+    if (zoneBreakdownDiv) zoneBreakdownDiv.style.display = 'block';
+    if (zoneCountryDetailsDiv) zoneCountryDetailsDiv.style.display = 'none';
+}
+
+// Load transportation analytics
+function loadTransportationAnalytics(registrations) {
+    // Display pickup location summary (same as pickup breakdown)
+    const pickupBreakdown = {};
+    registrations.forEach(reg => {
+        const pickup = reg.pickupLocation || reg['Pickup Location'] || 'Not Specified';
+        pickupBreakdown[pickup] = (pickupBreakdown[pickup] || 0) + 1;
+    });
+    
+    displayBreakdownTable('pickupLocationSummaryTableBody', pickupBreakdown, registrations.length);
+    
+    // Load complex transportation view
+    displayComplexTransportationView(registrations);
+}
+
+// Load transportation changes based on time period
+async function loadTransportationChanges(period) {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized.', 'error');
+        return;
+    }
+    
+    const db = firebase.firestore();
+    const now = new Date();
+    let startTime;
+    
+    if (period === 'day') {
+        startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    } else if (period === 'week') {
+        startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else {
+        startTime = null; // Anytime
+    }
+    
+    try {
+        // For "anytime" or if query fails, use fallback approach
+        if (!startTime) {
+            // Use fallback approach for "anytime"
+            const allRegistrations = await db.collection('registrations').get();
+            const changes = [];
+            
+            allRegistrations.forEach(doc => {
+                const data = doc.data();
+                if (data.transportationUpdatedAt) {
+                    changes.push({
+                        name: data.name || data['Full Name'] || 'Unknown',
+                        uniqueId: data.uniqueId || doc.id,
+                        email: data.email || data['Email address'] || '',
+                        pickupLocation: data.pickupLocation || data['Pickup Location'] || 'Not Specified',
+                        arrivalDate: data.arrivalDate || data['Arrival Date'] || '',
+                        arrivalTime: data.arrivalTime || data['Arrival Time'] || '',
+                        transportationUpdatedAt: data.transportationUpdatedAt
+                    });
+                }
+            });
+            
+            // Sort by update time descending
+            changes.sort((a, b) => {
+                const timeA = a.transportationUpdatedAt.toDate ? a.transportationUpdatedAt.toDate() : new Date(0);
+                const timeB = b.transportationUpdatedAt.toDate ? b.transportationUpdatedAt.toDate() : new Date(0);
+                return timeB - timeA;
+            });
+            
+            // Limit to 1000 for performance
+            const limitedChanges = changes.slice(0, 1000);
+            
+            displayTransportationChanges(limitedChanges);
+            return;
+        }
+        
+        // For day/week periods, use query
+        let query = db.collection('registrations')
+            .where('transportationUpdatedAt', '>=', firebase.firestore.Timestamp.fromDate(startTime))
+            .orderBy('transportationUpdatedAt', 'desc');
+        
+        const snapshot = await query.get();
+        
+        const changes = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.transportationUpdatedAt) {
+                changes.push({
+                    name: data.name || data['Full Name'] || 'Unknown',
+                    uniqueId: data.uniqueId || doc.id,
+                    email: data.email || data['Email address'] || '',
+                    pickupLocation: data.pickupLocation || data['Pickup Location'] || 'Not Specified',
+                    arrivalDate: data.arrivalDate || data['Arrival Date'] || '',
+                    arrivalTime: data.arrivalTime || data['Arrival Time'] || '',
+                    transportationUpdatedAt: data.transportationUpdatedAt
+                });
+            }
+        });
+        
+        displayTransportationChanges(changes);
+        
+    } catch (error) {
+        console.error('Error loading transportation changes:', error);
+        // If the query fails (e.g., no index), try a simpler approach
+        try {
+            const allRegistrations = await db.collection('registrations').get();
+            const changes = [];
+            
+            allRegistrations.forEach(doc => {
+                const data = doc.data();
+                if (data.transportationUpdatedAt) {
+                    const updateTime = data.transportationUpdatedAt.toDate ? 
+                        data.transportationUpdatedAt.toDate() : 
+                        null;
+                    
+                    if (!startTime || (updateTime && updateTime >= startTime)) {
+                        changes.push({
+                            name: data.name || data['Full Name'] || 'Unknown',
+                            uniqueId: data.uniqueId || doc.id,
+                            email: data.email || data['Email address'] || '',
+                            pickupLocation: data.pickupLocation || data['Pickup Location'] || 'Not Specified',
+                            arrivalDate: data.arrivalDate || data['Arrival Date'] || '',
+                            arrivalTime: data.arrivalTime || data['Arrival Time'] || '',
+                            transportationUpdatedAt: data.transportationUpdatedAt
+                        });
+                    }
+                }
+            });
+            
+            // Sort by update time descending
+            changes.sort((a, b) => {
+                const timeA = a.transportationUpdatedAt.toDate ? a.transportationUpdatedAt.toDate() : new Date(0);
+                const timeB = b.transportationUpdatedAt.toDate ? b.transportationUpdatedAt.toDate() : new Date(0);
+                return timeB - timeA;
+            });
+            
+            displayTransportationChanges(changes);
+        } catch (fallbackError) {
+            console.error('Fallback error:', fallbackError);
+            showNotification('Error loading transportation changes. Please try again.', 'error');
+        }
+    }
+}
+
+// Helper function to display transportation changes
+function displayTransportationChanges(changes) {
+    // Update total changes count
+    const totalChangesEl = document.getElementById('totalTransportationChanges');
+    if (totalChangesEl) {
+        totalChangesEl.textContent = changes.length;
+    }
+    
+    // Display changes
+    const tbody = document.getElementById('transportationChangesTableBody');
+    if (!tbody) return;
+    
+    let html = '';
+    if (changes.length === 0) {
+        html = '<tr><td colspan="7" style="text-align: center;">No changes found for the selected period.</td></tr>';
+    } else {
+        changes.forEach(change => {
+            const updateTime = change.transportationUpdatedAt.toDate ? 
+                change.transportationUpdatedAt.toDate().toLocaleString() : 
+                'Unknown';
+            
+            html += `
+                <tr>
+                    <td>${escapeHtml(change.name)}</td>
+                    <td>${escapeHtml(change.uniqueId)}</td>
+                    <td>${escapeHtml(change.email)}</td>
+                    <td>${escapeHtml(change.pickupLocation)}</td>
+                    <td>${escapeHtml(change.arrivalDate)}</td>
+                    <td>${escapeHtml(change.arrivalTime)}</td>
+                    <td>${escapeHtml(updateTime)}</td>
+                </tr>
+            `;
+        });
+    }
+    
+    tbody.innerHTML = html;
+}
+
+// Display complex transportation view: sorted by location, date, time
+function displayComplexTransportationView(registrations) {
+    const tbody = document.getElementById('complexTransportationTableBody');
+    if (!tbody) return;
+    
+    // Filter registrations that have transportation details
+    const transportationData = registrations
+        .filter(reg => {
+            const pickup = reg.pickupLocation || reg['Pickup Location'];
+            const arrivalDate = reg.arrivalDate || reg['Arrival Date'];
+            const arrivalTime = reg.arrivalTime || reg['Arrival Time'];
+            return pickup && arrivalDate && arrivalTime;
+        })
+        .map(reg => ({
+            name: reg.name || reg['Full Name'] || 'Unknown',
+            uniqueId: reg.uniqueId || '',
+            email: reg.email || reg['Email address'] || '',
+            pickupLocation: reg.pickupLocation || reg['Pickup Location'] || '',
+            arrivalDate: reg.arrivalDate || reg['Arrival Date'] || '',
+            arrivalTime: reg.arrivalTime || reg['Arrival Time'] || '',
+            flightTrainNumber: reg.flightTrainNumber || reg['Flight/Train Number'] || ''
+        }));
+    
+    // Sort by: 1) Pickup Location (alphabetical), 2) Arrival Date, 3) Arrival Time
+    transportationData.sort((a, b) => {
+        // First by pickup location
+        const locationCompare = (a.pickupLocation || '').localeCompare(b.pickupLocation || '');
+        if (locationCompare !== 0) return locationCompare;
+        
+        // Then by arrival date
+        const dateCompare = (a.arrivalDate || '').localeCompare(b.arrivalDate || '');
+        if (dateCompare !== 0) return dateCompare;
+        
+        // Finally by arrival time
+        return (a.arrivalTime || '').localeCompare(b.arrivalTime || '');
+    });
+    
+    let html = '';
+    if (transportationData.length === 0) {
+        html = '<tr><td colspan="7" style="text-align: center;">No transportation data available.</td></tr>';
+    } else {
+        transportationData.forEach(item => {
+            html += `
+                <tr>
+                    <td>${escapeHtml(item.pickupLocation)}</td>
+                    <td>${escapeHtml(item.arrivalDate)}</td>
+                    <td>${escapeHtml(item.arrivalTime)}</td>
+                    <td>${escapeHtml(item.name)}</td>
+                    <td>${escapeHtml(item.uniqueId)}</td>
+                    <td>${escapeHtml(item.flightTrainNumber)}</td>
+                    <td>${escapeHtml(item.email)}</td>
+                </tr>
+            `;
+        });
     }
     
     tbody.innerHTML = html;
