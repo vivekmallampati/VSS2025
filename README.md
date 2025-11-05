@@ -20,7 +20,21 @@ npm install
 
 ### Email Configuration (SMTP)
 
+**⚠️ If you see `"Email service not configured"` error, you need to set environment variables in Vercel (see below).**
+
 The application uses Gmail SMTP to send contact form emails. You need to configure the following environment variables:
+
+#### Quick Fix for Vercel (Current Error)
+
+1. Go to **Vercel Dashboard** → Your Project → **Settings** → **Environment Variables**
+2. Add these 5 variables (select all environments: Production, Preview, Development):
+   - `SMTP_HOST` = `smtp.gmail.com`
+   - `SMTP_PORT` = `587`
+   - `SMTP_USER` = `your-email@gmail.com`
+   - `SMTP_PASS` = `your-gmail-app-password` (see "Getting a Gmail App Password" below)
+   - `TO_EMAIL` = `info@vss2025.org` (optional)
+3. **Redeploy** your project after adding variables
+4. **Get App Password:** You cannot use your regular password. Go to https://myaccount.google.com/apppasswords and generate one (see detailed steps below)
 
 #### For Local Development
 

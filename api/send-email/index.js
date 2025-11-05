@@ -42,11 +42,24 @@ module.exports = async (req, res) => {
     }
 
     // Get SMTP configuration from environment variables
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    const toEmail = process.env.TO_EMAIL || 'info@vss2025.org';
+    // Trim whitespace in case there are accidental spaces
+    const smtpHost = process.env.SMTP_HOST?.trim();
+    const smtpPort = parseInt(process.env.SMTP_PORT?.trim() || '587', 10);
+    const smtpUser = process.env.SMTP_USER?.trim();
+    const smtpPass = process.env.SMTP_PASS?.trim();
+    const toEmail = process.env.TO_EMAIL?.trim() || 'info@vss2025.org';
+
+    // Debug: Log what we found (without exposing sensitive data)
+    console.log('Environment variables check:');
+    console.log(`SMTP_HOST: ${smtpHost ? '✓ Set (' + smtpHost.length + ' chars)' : '✗ Missing'}`);
+    console.log(`SMTP_PORT: ${process.env.SMTP_PORT || 'Not set (using default 587)'}`);
+    console.log(`SMTP_USER: ${smtpUser ? '✓ Set (' + smtpUser.length + ' chars)' : '✗ Missing'}`);
+    console.log(`SMTP_PASS: ${smtpPass ? '✓ Set (' + smtpPass.length + ' chars)' : '✗ Missing'}`);
+    console.log(`TO_EMAIL: ${toEmail}`);
+    
+    // List all SMTP-related env vars for debugging
+    const allEnvVars = Object.keys(process.env).filter(key => key.includes('SMTP') || key.includes('EMAIL'));
+    console.log('All SMTP/EMAIL env vars found:', allEnvVars.join(', ') || 'None');
 
     // Check if SMTP is configured
     if (!smtpHost || !smtpUser || !smtpPass) {
@@ -58,10 +71,19 @@ module.exports = async (req, res) => {
       console.error('SMTP configuration missing:', missing.join(', '));
       console.error('Required environment variables: SMTP_HOST, SMTP_USER, SMTP_PASS');
       console.error('Optional: SMTP_PORT (default: 587), TO_EMAIL (default: info@vss2025.org)');
+      console.error('Troubleshooting:');
+      console.error('1. Check Vercel Dashboard → Settings → Environment Variables');
+      console.error('2. Ensure variables are set for Production, Preview, AND Development environments');
+      console.error('3. Redeploy after adding variables');
+      console.error('4. Check for typos in variable names (case-sensitive)');
       
       return res.status(500).json({ 
         error: 'Email service not configured. Please contact the administrator.',
-        details: `Missing: ${missing.join(', ')}`
+        details: `Missing: ${missing.join(', ')}`,
+        debug: {
+          foundEnvVars: allEnvVars,
+          tip: 'Check Vercel Dashboard → Settings → Environment Variables. Ensure variables are set for all environments and redeploy.'
+        }
       });
     }
 
