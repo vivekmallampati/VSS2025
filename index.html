@@ -125,43 +125,267 @@
                     <div class="shibir-nav">
   <!-- Sub Tabs -->
   <div class="subtab-container">
-    <button class="subtab-button active" onclick="openSubTab('general')">General Guidelines</button>
-    <button class="subtab-button" onclick="openSubTab('particulars')">Particulars</button>
-    <button class="subtab-button" onclick="openSubTab('forms')">Forms</button>
-    <button class="subtab-button" onclick="openSubTab('accommodation')">Accommodation</button>
-    <button class="subtab-button" onclick="openSubTab('food')">Food</button>
-    <button class="subtab-button" onclick="openSubTab('transport')">Transport</button>
+    <button type="button" class="subtab-button active" onclick="openSubTab('general', event)">General</button>
+    <button type="button" class="subtab-button" onclick="openSubTab('contacts', event)">Contacts</button>
+    <button type="button" class="subtab-button" onclick="openSubTab('ganavesh', event)">Ganavesh</button>
+    <button type="button" class="subtab-button" onclick="openSubTab('accommodation', event)">Accommodation</button>
+    <button type="button" class="subtab-button" onclick="openSubTab('shulk', event)">Shulk</button>
+    <button type="button" class="subtab-button" onclick="openSubTab('travel', event)">Travel</button>
+    <button type="button" class="subtab-button" onclick="openSubTab('tours', event)">Tours</button>
+    <button type="button" class="subtab-button" onclick="openSubTab('things-to-carry', event)">Things to Carry</button>
   </div>
 
   <!-- Sub Tab Content -->
   <div id="general" class="subtab-content" style="display:block;">
-    <h3>General Guidelines</h3>
-    <p>All general guidelines for Shibirarthis will be displayed here...</p>
+    <div class="letter-intro">
+      <p><strong>Namaste,</strong></p>
+      <p>Hope you are doing well.</p>
+      <p>You have registered for the Vishwa Sangh Shibir 2025 in Bhagyanagar. We trust you have received the soochana patrak 3 and have gone through the details.</p>
+    </div>
+    
+    <div class="info-section">
+      <h3>General Guidelines</h3>
+      <ul>
+        <li>Shibirarthis are expected to attend the shibir full time including nivas at the venue.</li>
+        <li>Please ensure that you carry enough cash in INR for the shibir shulk and any other purchases.</li>
+        <li>If you are not able to attend the shibir for any reason, please convey it immediately to your country karyavah and Santosh Pillai.</li>
+      </ul>
+    </div>
+    
+    <div class="info-section">
+      <h3>For non-Bharatiya citizen who do not have an OCI card:</h3>
+      <p>If you are not a Bharatiya citizen and do not have an OCI card, please send a copy of the first page of your passport to Santosh Pillai (santovpillai@gmail.com) before November 10. This would be needed to complete formalities related to conducting an international camp in Bharat.</p>
+    </div>
+    
+    <div class="info-section">
+      <h3>Weather</h3>
+      <p>The temperature in Bhagyanagar is expected to be around 15-29 °C (59-84 °F).</p>
+    </div>
+    
+    <div class="particulars-section">
+      <h3>Particulars</h3>
+      <table class="particulars-table">
+        <tr>
+          <td><strong>Vishwa Sangh Shibir 2025</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Dates</strong></td>
+          <td>December 25 to 29, 2025</td>
+        </tr>
+        <tr>
+          <td><strong>Venue</strong></td>
+          <td>Kanha Shanti Vanam, Bhagyanagar (Hyderabad)</td>
+        </tr>
+        <tr>
+          <td><strong>Reporting time</strong></td>
+          <td>Thursday, December 25, noon</td>
+        </tr>
+        <tr>
+          <td><strong>End of shibir</strong></td>
+          <td>Monday, December 29, morning</td>
+        </tr>
+        <tr>
+          <td><strong>Shulk</strong></td>
+          <td>INR 2000</td>
+        </tr>
+      </table>
+    </div>
+    
+    <div class="letter-closing">
+      <p>Please contact me if you have any queries regarding the shibir. I hope you have a pleasant and inspiring experience during the VSS.</p>
+      
+      <p>With Best Regards,</p>
+      <p><strong>Santosh Pillai</strong><br>
+      <strong>Vishwa Vibhag Karyalay Pramukh</strong></p>
+    </div>
   </div>
 
-  <div id="particulars" class="subtab-content">
-    <h3>Particulars</h3>
-    <p>Enter or view particulars of participants here...</p>
+  <div id="contacts" class="subtab-content">
+    <div class="contact-section">
+      <h3>Shibir Contacts</h3>
+      <div class="contact-points">
+        <div class="contact-person">
+          <h4>Contact Person</h4>
+          <p><strong>Vishwa Vibhag Sampark</strong><br>
+          Santosh Pillai<br>
+          +91 9324 331870<br>
+          santovpillai@gmail.com</p>
+        </div>
+        <div class="contact-person">
+          <h4>Tour Planning</h4>
+          <p>Vijay Mallampati<br>
+          +91 90000 04096<br>
+          vss2025tours@gmail.com</p>
+        </div>
+        <div class="contact-person">
+          <h4>Pickup Arrangements</h4>
+          <p>Raghuram Vemaraju<br>
+          +91 98497 23353<br>
+          raghuvemaraju@gmail.com</p>
+        </div>
+        <div class="contact-person">
+          <h4>Any other support in Bhagyanagar</h4>
+          <p>Sreedhar Reddy<br>
+          +91 94400 09898<br>
+          satwikrdd@gmail.com</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="info-section">
+      <h3>Immigration Contacts</h3>
+      <p>Please note the following address to be filled at immigration as needed.</p>
+      
+      <div class="immigration-addresses">
+        <div class="address-block">
+          <h4>Delhi:</h4>
+          <p>Santosh Pillai<br>
+          10196, Keshav Kunj, Jhandewala,<br>
+          Desh Bandhu Gupt Marg,<br>
+          New Delhi 110055<br>
+          Tel: +91 9324331870</p>
+        </div>
+        
+        <div class="address-block">
+          <h4>Hyderabad:</h4>
+          <p>Vijay Mallampatti<br>
+          101 Viswa Residency<br>
+          Chitra Layout, LB Nagar<br>
+          Hyderabad 500074<br>
+          Tel: +91 90000 04096</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="info-section">
+      <h3>Invitation Letter</h3>
+      <p>If an invitation letter is required, please write to santovpillai@gmail.com with a copy of the passport.</p>
+    </div>
   </div>
 
-  <div id="forms" class="subtab-content">
-    <h3>Forms</h3>
-    <p>Form submissions, downloads, and registration links will go here...</p>
+  <div id="ganavesh" class="subtab-content">
+    <div class="info-section">
+      <h3>Ganvesh</h3>
+      <p><strong>For Swayamsevaks</strong> - Black formal trousers, VSS ganvesh kurta, any shoes (preferably black) with socks.</p>
+      <p>VSS ganvesh kurta will have to be purchased at the shibir. Participants will have to bring the trousers and shoes while coming for the shibir.</p>
+      
+      <p><strong>For Sevikas</strong> - There are two options - Kurti OR Saree.</p>
+      <p><strong>Kurti Option:</strong> Black salwar / leggings / pants, VSS ganvesh kurti, any shoes (preferably black) with socks.</p>
+      <p><strong>Saree Option:</strong> Saree with any shoes (preferably black) and socks.</p>
+      
+      <p>VSS ganvesh kurti OR saree will have to be purchased at the shibir. Underskirt (off white colour) can also be purchased at the venue.</p>
+      
+      <p>Those who are opting for saree should contact Manasi ji (+91 6304 560 830, Meghanakasula131126@gmail.com) before November 21 for the blouse stitching.</p>
+      
+      <p>All participants will have to bring their shoes and socks and those opting for Kurti will have to bring their black salwar / leggings/ pants while coming for the shibir.</p>
+    </div>
   </div>
 
   <div id="accommodation" class="subtab-content">
-    <h3>Accommodation</h3>
-    <p>Accommodation details for Shibirarthis go here...</p>
+    <div class="info-section">
+      <h3>Accommodation</h3>
+      <ul>
+        <li>A modest dormitory accommodation (separate for swayamsevaks and sevikas) with common wash areas will be arranged during the shibir.</li>
+        <li>Accommodation during the post-shibir tour to Srisailam and Yadadri will be arranged as per the destination.</li>
+        <li>Pre and post shibir accommodation will be arranged in Bhagyanagar.</li>
+      </ul>
+    </div>
   </div>
 
-  <div id="food" class="subtab-content">
-    <h3>Food Arrangements</h3>
-    <p>Details regarding meals and food services will be provided here...</p>
+  <div id="shulk" class="subtab-content">
+    <div class="info-section">
+      <h3>Shulk</h3>
+      <p>The shulk will be collected in INR at the VSS venue. Foreign currency exchange facility will be made available there.</p>
+    </div>
   </div>
 
-  <div id="transport" class="subtab-content">
-    <h3>Transport</h3>
-    <p>Transport schedules and pickup/drop arrangements will appear here...</p>
+  <div id="travel" class="subtab-content">
+    <div class="info-section">
+      <h3>Travel</h3>
+      <p>Rail reservations in Bharat start 60 days in advance. It is advisable to finalize the plans and make bookings for the return journey before coming for VSS.</p>
+      <p>Please note that the check-in baggage limit for domestic flights in Bharat is 15 kgs.</p>
+      <p>If any train ticket booking needs to be done by the shibir vyavastha, please convey the travel details to Santosh Pillai (santovpillai@gmail.com). Please mention name as on passport, gender and age for such bookings.</p>
+    </div>
+    
+    <div class="info-section">
+      <h3>Pickup</h3>
+      <p>Arrangements for pickup will be made at Bhagyanagar airport, railway station and bus terminals.</p>
+      
+      <p>To ensure a smooth pickup, please</p>
+      <ol>
+        <li>Update all your arrival details - date, time, arrival point and train/ flight number - in your registration before November 15.</li>
+        <li>You will receive the pickup details before you commence your travel. In case you have not received it, please confirm your pickup arrangements with Raghuram Vemaraju before you start your journey to Bhagyanagar.</li>
+      </ol>
+      
+      <p>You must have received an email from 'forms-receipts-noreply@google.com' on submission of your registration. Please use the 'Edit Response' button in the email to update your registration.</p>
+    </div>
+    
+    <div class="info-section">
+      <h3>Return Journey</h3>
+      <p>You have already selected a tour option while registering. Accordingly, it is advisable to book the return tickets from Bhagyanagar as follows:</p>
+  
+      <div class="return-journey-tables">
+        <h4>If not opting for post shibir tour</h4>
+        <table class="journey-table">
+          <tr>
+            <th>Mode of travel</th>
+            <th>Advisable return ticket</th>
+          </tr>
+          <tr>
+            <td>Domestic flight</td>
+            <td>After 1 pm on December 29</td>
+          </tr>
+          <tr>
+            <td>International flight</td>
+            <td>After 2 pm on December 29</td>
+          </tr>
+          <tr>
+            <td>Train</td>
+            <td>After 12:30 pm on December 29</td>
+          </tr>
+        </table>
+        
+        <h4>If opting for post shibir tour</h4>
+        <table class="journey-table">
+          <tr>
+            <th>Mode of travel</th>
+            <th>Advisable return ticket</th>
+          </tr>
+          <tr>
+            <td>Domestic flight</td>
+            <td>After 11 pm on December 30</td>
+          </tr>
+          <tr>
+            <td>International flight</td>
+            <td>Anytime on December 31</td>
+          </tr>
+          <tr>
+            <td>Train</td>
+            <td>After 10:30 pm on December 30</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tours" class="subtab-content">
+    <div class="info-section">
+      <h3>Post Shibir Tour</h3>
+      <p>If you have selected 'Kandakurthi' as the tour option, we regret to inform you that the tour to Kandakurthi has to be cancelled as the project undertaken there is not yet complete. You can edit your registration and opt to go for the 'Srisailam' tour or to 'Yadadri Mandir and local sites in Bhagyanagar'.</p>
+    </div>
+  </div>
+
+  <div id="things-to-carry" class="subtab-content">
+    <div class="info-section">
+      <h3>Things to Carry</h3>
+      <p><strong>a) Personal Clothing:</strong> Please bring a trainer for shareerik, Bharatiya Vesh for udghatan and other programs, hangers</p>
+      <p><strong>b) Essential Toiletries</strong></p>
+      <p><strong>c) Personal medicines if any</strong></p>
+      <p><strong>d)</strong> Mattress, bed sheets, blanket and pillow will be provided at the shibir. You may bring a light quilt / shawl along with you in case the temperature falls.</p>
+      <p><strong>e) Ganvesh</strong></p>
+      <p><strong>Swayamsevaks:</strong> Formal trousers, socks and shoes.</p>
+      <p><strong>Sevikas:</strong> Shoes and socks. Those opting for Kurti, please also bring black salwar / leggings/ pants.</p>
+    </div>
   </div>
 </div>
 
@@ -170,7 +394,7 @@
                 
                 <!-- Quick navigation moved to header dropdown -->
                 
-                <div class="letter-content">
+                <div class="letter-content" style="display: none;">
                     <div class="letter-body">
                         <div class="letter-intro">
                             <p><strong>Namaste,</strong></p>
@@ -1024,15 +1248,33 @@
     <script src="firebase-config.js"></script>
     <script src="script.js"></script>
     <script>
-function openSubTab(tabName) {
+function openSubTab(tabName, event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  
   const subTabs = document.querySelectorAll('.subtab-content');
   const subButtons = document.querySelectorAll('.subtab-button');
 
   subTabs.forEach(tab => tab.style.display = 'none');
   subButtons.forEach(btn => btn.classList.remove('active'));
 
-  document.getElementById(tabName).style.display = 'block';
-  event.currentTarget.classList.add('active');
+  const selectedTab = document.getElementById(tabName);
+  if (selectedTab) {
+    selectedTab.style.display = 'block';
+  }
+  
+  if (event && event.currentTarget) {
+    event.currentTarget.classList.add('active');
+  } else {
+    // Fallback: find button by tab name
+    subButtons.forEach(btn => {
+      if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${tabName}'`)) {
+        btn.classList.add('active');
+      }
+    });
+  }
 }
 </script>
 </body>

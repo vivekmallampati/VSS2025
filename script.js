@@ -2077,43 +2077,53 @@ function createTransportationCardHTML(transportationData, index, isExpanded = fa
                     ${!hasReturnInfo ? `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); editTransportationReturn('${safeUniqueId}');">✏️ Add Return</button>` : ''}
                 </div>
                 <div class="transportation-display">
-                    <div class="transportation-section">
-                        <h4 class="section-title">🛬 Arrival Information</h4>
-                        ${hasArrivalInfo ? `
-                        <div class="info-item">
-                            <span class="info-label">Pickup Location:</span>
-                            <span class="info-value">${formatValue(pickupLocation) || 'Not specified'}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Date:</span>
-                            <span class="info-value">${formatValue(arrivalDate) || 'Not specified'}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Time:</span>
-                            <span class="info-value">${formatValue(arrivalTime) || 'Not specified'}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Flight/Train Number:</span>
-                            <span class="info-value">${formatValue(flightTrainNumber) || 'Not specified'}</span>
-                        </div>
-                        ` : '<p class="no-info">No arrival information provided</p>'}
+                    <div class="transportation-section-buttons" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <button type="button" class="transportation-section-btn active" onclick="toggleTransportationSection(${index}, 'arrival', event)" data-section="arrival" data-card-index="${index}">
+                            🛬 Arrival Information
+                        </button>
+                        <button type="button" class="transportation-section-btn" onclick="toggleTransportationSection(${index}, 'return', event)" data-section="return" data-card-index="${index}">
+                            🛫 Return Information
+                        </button>
                     </div>
-                    <div class="transportation-section">
-                        <h4 class="section-title">🛫 Return Information</h4>
-                        ${hasReturnInfo ? `
-                        <div class="info-item">
-                            <span class="info-label">Date:</span>
-                            <span class="info-value">${formatValue(returnDate) || 'Not specified'}</span>
+                    <div class="transportation-section-content" data-card-index="${index}">
+                        <div class="transportation-section" data-section="arrival" data-card-index="${index}" style="display: block;">
+                            <h4 class="section-title">🛬 Arrival Information</h4>
+                            ${hasArrivalInfo ? `
+                            <div class="info-item">
+                                <span class="info-label">Pickup Location:</span>
+                                <span class="info-value">${formatValue(pickupLocation) || 'Not specified'}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Date:</span>
+                                <span class="info-value">${formatValue(arrivalDate) || 'Not specified'}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Time:</span>
+                                <span class="info-value">${formatValue(arrivalTime) || 'Not specified'}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Flight/Train Number:</span>
+                                <span class="info-value">${formatValue(flightTrainNumber) || 'Not specified'}</span>
+                            </div>
+                            ` : '<p class="no-info">No arrival information provided</p>'}
                         </div>
-                        <div class="info-item">
-                            <span class="info-label">Time:</span>
-                            <span class="info-value">${formatValue(returnTime) || 'Not specified'}</span>
+                        <div class="transportation-section" data-section="return" data-card-index="${index}" style="display: none;">
+                            <h4 class="section-title">🛫 Return Information</h4>
+                            ${hasReturnInfo ? `
+                            <div class="info-item">
+                                <span class="info-label">Date:</span>
+                                <span class="info-value">${formatValue(returnDate) || 'Not specified'}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Time:</span>
+                                <span class="info-value">${formatValue(returnTime) || 'Not specified'}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Flight/Train Number:</span>
+                                <span class="info-value">${formatValue(returnFlightTrainNumber) || 'Not specified'}</span>
+                            </div>
+                            ` : '<p class="no-info">No return information provided</p>'}
                         </div>
-                        <div class="info-item">
-                            <span class="info-label">Flight/Train Number:</span>
-                            <span class="info-value">${formatValue(returnFlightTrainNumber) || 'Not specified'}</span>
-                        </div>
-                        ` : '<p class="no-info">No return information provided</p>'}
                     </div>
                 </div>
             </div>
@@ -2138,6 +2148,45 @@ function toggleTransportationCard(index) {
         card.classList.add('expanded');
         content.style.display = 'block';
         if (toggleIcon) toggleIcon.textContent = '▼';
+    }
+}
+
+// Global function to toggle transportation section (arrival/return)
+function toggleTransportationSection(cardIndex, sectionName, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    const card = document.querySelector(`.user-profile-card[data-card-index="${cardIndex}"]`);
+    if (!card) return;
+    
+    // Get all section buttons for this card
+    const sectionButtons = card.querySelectorAll(`.transportation-section-btn[data-card-index="${cardIndex}"]`);
+    
+    // Get all section content divs for this card
+    const sections = card.querySelectorAll(`.transportation-section[data-card-index="${cardIndex}"]`);
+    
+    // Remove active class from all buttons
+    sectionButtons.forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Hide all sections
+    sections.forEach(section => {
+        section.style.display = 'none';
+    });
+    
+    // Show selected section and activate its button
+    const selectedSection = card.querySelector(`.transportation-section[data-section="${sectionName}"][data-card-index="${cardIndex}"]`);
+    const selectedButton = card.querySelector(`.transportation-section-btn[data-section="${sectionName}"][data-card-index="${cardIndex}"]`);
+    
+    if (selectedSection) {
+        selectedSection.style.display = 'block';
+    }
+    
+    if (selectedButton) {
+        selectedButton.classList.add('active');
     }
 }
 

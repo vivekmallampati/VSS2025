@@ -2012,6 +2012,10 @@ body {
 }
 
 /* Transportation Section Styling */
+.transportation-section-content {
+    position: relative;
+}
+
 .transportation-section {
     background: var(--light-cream);
     border-radius: 8px;
@@ -2025,6 +2029,53 @@ body {
     font-size: 1.2rem;
     font-weight: 600;
     margin-bottom: 1rem;
+}
+
+/* Transportation Section Buttons */
+.transportation-section-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.transportation-section-btn {
+    flex: 1;
+    min-width: 150px;
+    padding: 0.75rem 1.5rem;
+    background: #f5f5f5;
+    border: 2px solid var(--primary-brown);
+    border-radius: 8px;
+    color: var(--primary-brown);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    outline: none;
+}
+
+.transportation-section-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.2);
+}
+
+.transportation-section-btn:hover {
+    background: var(--light-cream);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.transportation-section-btn.active {
+    background: var(--primary-brown);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.transportation-section-btn.active:hover {
+    background: var(--primary-brown);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .no-info {
