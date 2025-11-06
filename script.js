@@ -925,9 +925,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 handleLoginError(error);
                             }
                         });
-                } else {
-                    showNotification('Firebase not initialized. Please check your configuration.', 'error');
                 }
+            } else {
+                showNotification('Firebase not initialized. Please check your configuration.', 'error');
+            }
             }); // waitForFirebase callback
         });
     }
