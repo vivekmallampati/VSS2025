@@ -20,6 +20,44 @@ service cloud.firestore {
       return id.lower().replaceAll('/', '').replaceAll('-', '');
     }
     
+    // Helper function to check if user is an admin (superadmin or admin)
+    function isAdmin() {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin' ||
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+    
+    // Helper function to check if user is a volunteer
+    function isVolunteer() {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'volunteer';
+    }
+    
+    // Helper function to get volunteer teams
+    function getVolunteerTeams() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.volunteerTeams;
+    }
+    
+    // Helper function to check if volunteer has access to checkin type
+    function volunteerHasAccess(checkinType) {
+      let teams = getVolunteerTeams();
+      // Map checkin types to team names
+      let teamMap = {
+        'pickup_location': 'transportation',
+        'venue_entrance': 'venue_entrance',
+        'cloak_room': 'cloak_room',
+        'accommodation': 'accommodation',
+        'food': 'food',
+        'post_tour': 'post_tour'
+      };
+      let requiredTeam = teamMap[checkinType];
+      // Check if requiredTeam exists in teams array
+      // Note: Firestore rules don't support array.includes(), so we check if any element matches
+      return requiredTeam != null && teams != null && requiredTeam in teams;
+    }
+    
     // Registrations collection
     match /registrations/{uniqueId} {
       // Anyone can read for verification
@@ -81,6 +119,31 @@ service cloud.firestore {
       allow read: if isSuperadmin();
       // No updates or deletes allowed (contact messages are immutable)
       allow update, delete: if false;
+    }
+    
+    // Checkins collection
+    match /checkins/{checkinId} {
+      // Superadmins and admins can read all checkins
+      allow read: if request.auth != null && isAdmin();
+      // Volunteers can read checkins for their assigned teams
+      allow read: if request.auth != null && isVolunteer() && volunteerHasAccess(resource.data.checkinType);
+      // Participants can read their own checkins
+      allow read: if request.auth != null && 
+                    exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                    normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(resource.data.uniqueId);
+      
+      // Superadmins and admins can create checkins for anyone
+      allow create: if request.auth != null && isAdmin();
+      // Volunteers can create checkins for their assigned teams
+      allow create: if request.auth != null && isVolunteer() && volunteerHasAccess(request.resource.data.checkinType);
+      
+      // Superadmins and admins can update all checkins
+      allow update: if request.auth != null && isAdmin();
+      // Volunteers can update checkins for their assigned teams
+      allow update: if request.auth != null && isVolunteer() && volunteerHasAccess(resource.data.checkinType);
+      
+      // Only superadmins and admins can delete checkins
+      allow delete: if request.auth != null && isAdmin();
     }
   }
 }

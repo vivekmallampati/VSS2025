@@ -34,7 +34,7 @@ function waitForFirebase(callback, maxRetries = 50) {
 }
 
 // Protected tabs that require authentication
-const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours', 'admin-dashboard'];
+const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours', 'checkin', 'admin-dashboard'];
 
 // Helper function to check if a tab is protected
 function isProtectedTab(tabName) {
@@ -76,6 +76,114 @@ async function isSuperadmin(user) {
         console.error('Error checking superadmin status:', error);
         return false;
     }
+}
+
+// Helper function to check if user is an admin (superadmin or admin)
+async function isAdmin(user) {
+    if (!user || !window.firebase || !firebase.firestore) {
+        return false;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        
+        if (!userDoc.exists) {
+            return false;
+        }
+        
+        const userData = userDoc.data();
+        return userData.role === 'superadmin' || userData.role === 'admin';
+    } catch (error) {
+        console.error('Error checking admin status:', error);
+        return false;
+    }
+}
+
+// Helper function to check if user is a volunteer
+async function isVolunteer(user) {
+    if (!user || !window.firebase || !firebase.firestore) {
+        return false;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        
+        if (!userDoc.exists) {
+            return false;
+        }
+        
+        const userData = userDoc.data();
+        return userData.role === 'volunteer';
+    } catch (error) {
+        console.error('Error checking volunteer status:', error);
+        return false;
+    }
+}
+
+// Helper function to get volunteer teams
+async function getVolunteerTeams(user) {
+    if (!user || !window.firebase || !firebase.firestore) {
+        return [];
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        
+        if (!userDoc.exists) {
+            return [];
+        }
+        
+        const userData = userDoc.data();
+        return userData.volunteerTeams || [];
+    } catch (error) {
+        console.error('Error getting volunteer teams:', error);
+        return [];
+    }
+}
+
+// Helper function to check if user can view dashboard
+async function canViewDashboard(user) {
+    return await isSuperadmin(user);
+}
+
+// Helper function to check if user can perform checkin
+async function canPerformCheckin(user) {
+    if (!user) return false;
+    const isAdminUser = await isAdmin(user);
+    const isVolunteerUser = await isVolunteer(user);
+    return isAdminUser || isVolunteerUser;
+}
+
+// Helper function to check if user has access to specific checkin type
+async function hasAccessToCheckinType(user, checkinType) {
+    if (!user) return false;
+    
+    // Admins (superadmin and admin) have access to all checkin types
+    const isAdminUser = await isAdmin(user);
+    if (isAdminUser) return true;
+    
+    // Volunteers need to check their assigned teams
+    const isVolunteerUser = await isVolunteer(user);
+    if (!isVolunteerUser) return false;
+    
+    const teams = await getVolunteerTeams(user);
+    // Map checkin types to team names
+    const teamMap = {
+        'pickup_location': 'transportation',
+        'venue_entrance': 'venue_entrance',
+        'cloak_room': 'cloak_room',
+        'accommodation': 'accommodation',
+        'food': 'food',
+        'post_tour': 'post_tour'
+    };
+    
+    const requiredTeam = teamMap[checkinType];
+    if (!requiredTeam) return false;
+    
+    return teams.includes(requiredTeam);
 }
 
 // Helper function to check if user can access a protected tab
@@ -141,6 +249,9 @@ function activateTab(tabName, skipAuthCheck = false) {
             const user = firebase.auth().currentUser;
             if (user) {
                 switch(tabName) {
+                    case 'checkin':
+                        initializeCheckinInterface();
+                        break;
                     case 'myprofile':
                         loadUserProfile(user);
                         break;
@@ -1326,11 +1437,15 @@ function updateAuthUI() {
             const myProfileNavItem = document.getElementById('myProfileNavItem');
             const myTransportationNavItem = document.getElementById('myTransportationNavItem');
             const myToursNavItem = document.getElementById('myToursNavItem');
+            const checkinNavItem = document.getElementById('checkinNavItem');
             const adminDashboardNavItem = document.getElementById('adminDashboardNavItem');
             
             if (user) {
-                // Check if user is superadmin
-                const isAdmin = await isSuperadmin(user);
+                // Check user roles
+                const isSuperadminUser = await isSuperadmin(user);
+                const isAdminUser = await isAdmin(user);
+                const canPerformCheckinUser = await canPerformCheckin(user);
+                const canViewDashboardUser = await canViewDashboard(user);
                 
                 // User is logged in
                 if (loginBtn) {
@@ -1378,9 +1493,18 @@ function updateAuthUI() {
                     loadToursInfo(user);
                 }
                 
-                // Show admin dashboard only for superadmins
+                // Show checkin tab for superadmin, admin, or volunteers
+                if (checkinNavItem) {
+                    if (canPerformCheckinUser) {
+                        checkinNavItem.style.display = '';
+                    } else {
+                        checkinNavItem.style.display = 'none';
+                    }
+                }
+                
+                // Show admin dashboard only for superadmins (not admin)
                 if (adminDashboardNavItem) {
-                    if (isAdmin) {
+                    if (canViewDashboardUser) {
                         adminDashboardNavItem.style.display = '';
                     } else {
                         adminDashboardNavItem.style.display = 'none';
@@ -1417,6 +1541,9 @@ function updateAuthUI() {
                 if (myToursNavItem) {
                     myToursNavItem.style.display = 'none';
                 }
+                if (checkinNavItem) {
+                    checkinNavItem.style.display = 'none';
+                }
                 if (adminDashboardNavItem) {
                     adminDashboardNavItem.style.display = 'none';
                 }
@@ -1438,6 +1565,7 @@ function updateAuthUI() {
             const myProfileNavItem = document.getElementById('myProfileNavItem');
             const myTransportationNavItem = document.getElementById('myTransportationNavItem');
             const myToursNavItem = document.getElementById('myToursNavItem');
+            const checkinNavItem = document.getElementById('checkinNavItem');
             const adminDashboardNavItem = document.getElementById('adminDashboardNavItem');
             if (homeNavItem) homeNavItem.style.display = '';
             if (aboutNavItem) aboutNavItem.style.display = '';
@@ -1446,6 +1574,7 @@ function updateAuthUI() {
             if (myProfileNavItem) myProfileNavItem.style.display = 'none';
             if (myTransportationNavItem) myTransportationNavItem.style.display = 'none';
             if (myToursNavItem) myToursNavItem.style.display = 'none';
+            if (checkinNavItem) checkinNavItem.style.display = 'none';
             if (adminDashboardNavItem) adminDashboardNavItem.style.display = 'none';
         }
     });
@@ -1868,6 +1997,8 @@ function loadUserProfile(user) {
                                 ${createProfileCardHTML(profileData, 0, true)}
                             </div>
                         `;
+                        // Load checkin status
+                        loadCheckinStatusForProfile(uniqueIdsToFetch.length > 0 ? uniqueIdsToFetch[0] : (primaryUniqueId || ''));
                         return;
                     } else {
                         profileInfo.innerHTML = '<p>Profile information not found.</p>';
@@ -2007,6 +2138,9 @@ function loadUserProfile(user) {
                             return;
                         }
                         
+                        // Get all uniqueIds for checkin status
+                        const allUniqueIdsForCheckin = profiles.map(p => p.uniqueId).filter(Boolean);
+                        
                         
                         // Create tabs and tab panes
                         const tabsHTML = profiles.map((profile, index) => 
@@ -2026,7 +2160,13 @@ function loadUserProfile(user) {
                                     ${panesHTML}
                                 </div>
                             </div>
+                            <div id="checkinStatusSection" class="checkin-status-section" style="margin-top: 2rem; padding-top: 2rem; border-top: 2px solid #e0e0e0;">
+                                <h3>Checkin Status</h3>
+                                <div id="checkinStatusContent">Loading checkin status...</div>
+                            </div>
                         `;
+                        // Load checkin status for all uniqueIds
+                        loadCheckinStatusForProfile(allUniqueIdsForCheckin);
                     });
             })
             .catch((error) => {
@@ -3492,6 +3632,9 @@ async function loadAdminDashboard(user) {
         // Load transportation changes (default to "all")
         loadTransportationChanges('all');
         
+        // Load checkin analytics
+        await loadCheckinAnalytics();
+        
         // Show data div, hide loading
         loadingDiv.style.display = 'none';
         dataDiv.style.display = 'block';
@@ -3689,9 +3832,9 @@ function showZoneCountryDetails(zone, countryBreakdownJson, total) {
     const zoneBreakdownDiv = document.getElementById('zoneBreakdown');
     const zoneCountryDetailsDiv = document.getElementById('zoneCountryDetails');
     const zoneCountryTitle = document.getElementById('zoneCountryTitle');
-    const tbody = document.getElementById('zoneCountryTableBody');
+    const zoneCountryTableBody = document.getElementById('zoneCountryTableBody');
     
-    if (!zoneBreakdownDiv || !zoneCountryDetailsDiv || !zoneCountryTitle || !tbody) return;
+    if (!zoneBreakdownDiv || !zoneCountryDetailsDiv || !zoneCountryTitle || !zoneCountryTableBody) return;
     
     // Parse the country breakdown JSON
     let countryBreakdown;
@@ -3710,23 +3853,139 @@ function showZoneCountryDetails(zone, countryBreakdownJson, total) {
     // Sort by count descending
     const sortedEntries = Object.entries(countryBreakdown).sort((a, b) => b[1] - a[1]);
     
-    let html = '';
+    // Build table with headers
+    let html = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Country</th>
+                    <th>Count</th>
+                    <th>Percentage</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
     sortedEntries.forEach(([country, count]) => {
         const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+        const countryEscaped = escapeHtml(country);
         html += `
-            <tr>
-                <td>${escapeHtml(country)}</td>
+            <tr style="cursor: pointer;" onclick="showCountryShibirarthis('${escapeHtml(zone)}', '${countryEscaped.replace(/'/g, "\\'")}')">
+                <td>${countryEscaped}</td>
                 <td>${count}</td>
                 <td>${percentage}%</td>
+                <td><button class="btn btn-small btn-secondary">View Shibirarthis</button></td>
             </tr>
         `;
     });
     
     if (sortedEntries.length === 0) {
-        html = '<tr><td colspan="3" style="text-align: center;">No data available</td></tr>';
+        html += '<tr><td colspan="4" style="text-align: center;">No data available</td></tr>';
     }
     
-    tbody.innerHTML = html;
+    html += `
+            </tbody>
+        </table>
+    `;
+    
+    zoneCountryTableBody.innerHTML = html;
+}
+
+// Show Shibirarthis for a specific country
+async function showCountryShibirarthis(zone, country) {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    const zoneCountryDetailsDiv = document.getElementById('zoneCountryDetails');
+    const zoneCountryTitle = document.getElementById('zoneCountryTitle');
+    
+    if (!zoneCountryDetailsDiv || !zoneCountryTitle) return;
+    
+    // Show loading
+    const tbody = document.getElementById('zoneCountryTableBody');
+    if (tbody) {
+        tbody.innerHTML = '<p style="text-align: center; padding: 2rem;">Loading Shibirarthis...</p>';
+    }
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Fetch all registrations for this country
+        const registrationsSnapshot = await db.collection('registrations').get();
+        const countryRegistrations = [];
+        
+        registrationsSnapshot.forEach(doc => {
+            const data = doc.data();
+            const regCountry = data.Country || data.country || data['Country of Current Residence'] || '';
+            const regZone = data.Zone || data.zone || data['Zone/Shreni'] || '';
+            
+            if (regCountry === country && (zone === 'Unknown' || regZone === zone)) {
+                countryRegistrations.push({
+                    uniqueId: data.uniqueId || doc.id,
+                    name: data.name || data['Full Name'] || 'Unknown',
+                    email: data.email || data['Email address'] || '',
+                    shreni: data.Shreni || data.shreni || data['Corrected Shreni'] || '',
+                    phone: data.phone || data.Phone || '',
+                    city: data.city || data.City || data['City of Current Residence'] || ''
+                });
+            }
+        });
+        
+        // Sort by name
+        countryRegistrations.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        
+        // Update UI
+        zoneCountryTitle.textContent = `Shibirarthis in ${country} (Zone: ${zone})`;
+        
+        if (tbody) {
+            if (countryRegistrations.length === 0) {
+                tbody.innerHTML = '<p style="text-align: center; padding: 2rem;">No Shibirarthis found in this country.</p>';
+            } else {
+                let html = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Praveshika ID</th>
+                                <th>Email</th>
+                                <th>Shreni</th>
+                                <th>City</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                countryRegistrations.forEach(reg => {
+                    html += `
+                        <tr>
+                            <td>${escapeHtml(reg.name)}</td>
+                            <td>${escapeHtml(reg.uniqueId)}</td>
+                            <td>${escapeHtml(reg.email)}</td>
+                            <td>${escapeHtml(reg.shreni)}</td>
+                            <td>${escapeHtml(reg.city)}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                        </tbody>
+                    </table>
+                    <p style="margin-top: 1rem;"><strong>Total:</strong> ${countryRegistrations.length} Shibirarthi(s)</p>
+                `;
+                
+                tbody.innerHTML = html;
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error loading country Shibirarthis:', error);
+        if (tbody) {
+            tbody.innerHTML = '<p style="text-align: center; padding: 2rem; color: red;">Error loading Shibirarthis</p>';
+        }
+    }
 }
 
 // Close zone country details view
@@ -3743,14 +4002,192 @@ function loadTransportationAnalytics(registrations) {
     // Display pickup location summary (same as pickup breakdown)
     const pickupBreakdown = {};
     registrations.forEach(reg => {
-        const pickup = reg.pickupLocation || reg['Pickup Location'] || 'Not Specified';
+        const pickup = reg.pickupLocation || reg['Pickup Location'] || reg['Place of Arrival'] || 'Not Specified';
         pickupBreakdown[pickup] = (pickupBreakdown[pickup] || 0) + 1;
     });
     
     displayBreakdownTable('pickupLocationSummaryTableBody', pickupBreakdown, registrations.length);
     
+    // Enhanced transportation analytics with more fields
+    displayEnhancedTransportationAnalytics(registrations);
+    
     // Load complex transportation view
     displayComplexTransportationView(registrations);
+}
+
+// Display enhanced transportation analytics
+function displayEnhancedTransportationAnalytics(registrations) {
+    // Add analytics sections to the transportation analytics area
+    const transportationSection = document.querySelector('.transportation-changes-section');
+    if (!transportationSection) return;
+    
+    // Create analytics container if it doesn't exist
+    let analyticsContainer = document.getElementById('enhancedTransportationAnalytics');
+    if (!analyticsContainer) {
+        analyticsContainer = document.createElement('div');
+        analyticsContainer.id = 'enhancedTransportationAnalytics';
+        analyticsContainer.className = 'analytics-section';
+        analyticsContainer.style.cssText = 'margin-top: 2rem; padding-top: 2rem; border-top: 2px solid #e0e0e0;';
+        transportationSection.parentNode.insertBefore(analyticsContainer, transportationSection.nextSibling);
+    }
+    
+    // Extract all transportation-related fields
+    const placeOfArrivalBreakdown = {};
+    const arrivalDateBreakdown = {};
+    const arrivalTimeBreakdown = {};
+    const modeOfTravelBreakdown = {};
+    const returnPlaceBreakdown = {};
+    const returnDateBreakdown = {};
+    
+    registrations.forEach(reg => {
+        // Place of Arrival
+        const placeOfArrival = reg['Place of Arrival'] || reg.placeOfArrival || reg.pickupLocation || reg['Pickup Location'] || 'Not Specified';
+        if (placeOfArrival && placeOfArrival !== 'Not Specified') {
+            placeOfArrivalBreakdown[placeOfArrival] = (placeOfArrivalBreakdown[placeOfArrival] || 0) + 1;
+        }
+        
+        // Date of Arrival
+        const arrivalDate = reg['Date of Arrival'] || reg.dateOfArrival || reg.arrivalDate || reg['Arrival Date'] || '';
+        if (arrivalDate) {
+            arrivalDateBreakdown[arrivalDate] = (arrivalDateBreakdown[arrivalDate] || 0) + 1;
+        }
+        
+        // Arrival Time
+        const arrivalTime = reg['Arrival Time'] || reg.arrivalTime || reg['Time of Arrival'] || '';
+        if (arrivalTime) {
+            // Group by time ranges for better analytics
+            const timeRange = getTimeRange(arrivalTime);
+            arrivalTimeBreakdown[timeRange] = (arrivalTimeBreakdown[timeRange] || 0) + 1;
+        }
+        
+        // Mode of Travel
+        const modeOfTravel = reg['Mode of Travel'] || reg.modeOfTravel || reg['Transportation Mode'] || '';
+        if (modeOfTravel) {
+            modeOfTravelBreakdown[modeOfTravel] = (modeOfTravelBreakdown[modeOfTravel] || 0) + 1;
+        }
+        
+        // Return Place
+        const returnPlace = reg['Place of Return'] || reg.returnPlace || reg.dropoffLocation || reg['Dropoff Location'] || '';
+        if (returnPlace) {
+            returnPlaceBreakdown[returnPlace] = (returnPlaceBreakdown[returnPlace] || 0) + 1;
+        }
+        
+        // Return Date
+        const returnDate = reg['Date of Return'] || reg.returnDate || reg['Return Date'] || '';
+        if (returnDate) {
+            returnDateBreakdown[returnDate] = (returnDateBreakdown[returnDate] || 0) + 1;
+        }
+    });
+    
+    // Build HTML for analytics
+    let html = `
+        <h3>Enhanced Transportation Analytics</h3>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-top: 1.5rem;">
+    `;
+    
+    // Place of Arrival breakdown
+    if (Object.keys(placeOfArrivalBreakdown).length > 0) {
+        html += `
+            <div class="analytics-subsection">
+                <h4>Place of Arrival</h4>
+                ${createBreakdownHTML(placeOfArrivalBreakdown, registrations.length)}
+            </div>
+        `;
+    }
+    
+    // Date of Arrival breakdown
+    if (Object.keys(arrivalDateBreakdown).length > 0) {
+        html += `
+            <div class="analytics-subsection">
+                <h4>Date of Arrival</h4>
+                ${createBreakdownHTML(arrivalDateBreakdown, registrations.length)}
+            </div>
+        `;
+    }
+    
+    // Arrival Time breakdown
+    if (Object.keys(arrivalTimeBreakdown).length > 0) {
+        html += `
+            <div class="analytics-subsection">
+                <h4>Arrival Time Distribution</h4>
+                ${createBreakdownHTML(arrivalTimeBreakdown, registrations.length)}
+            </div>
+        `;
+    }
+    
+    // Mode of Travel breakdown
+    if (Object.keys(modeOfTravelBreakdown).length > 0) {
+        html += `
+            <div class="analytics-subsection">
+                <h4>Mode of Travel</h4>
+                ${createBreakdownHTML(modeOfTravelBreakdown, registrations.length)}
+            </div>
+        `;
+    }
+    
+    // Return Place breakdown
+    if (Object.keys(returnPlaceBreakdown).length > 0) {
+        html += `
+            <div class="analytics-subsection">
+                <h4>Place of Return</h4>
+                ${createBreakdownHTML(returnPlaceBreakdown, registrations.length)}
+            </div>
+        `;
+    }
+    
+    // Return Date breakdown
+    if (Object.keys(returnDateBreakdown).length > 0) {
+        html += `
+            <div class="analytics-subsection">
+                <h4>Date of Return</h4>
+                ${createBreakdownHTML(returnDateBreakdown, registrations.length)}
+            </div>
+        `;
+    }
+    
+    html += `
+        </div>
+    `;
+    
+    analyticsContainer.innerHTML = html;
+}
+
+// Helper to create breakdown HTML
+function createBreakdownHTML(breakdown, total) {
+    const sortedEntries = Object.entries(breakdown).sort((a, b) => b[1] - a[1]);
+    let html = '<table class="data-table" style="margin-top: 0.5rem;">';
+    html += '<thead><tr><th>Value</th><th>Count</th><th>Percentage</th></tr></thead><tbody>';
+    
+    sortedEntries.forEach(([key, count]) => {
+        const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+        html += `
+            <tr>
+                <td>${escapeHtml(key)}</td>
+                <td>${count}</td>
+                <td>${percentage}%</td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table>';
+    return html;
+}
+
+// Helper to get time range from time string
+function getTimeRange(timeStr) {
+    if (!timeStr) return 'Unknown';
+    
+    // Try to extract hour from time string (format: HH:MM or HH:MM:SS)
+    const timeMatch = timeStr.match(/(\d{1,2}):\d{2}/);
+    if (!timeMatch) return 'Unknown';
+    
+    const hour = parseInt(timeMatch[1]);
+    
+    if (hour >= 0 && hour < 6) return '00:00 - 05:59';
+    if (hour >= 6 && hour < 12) return '06:00 - 11:59';
+    if (hour >= 12 && hour < 18) return '12:00 - 17:59';
+    return '18:00 - 23:59';
 }
 
 // Load transportation changes based on time period
@@ -3920,21 +4357,23 @@ function displayComplexTransportationView(registrations) {
     if (!tbody) return;
     
     // Filter registrations that have transportation details
+    // Look for various field name variations
     const transportationData = registrations
         .filter(reg => {
-            const pickup = reg.pickupLocation || reg['Pickup Location'];
-            const arrivalDate = reg.arrivalDate || reg['Arrival Date'];
-            const arrivalTime = reg.arrivalTime || reg['Arrival Time'];
-            return pickup && arrivalDate && arrivalTime;
+            const pickup = reg.pickupLocation || reg['Pickup Location'] || reg['Place of Arrival'] || reg.placeOfArrival;
+            const arrivalDate = reg.arrivalDate || reg['Arrival Date'] || reg['Date of Arrival'] || reg.dateOfArrival;
+            const arrivalTime = reg.arrivalTime || reg['Arrival Time'] || reg['Time of Arrival'] || reg.timeOfArrival;
+            return pickup || arrivalDate || arrivalTime;
         })
         .map(reg => ({
             name: reg.name || reg['Full Name'] || 'Unknown',
             uniqueId: reg.uniqueId || '',
             email: reg.email || reg['Email address'] || '',
-            pickupLocation: reg.pickupLocation || reg['Pickup Location'] || '',
-            arrivalDate: reg.arrivalDate || reg['Arrival Date'] || '',
-            arrivalTime: reg.arrivalTime || reg['Arrival Time'] || '',
-            flightTrainNumber: reg.flightTrainNumber || reg['Flight/Train Number'] || ''
+            pickupLocation: reg.pickupLocation || reg['Pickup Location'] || reg['Place of Arrival'] || reg.placeOfArrival || '',
+            arrivalDate: reg.arrivalDate || reg['Arrival Date'] || reg['Date of Arrival'] || reg.dateOfArrival || '',
+            arrivalTime: reg.arrivalTime || reg['Arrival Time'] || reg['Time of Arrival'] || reg.timeOfArrival || '',
+            flightTrainNumber: reg.flightTrainNumber || reg['Flight/Train Number'] || reg['Flight Number'] || reg['Train Number'] || '',
+            modeOfTravel: reg['Mode of Travel'] || reg.modeOfTravel || ''
         }));
     
     // Sort by: 1) Pickup Location (alphabetical), 2) Arrival Date, 3) Arrival Time
@@ -3953,7 +4392,7 @@ function displayComplexTransportationView(registrations) {
     
     let html = '';
     if (transportationData.length === 0) {
-        html = '<tr><td colspan="7" style="text-align: center;">No transportation data available.</td></tr>';
+        html = '<tr><td colspan="8" style="text-align: center;">No transportation data available.</td></tr>';
     } else {
         transportationData.forEach(item => {
             html += `
@@ -3961,6 +4400,7 @@ function displayComplexTransportationView(registrations) {
                     <td>${escapeHtml(item.pickupLocation)}</td>
                     <td>${escapeHtml(item.arrivalDate)}</td>
                     <td>${escapeHtml(item.arrivalTime)}</td>
+                    <td>${escapeHtml(item.modeOfTravel)}</td>
                     <td>${escapeHtml(item.name)}</td>
                     <td>${escapeHtml(item.uniqueId)}</td>
                     <td>${escapeHtml(item.flightTrainNumber)}</td>
@@ -4300,6 +4740,1419 @@ window.addEventListener('click', function(event) {
         closeBadge();
     }
 });
+
+// ============================================
+// CHECKIN MODULE FUNCTIONS
+// ============================================
+
+// Global variables for checkin
+let currentCheckinType = 'pickup_location';
+let currentParticipantUniqueId = null;
+let checkinHistoryListener = null;
+let currentHistoryPage = 1;
+let historyPageSize = 50;
+let checkinNotificationSettings = {
+    enabled: true,
+    types: [],
+    soundEnabled: false,
+    duration: 5000
+};
+
+// Checkin type labels
+const CHECKIN_TYPE_LABELS = {
+    'pickup_location': 'Pickup Location',
+    'venue_entrance': 'Venue Entrance',
+    'cloak_room': 'Cloak Room',
+    'accommodation': 'Accommodation',
+    'food': 'Food',
+    'post_tour': 'Post Tour'
+};
+
+// Load notification settings from localStorage
+function loadNotificationSettings() {
+    const saved = localStorage.getItem('checkinNotificationSettings');
+    if (saved) {
+        try {
+            checkinNotificationSettings = JSON.parse(saved);
+        } catch (e) {
+            console.error('Error loading notification settings:', e);
+        }
+    }
+}
+
+// Save notification settings to localStorage
+function saveNotificationSettings() {
+    localStorage.setItem('checkinNotificationSettings', JSON.stringify(checkinNotificationSettings));
+}
+
+// Initialize checkin interface
+async function initializeCheckinInterface() {
+    if (!window.firebase || !firebase.auth) return;
+    
+    const user = firebase.auth().currentUser;
+    if (!user) return;
+    
+    const canPerform = await canPerformCheckin(user);
+    if (!canPerform) return;
+    
+    // Check if user has access to checkin tab
+    const checkinTab = document.getElementById('checkin');
+    if (!checkinTab) return;
+    
+    // Load notification settings
+    loadNotificationSettings();
+    
+    // Initialize checkin interface
+    const checkinLoading = document.getElementById('checkinLoading');
+    const checkinData = document.getElementById('checkinData');
+    
+    if (checkinLoading && checkinData) {
+        try {
+            // Filter checkin type tabs based on user permissions
+            await filterCheckinTypeTabs(user);
+            
+            // Load recent checkins
+            await loadRecentCheckins(currentCheckinType);
+            
+            // Setup checkin form
+            setupCheckinForm();
+            
+            // Setup real-time listeners
+            setupCheckinListeners();
+            
+            // Load checkin history
+            await loadCheckinHistory();
+            
+            checkinLoading.style.display = 'none';
+            checkinData.style.display = 'block';
+        } catch (error) {
+            console.error('Error initializing checkin interface:', error);
+            if (checkinLoading) {
+                checkinLoading.innerHTML = '<p>Error loading checkin interface. Please refresh the page.</p>';
+            }
+        }
+    }
+}
+
+// Filter checkin type tabs based on user permissions
+async function filterCheckinTypeTabs(user) {
+    const tabs = document.querySelectorAll('.checkin-type-tab');
+    const isAdminUser = await isAdmin(user);
+    
+    if (isAdminUser) {
+        // Admins can see all tabs
+        tabs.forEach(tab => tab.style.display = '');
+        return;
+    }
+    
+    // Volunteers can only see their assigned teams
+    const teams = await getVolunteerTeams(user);
+    const teamMap = {
+        'pickup_location': 'transportation',
+        'venue_entrance': 'venue_entrance',
+        'cloak_room': 'cloak_room',
+        'accommodation': 'accommodation',
+        'food': 'food',
+        'post_tour': 'post_tour'
+    };
+    
+    tabs.forEach(tab => {
+        const checkinType = tab.getAttribute('data-checkin-type');
+        const requiredTeam = teamMap[checkinType];
+        if (requiredTeam && teams.includes(requiredTeam)) {
+            tab.style.display = '';
+        } else {
+            tab.style.display = 'none';
+        }
+    });
+}
+
+// Switch checkin type
+function switchCheckinType(checkinType) {
+    currentCheckinType = checkinType;
+    
+    // Update tab active state
+    document.querySelectorAll('.checkin-type-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.getAttribute('data-checkin-type') === checkinType) {
+            tab.classList.add('active');
+        }
+    });
+    
+    // Update form
+    updateCheckinFormForType();
+    
+    // Load recent checkins
+    loadRecentCheckins(checkinType);
+    
+    // Clear participant info
+    clearParticipantInfo();
+}
+
+// Update checkin form based on type
+function updateCheckinFormForType() {
+    const pickupLocationGroup = document.getElementById('pickupLocationGroup');
+    const cloakRoomFields = document.getElementById('cloakRoomFields');
+    const checkinTypeDisplay = document.getElementById('checkinTypeDisplay');
+    
+    if (checkinTypeDisplay) {
+        checkinTypeDisplay.textContent = CHECKIN_TYPE_LABELS[currentCheckinType] || currentCheckinType;
+    }
+    
+    if (pickupLocationGroup) {
+        pickupLocationGroup.style.display = currentCheckinType === 'pickup_location' ? 'block' : 'none';
+    }
+    
+    if (cloakRoomFields) {
+        cloakRoomFields.style.display = currentCheckinType === 'cloak_room' ? 'block' : 'none';
+    }
+}
+
+// Switch search mode
+function switchSearchMode(mode) {
+    // Update button states
+    document.querySelectorAll('.search-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event?.target?.classList.add('active');
+    
+    // Show/hide search modes
+    document.querySelectorAll('.search-mode').forEach(div => {
+        div.classList.remove('active');
+    });
+    
+    const targetMode = document.getElementById(`searchMode-${mode}`);
+    if (targetMode) {
+        targetMode.classList.add('active');
+    }
+    
+    // Clear participant info when switching modes
+    clearParticipantInfo();
+}
+
+// Search participant by barcode/Praveshika ID
+async function searchParticipant() {
+    const barcodeInput = document.getElementById('barcodeInput');
+    if (!barcodeInput) return;
+    
+    const uniqueId = barcodeInput.value.trim();
+    if (!uniqueId) {
+        showNotification('Please enter a barcode or Praveshika ID', 'error');
+        return;
+    }
+    
+    await searchByPraveshikaIdDirect(uniqueId);
+}
+
+// Search by Praveshika ID
+async function searchByPraveshikaId() {
+    const manualInput = document.getElementById('manualPraveshikaId');
+    if (!manualInput) return;
+    
+    const uniqueId = manualInput.value.trim();
+    if (!uniqueId) {
+        showNotification('Please enter a Praveshika ID', 'error');
+        return;
+    }
+    
+    await searchByPraveshikaIdDirect(uniqueId);
+}
+
+// Direct search by Praveshika ID
+async function searchByPraveshikaIdDirect(uniqueId) {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const normalizedId = normalizePraveshikaId(uniqueId);
+        
+        // Search in registrations collection
+        const registrationsQuery = await db.collection('registrations')
+            .where('normalizedId', '==', normalizedId)
+            .limit(1)
+            .get();
+        
+        if (registrationsQuery.empty) {
+            // Try direct document ID lookup
+            const regDoc = await db.collection('registrations').doc(uniqueId).get();
+            if (regDoc.exists) {
+                displayParticipantInfo(regDoc.data(), uniqueId);
+            } else {
+                showNotification('Participant not found', 'error');
+            }
+        } else {
+            const regData = registrationsQuery.docs[0].data();
+            displayParticipantInfo(regData, uniqueId);
+        }
+    } catch (error) {
+        console.error('Error searching participant:', error);
+        showNotification('Error searching participant: ' + error.message, 'error');
+    }
+}
+
+// Advanced search by name or email
+async function advancedSearch() {
+    const nameInput = document.getElementById('searchByName');
+    const emailInput = document.getElementById('searchByEmail');
+    
+    if (!nameInput || !emailInput) return;
+    
+    const name = nameInput.value.trim();
+    const email = emailInput.value.trim();
+    
+    if (!name && !email) {
+        showNotification('Please enter a name or email to search', 'error');
+        return;
+    }
+    
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        let query = db.collection('registrations');
+        
+        if (name) {
+            // Note: Firestore doesn't support full-text search, so we'll do a prefix search
+            // This is a limitation - for better search, consider using Algolia or similar
+            query = query.where('name', '>=', name).where('name', '<=', name + '\uf8ff');
+        }
+        
+        if (email) {
+            query = query.where('email', '==', email.toLowerCase());
+        }
+        
+        const results = await query.limit(10).get();
+        
+        if (results.empty) {
+            showNotification('No participants found', 'info');
+            return;
+        }
+        
+        if (results.size === 1) {
+            const regData = results.docs[0].data();
+            displayParticipantInfo(regData, regData.uniqueId);
+        } else {
+            // Show list of results
+            displayParticipantSearchResults(results.docs);
+        }
+    } catch (error) {
+        console.error('Error in advanced search:', error);
+        showNotification('Error searching: ' + error.message, 'error');
+    }
+}
+
+// Display participant search results
+function displayParticipantSearchResults(docs) {
+    const participantInfo = document.getElementById('participantInfo');
+    const participantDetails = document.getElementById('participantDetails');
+    
+    if (!participantInfo || !participantDetails) return;
+    
+    let html = '<div class="participant-search-results"><h4>Multiple results found. Please select:</h4><ul>';
+    
+    docs.forEach(doc => {
+        const data = doc.data();
+        const name = data.name || data['Full Name'] || 'Unknown';
+        const uniqueId = data.uniqueId || doc.id;
+        html += `<li><button class="btn btn-link" onclick="selectParticipantFromSearch('${escapeHtml(uniqueId)}')">${escapeHtml(name)} - ${escapeHtml(uniqueId)}</button></li>`;
+    });
+    
+    html += '</ul></div>';
+    participantDetails.innerHTML = html;
+    participantInfo.style.display = 'block';
+}
+
+// Select participant from search results
+async function selectParticipantFromSearch(uniqueId) {
+    const db = firebase.firestore();
+    const regDoc = await db.collection('registrations').doc(uniqueId).get();
+    if (regDoc.exists) {
+        displayParticipantInfo(regDoc.data(), uniqueId);
+    }
+}
+
+// Display participant information
+function displayParticipantInfo(regData, uniqueId) {
+    const participantInfo = document.getElementById('participantInfo');
+    const participantDetails = document.getElementById('participantDetails');
+    const checkinForm = document.getElementById('checkinForm');
+    
+    if (!participantInfo || !participantDetails || !checkinForm) return;
+    
+    currentParticipantUniqueId = uniqueId;
+    
+    const name = regData.name || regData['Full Name'] || 'Unknown';
+    const email = regData.email || regData['Email address'] || 'N/A';
+    const country = regData.country || regData.Country || 'N/A';
+    const shreni = regData.shreni || regData.Shreni || 'N/A';
+    
+    participantDetails.innerHTML = `
+        <div class="participant-details">
+            <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+            <p><strong>Praveshika ID:</strong> ${escapeHtml(uniqueId)}</p>
+            <p><strong>Email:</strong> ${escapeHtml(email)}</p>
+            <p><strong>Country:</strong> ${escapeHtml(country)}</p>
+            <p><strong>Shreni:</strong> ${escapeHtml(shreni)}</p>
+        </div>
+    `;
+    
+    participantInfo.style.display = 'block';
+    checkinForm.style.display = 'block';
+    
+    // Check if already checked in
+    checkCheckinStatus(uniqueId);
+}
+
+// Clear participant info
+function clearParticipantInfo() {
+    currentParticipantUniqueId = null;
+    const participantInfo = document.getElementById('participantInfo');
+    const checkinForm = document.getElementById('checkinForm');
+    
+    if (participantInfo) participantInfo.style.display = 'none';
+    if (checkinForm) checkinForm.style.display = 'none';
+    
+    // Clear inputs
+    const barcodeInput = document.getElementById('barcodeInput');
+    const manualInput = document.getElementById('manualPraveshikaId');
+    if (barcodeInput) barcodeInput.value = '';
+    if (manualInput) manualInput.value = '';
+}
+
+// Setup checkin form
+function setupCheckinForm() {
+    const form = document.getElementById('checkinFormElement');
+    if (!form) return;
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await performCheckin();
+    });
+}
+
+// Perform checkin
+async function performCheckin() {
+    if (!currentParticipantUniqueId) {
+        showNotification('Please search for a participant first', 'error');
+        return;
+    }
+    
+    if (!window.firebase || !firebase.auth || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        showNotification('Please log in to perform checkin', 'error');
+        return;
+    }
+    
+    // Check permissions
+    const hasAccess = await hasAccessToCheckinType(user, currentCheckinType);
+    if (!hasAccess) {
+        showNotification('You do not have permission to perform this checkin type', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Get user data for checkedInByName
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        const userData = userDoc.exists ? userDoc.data() : {};
+        const checkedInByName = userData.volunteerName || userData.name || user.email || 'Unknown';
+        
+        // Get participant data
+        const regDoc = await db.collection('registrations').doc(currentParticipantUniqueId).get();
+        const regData = regDoc.exists ? regDoc.data() : {};
+        
+        // Build checkin data
+        const checkinData = {
+            uniqueId: currentParticipantUniqueId,
+            checkinType: currentCheckinType,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            checkedInBy: user.uid,
+            checkedInByName: checkedInByName,
+            participantName: regData.name || regData['Full Name'] || 'Unknown',
+            participantEmail: regData.email || regData['Email address'] || '',
+            notes: document.getElementById('checkinNotes')?.value.trim() || null
+        };
+        
+        // Add type-specific fields
+        if (currentCheckinType === 'pickup_location') {
+            const pickupLocation = document.getElementById('checkinPickupLocation')?.value.trim();
+            if (pickupLocation) {
+                checkinData.pickupLocation = pickupLocation;
+            } else {
+                // Try to get from registration
+                checkinData.pickupLocation = regData.pickupLocation || regData['Pickup Location'] || null;
+            }
+        }
+        
+        if (currentCheckinType === 'cloak_room') {
+            const bagCount = document.getElementById('checkinBagCount')?.value;
+            const lockerId = document.getElementById('checkinLockerId')?.value.trim();
+            if (bagCount) checkinData.bagCount = parseInt(bagCount);
+            if (lockerId) checkinData.lockerId = lockerId;
+        }
+        
+        // Create checkin document
+        const checkinId = `${currentParticipantUniqueId}_${currentCheckinType}_${Date.now()}`;
+        await db.collection('checkins').doc(checkinId).set(checkinData);
+        
+        showNotification('Checkin successful!', 'success');
+        
+        // Clear form
+        clearCheckinForm();
+        clearParticipantInfo();
+        
+        // Reload recent checkins
+        await loadRecentCheckins(currentCheckinType);
+        
+        // Reload history if on history view
+        await loadCheckinHistory();
+        
+    } catch (error) {
+        console.error('Error performing checkin:', error);
+        showNotification('Error performing checkin: ' + error.message, 'error');
+    }
+}
+
+// Clear checkin form
+function clearCheckinForm() {
+    const form = document.getElementById('checkinFormElement');
+    if (form) form.reset();
+    
+    const notes = document.getElementById('checkinNotes');
+    if (notes) notes.value = '';
+    
+    const bagCount = document.getElementById('checkinBagCount');
+    const lockerId = document.getElementById('checkinLockerId');
+    if (bagCount) bagCount.value = '';
+    if (lockerId) lockerId.value = '';
+}
+
+// Check checkin status
+async function checkCheckinStatus(uniqueId) {
+    if (!window.firebase || !firebase.firestore) return;
+    
+    try {
+        const db = firebase.firestore();
+        const checkinsQuery = await db.collection('checkins')
+            .where('uniqueId', '==', uniqueId)
+            .where('checkinType', '==', currentCheckinType)
+            .orderBy('timestamp', 'desc')
+            .limit(1)
+            .get();
+        
+        if (!checkinsQuery.empty) {
+            const checkinData = checkinsQuery.docs[0].data();
+            const timestamp = checkinData.timestamp?.toDate();
+            const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+            
+            showNotification(`Already checked in at ${timeStr}`, 'info');
+        }
+    } catch (error) {
+        console.error('Error checking checkin status:', error);
+    }
+}
+
+// Load recent checkins
+async function loadRecentCheckins(checkinType, limit = 10) {
+    if (!window.firebase || !firebase.firestore) return;
+    
+    const recentCheckinsList = document.getElementById('recentCheckinsList');
+    if (!recentCheckinsList) return;
+    
+    try {
+        const db = firebase.firestore();
+        const user = firebase.auth().currentUser;
+        if (!user) return;
+        
+        let query = db.collection('checkins')
+            .where('checkinType', '==', checkinType)
+            .orderBy('timestamp', 'desc')
+            .limit(limit);
+        
+        // If volunteer, filter by their access
+        const isAdminUser = await isAdmin(user);
+        if (!isAdminUser) {
+            // Volunteers can only see checkins they have access to
+            // This is handled by Firestore rules, but we can add additional filtering if needed
+        }
+        
+        const snapshot = await query.get();
+        
+        if (snapshot.empty) {
+            recentCheckinsList.innerHTML = '<p>No recent checkins</p>';
+            return;
+        }
+        
+        let html = '<ul class="recent-checkins-list">';
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const timestamp = data.timestamp?.toDate();
+            const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+            
+            html += `
+                <li class="recent-checkin-item">
+                    <div class="checkin-item-name">${escapeHtml(data.participantName)}</div>
+                    <div class="checkin-item-id">${escapeHtml(data.uniqueId)}</div>
+                    <div class="checkin-item-time">${escapeHtml(timeStr)}</div>
+                    <div class="checkin-item-by">By: ${escapeHtml(data.checkedInByName)}</div>
+                </li>
+            `;
+        });
+        html += '</ul>';
+        
+        recentCheckinsList.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading recent checkins:', error);
+        recentCheckinsList.innerHTML = '<p>Error loading recent checkins</p>';
+    }
+}
+
+// ============================================
+// BATCH CHECKIN FUNCTIONS
+// ============================================
+
+// Process batch checkin
+async function processBatchCheckin() {
+    const batchInput = document.getElementById('batchInput');
+    if (!batchInput) return;
+    
+    const inputText = batchInput.value.trim();
+    if (!inputText) {
+        showNotification('Please enter Praveshika IDs', 'error');
+        return;
+    }
+    
+    // Parse input (support both comma-separated and newline-separated)
+    const ids = inputText.split(/[,\n]/)
+        .map(id => id.trim())
+        .filter(id => id.length > 0);
+    
+    if (ids.length === 0) {
+        showNotification('No valid Praveshika IDs found', 'error');
+        return;
+    }
+    
+    // Show preview
+    const batchPreview = document.getElementById('batchPreview');
+    if (batchPreview) {
+        batchPreview.style.display = 'block';
+        // Store IDs globally for the confirm button
+        window.batchCheckinIds = ids;
+        batchPreview.innerHTML = `
+            <div class="batch-preview">
+                <h4>Batch Checkin Preview</h4>
+                <p>Found ${ids.length} participant(s) to check in</p>
+                <ul class="batch-preview-list">
+                    ${ids.map(id => `<li>${escapeHtml(id)}</li>`).join('')}
+                </ul>
+                <button class="btn btn-primary" onclick="executeBatchCheckinFromPreview()">Confirm Batch Checkin</button>
+                <button class="btn btn-secondary" onclick="cancelBatchCheckin()">Cancel</button>
+            </div>
+        `;
+    }
+}
+
+// Execute batch checkin from preview
+async function executeBatchCheckinFromPreview() {
+    const ids = window.batchCheckinIds;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        showNotification('No participants to check in', 'error');
+        return;
+    }
+    await executeBatchCheckin(ids);
+}
+
+// Execute batch checkin
+async function executeBatchCheckin(ids) {
+    if (!window.firebase || !firebase.auth || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        showNotification('Please log in to perform checkin', 'error');
+        return;
+    }
+    
+    // Check permissions
+    const hasAccess = await hasAccessToCheckinType(user, currentCheckinType);
+    if (!hasAccess) {
+        showNotification('You do not have permission to perform this checkin type', 'error');
+        return;
+    }
+    
+    const batchPreview = document.getElementById('batchPreview');
+    if (batchPreview) {
+        batchPreview.innerHTML = '<p>Processing batch checkin...</p>';
+    }
+    
+    const db = firebase.firestore();
+    const userDoc = await db.collection('users').doc(user.uid).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+    const checkedInByName = userData.volunteerName || userData.name || user.email || 'Unknown';
+    
+    let successCount = 0;
+    let failCount = 0;
+    const results = [];
+    
+    for (const uniqueId of ids) {
+        try {
+            // Get participant data
+            const regDoc = await db.collection('registrations').doc(uniqueId).get();
+            if (!regDoc.exists) {
+                results.push({ uniqueId, status: 'failed', error: 'Participant not found' });
+                failCount++;
+                continue;
+            }
+            
+            const regData = regDoc.data();
+            
+            // Build checkin data
+            const checkinData = {
+                uniqueId: uniqueId,
+                checkinType: currentCheckinType,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                checkedInBy: user.uid,
+                checkedInByName: checkedInByName,
+                participantName: regData.name || regData['Full Name'] || 'Unknown',
+                participantEmail: regData.email || regData['Email address'] || '',
+                notes: null
+            };
+            
+            // Add type-specific fields
+            if (currentCheckinType === 'pickup_location') {
+                checkinData.pickupLocation = regData.pickupLocation || regData['Pickup Location'] || null;
+            }
+            
+            // Create checkin document
+            const checkinId = `${uniqueId}_${currentCheckinType}_${Date.now()}`;
+            await db.collection('checkins').doc(checkinId).set(checkinData);
+            
+            results.push({ uniqueId, status: 'success' });
+            successCount++;
+        } catch (error) {
+            console.error(`Error checking in ${uniqueId}:`, error);
+            results.push({ uniqueId, status: 'failed', error: error.message });
+            failCount++;
+        }
+    }
+    
+    // Show results
+    if (batchPreview) {
+        let html = `
+            <div class="batch-results">
+                <h4>Batch Checkin Results</h4>
+                <p><strong>Total:</strong> ${ids.length} | <strong>Success:</strong> ${successCount} | <strong>Failed:</strong> ${failCount}</p>
+                <div class="batch-results-list">
+        `;
+        
+        results.forEach(result => {
+            const statusClass = result.status === 'success' ? 'success' : 'error';
+            html += `
+                <div class="batch-result-item ${statusClass}">
+                    <span>${escapeHtml(result.uniqueId)}</span>
+                    <span>${result.status === 'success' ? '✓' : '✗'} ${result.error || ''}</span>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+                <button class="btn btn-secondary" onclick="cancelBatchCheckin()">Close</button>
+            </div>
+        `;
+        
+        batchPreview.innerHTML = html;
+    }
+    
+    // Reload recent checkins
+    await loadRecentCheckins(currentCheckinType);
+    await loadCheckinHistory();
+    
+    showNotification(`Batch checkin complete: ${successCount} successful, ${failCount} failed`, 
+        failCount === 0 ? 'success' : 'info');
+}
+
+// Cancel batch checkin
+function cancelBatchCheckin() {
+    const batchInput = document.getElementById('batchInput');
+    const batchPreview = document.getElementById('batchPreview');
+    
+    if (batchInput) batchInput.value = '';
+    if (batchPreview) {
+        batchPreview.style.display = 'none';
+        batchPreview.innerHTML = '';
+    }
+}
+
+// ============================================
+// CHECKIN HISTORY FUNCTIONS
+// ============================================
+
+// Load checkin history
+async function loadCheckinHistory(page = 1) {
+    if (!window.firebase || !firebase.firestore) return;
+    
+    currentHistoryPage = page;
+    
+    const historyList = document.getElementById('checkinHistoryList');
+    const resultsCount = document.getElementById('historyResultsCount');
+    
+    if (!historyList) return;
+    
+    try {
+        const db = firebase.firestore();
+        const user = firebase.auth().currentUser;
+        if (!user) return;
+        
+        // Get filters
+        const filterType = document.getElementById('historyFilterType')?.value || '';
+        const filterFromDate = document.getElementById('historyFilterFromDate')?.value || '';
+        const filterToDate = document.getElementById('historyFilterToDate')?.value || '';
+        const filterSearch = document.getElementById('historyFilterSearch')?.value.trim() || '';
+        
+        let query = db.collection('checkins');
+        
+        // Apply filters
+        if (filterType) {
+            query = query.where('checkinType', '==', filterType);
+        }
+        
+        if (filterFromDate) {
+            const fromDate = new Date(filterFromDate);
+            fromDate.setHours(0, 0, 0, 0);
+            query = query.where('timestamp', '>=', firebase.firestore.Timestamp.fromDate(fromDate));
+        }
+        
+        if (filterToDate) {
+            const toDate = new Date(filterToDate);
+            toDate.setHours(23, 59, 59, 999);
+            query = query.where('timestamp', '<=', firebase.firestore.Timestamp.fromDate(toDate));
+        }
+        
+        // Order by timestamp (requires composite index if filtering by checkinType or date)
+        // Firestore will show an error link if index is needed
+        query = query.orderBy('timestamp', 'desc');
+        
+        // Get total count (for pagination)
+        const totalSnapshot = await query.get();
+        const totalCount = totalSnapshot.size;
+        
+        // Apply pagination
+        const startAfter = (page - 1) * historyPageSize;
+        if (startAfter > 0) {
+            const startDoc = totalSnapshot.docs[startAfter - 1];
+            query = query.startAfter(startDoc);
+        }
+        query = query.limit(historyPageSize);
+        
+        const snapshot = await query.get();
+        
+        // Filter by search term if provided (client-side)
+        let filteredDocs = snapshot.docs;
+        if (filterSearch) {
+            const searchLower = filterSearch.toLowerCase();
+            filteredDocs = filteredDocs.filter(doc => {
+                const data = doc.data();
+                const name = (data.participantName || '').toLowerCase();
+                const email = (data.participantEmail || '').toLowerCase();
+                const uniqueId = (data.uniqueId || '').toLowerCase();
+                return name.includes(searchLower) || email.includes(searchLower) || uniqueId.includes(searchLower);
+            });
+        }
+        
+        // Update results count
+        if (resultsCount) {
+            resultsCount.innerHTML = `<p><strong>Total Results:</strong> ${filterSearch ? filteredDocs.length : totalCount}</p>`;
+        }
+        
+        // Display results
+        if (filteredDocs.length === 0) {
+            historyList.innerHTML = '<p>No checkins found</p>';
+            return;
+        }
+        
+        let html = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Participant</th>
+                        <th>Praveshika ID</th>
+                        <th>Checkin Type</th>
+                        <th>Location</th>
+                        <th>Checked In By</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        filteredDocs.forEach(doc => {
+            const data = doc.data();
+            const timestamp = data.timestamp?.toDate();
+            const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+            
+            html += `
+                <tr>
+                    <td>${escapeHtml(timeStr)}</td>
+                    <td>${escapeHtml(data.participantName || 'Unknown')}</td>
+                    <td>${escapeHtml(data.uniqueId || 'N/A')}</td>
+                    <td>${escapeHtml(CHECKIN_TYPE_LABELS[data.checkinType] || data.checkinType)}</td>
+                    <td>${escapeHtml(data.pickupLocation || 'N/A')}</td>
+                    <td>${escapeHtml(data.checkedInByName || 'Unknown')}</td>
+                    <td>${escapeHtml(data.notes || '')}</td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                </tbody>
+            </table>
+        `;
+        
+        historyList.innerHTML = html;
+        
+        // Update pagination
+        updateHistoryPagination(Math.ceil(totalCount / historyPageSize), page);
+        
+    } catch (error) {
+        console.error('Error loading checkin history:', error);
+        historyList.innerHTML = '<p>Error loading checkin history</p>';
+    }
+}
+
+// Apply history filters
+function applyHistoryFilters() {
+    loadCheckinHistory(1);
+}
+
+// Clear history filters
+function clearHistoryFilters() {
+    const filterType = document.getElementById('historyFilterType');
+    const filterFromDate = document.getElementById('historyFilterFromDate');
+    const filterToDate = document.getElementById('historyFilterToDate');
+    const filterSearch = document.getElementById('historyFilterSearch');
+    
+    if (filterType) filterType.value = '';
+    if (filterFromDate) filterFromDate.value = '';
+    if (filterToDate) filterToDate.value = '';
+    if (filterSearch) filterSearch.value = '';
+    
+    loadCheckinHistory(1);
+}
+
+// Update history pagination
+function updateHistoryPagination(totalPages, currentPage) {
+    const pagination = document.getElementById('historyPagination');
+    if (!pagination) return;
+    
+    if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+    }
+    
+    let html = '<div class="pagination-controls">';
+    
+    // Previous button
+    if (currentPage > 1) {
+        html += `<button class="btn btn-secondary" onclick="loadCheckinHistory(${currentPage - 1})">Previous</button>`;
+    }
+    
+    // Page numbers
+    for (let i = 1; i <= totalPages && i <= 10; i++) {
+        if (i === currentPage) {
+            html += `<button class="btn btn-primary" disabled>${i}</button>`;
+        } else {
+            html += `<button class="btn btn-secondary" onclick="loadCheckinHistory(${i})">${i}</button>`;
+        }
+    }
+    
+    // Next button
+    if (currentPage < totalPages) {
+        html += `<button class="btn btn-secondary" onclick="loadCheckinHistory(${currentPage + 1})">Next</button>`;
+    }
+    
+    html += '</div>';
+    pagination.innerHTML = html;
+}
+
+// ============================================
+// EXPORT FUNCTIONS
+// ============================================
+
+// Export checkin history
+async function exportCheckinHistory(format) {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Get all filtered data (not paginated)
+        const filterType = document.getElementById('historyFilterType')?.value || '';
+        const filterFromDate = document.getElementById('historyFilterFromDate')?.value || '';
+        const filterToDate = document.getElementById('historyFilterToDate')?.value || '';
+        const filterSearch = document.getElementById('historyFilterSearch')?.value.trim() || '';
+        
+        let query = db.collection('checkins');
+        
+        if (filterType) {
+            query = query.where('checkinType', '==', filterType);
+        }
+        
+        if (filterFromDate) {
+            const fromDate = new Date(filterFromDate);
+            fromDate.setHours(0, 0, 0, 0);
+            query = query.where('timestamp', '>=', firebase.firestore.Timestamp.fromDate(fromDate));
+        }
+        
+        if (filterToDate) {
+            const toDate = new Date(filterToDate);
+            toDate.setHours(23, 59, 59, 999);
+            query = query.where('timestamp', '<=', firebase.firestore.Timestamp.fromDate(toDate));
+        }
+        
+        // Order by timestamp
+        query = query.orderBy('timestamp', 'desc');
+        
+        const snapshot = await query.get();
+        
+        // Filter by search term
+        let docs = snapshot.docs;
+        if (filterSearch) {
+            const searchLower = filterSearch.toLowerCase();
+            docs = docs.filter(doc => {
+                const data = doc.data();
+                const name = (data.participantName || '').toLowerCase();
+                const email = (data.participantEmail || '').toLowerCase();
+                const uniqueId = (data.uniqueId || '').toLowerCase();
+                return name.includes(searchLower) || email.includes(searchLower) || uniqueId.includes(searchLower);
+            });
+        }
+        
+        if (format === 'csv') {
+            exportToCSV(docs);
+        } else if (format === 'pdf') {
+            exportToPDF(docs);
+        }
+        
+    } catch (error) {
+        console.error('Error exporting checkin history:', error);
+        showNotification('Error exporting: ' + error.message, 'error');
+    }
+}
+
+// Export to CSV
+function exportToCSV(docs) {
+    const headers = ['Timestamp', 'Participant Name', 'Praveshika ID', 'Email', 'Checkin Type', 'Location', 'Bag Count', 'Locker ID', 'Checked In By', 'Notes'];
+    
+    let csv = headers.join(',') + '\n';
+    
+    docs.forEach(doc => {
+        const data = doc.data();
+        const timestamp = data.timestamp?.toDate();
+        const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+        
+        const row = [
+            timeStr,
+            data.participantName || '',
+            data.uniqueId || '',
+            data.participantEmail || '',
+            CHECKIN_TYPE_LABELS[data.checkinType] || data.checkinType || '',
+            data.pickupLocation || '',
+            data.bagCount || '',
+            data.lockerId || '',
+            data.checkedInByName || '',
+            (data.notes || '').replace(/"/g, '""') // Escape quotes in CSV
+        ];
+        
+        csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+    });
+    
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `checkin_history_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showNotification('CSV exported successfully', 'success');
+}
+
+// Export to PDF
+function exportToPDF(docs) {
+    if (typeof window.jspdf === 'undefined') {
+        showNotification('PDF library not loaded', 'error');
+        return;
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Add header
+    doc.setFontSize(16);
+    doc.text('Checkin History Report', 14, 22);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+    doc.text(`Total Records: ${docs.length}`, 14, 36);
+    
+    // Add table
+    let y = 45;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 14;
+    
+    // Headers
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text('Timestamp', margin, y);
+    doc.text('Participant', margin + 40, y);
+    doc.text('ID', margin + 80, y);
+    doc.text('Type', margin + 110, y);
+    doc.text('By', margin + 140, y);
+    
+    y += 8;
+    doc.setFont(undefined, 'normal');
+    
+    docs.forEach((docItem, index) => {
+        if (y > pageHeight - 20) {
+            doc.addPage();
+            y = 20;
+        }
+        
+        const data = docItem.data();
+        const timestamp = data.timestamp?.toDate();
+        const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+        
+        doc.setFontSize(8);
+        doc.text(timeStr.substring(0, 16), margin, y);
+        doc.text((data.participantName || '').substring(0, 20), margin + 40, y);
+        doc.text((data.uniqueId || '').substring(0, 15), margin + 80, y);
+        doc.text((CHECKIN_TYPE_LABELS[data.checkinType] || '').substring(0, 15), margin + 110, y);
+        doc.text((data.checkedInByName || '').substring(0, 20), margin + 140, y);
+        
+        y += 6;
+    });
+    
+    // Save
+    doc.save(`checkin_history_${new Date().toISOString().split('T')[0]}.pdf`);
+    showNotification('PDF exported successfully', 'success');
+}
+
+// ============================================
+// REAL-TIME NOTIFICATIONS
+// ============================================
+
+// Setup checkin listeners
+function setupCheckinListeners() {
+    if (!window.firebase || !firebase.firestore) return;
+    
+    // Remove existing listener if any
+    if (checkinHistoryListener) {
+        checkinHistoryListener();
+    }
+    
+    const db = firebase.firestore();
+    const user = firebase.auth().currentUser;
+    if (!user) return;
+    
+    // Listen for new checkins (using timestamp ordering)
+    // Note: This requires a Firestore index on checkins collection with timestamp field
+    checkinHistoryListener = db.collection('checkins')
+        .orderBy('timestamp', 'desc')
+        .limit(1)
+        .onSnapshot((snapshot) => {
+            if (!checkinNotificationSettings.enabled) return;
+            
+            snapshot.docChanges().forEach(change => {
+                if (change.type === 'added') {
+                    const data = change.doc.data();
+                    
+                    // Check if notification should be shown for this type
+                    if (checkinNotificationSettings.types.length > 0 && 
+                        !checkinNotificationSettings.types.includes(data.checkinType)) {
+                        return;
+                    }
+                    
+                    // Show notification
+                    showCheckinNotification(data);
+                    
+                    // Play sound if enabled
+                    if (checkinNotificationSettings.soundEnabled) {
+                        playNotificationSound();
+                    }
+                    
+                    // Reload recent checkins
+                    loadRecentCheckins(currentCheckinType);
+                }
+            });
+        }, (error) => {
+            console.error('Error in checkin listener:', error);
+        });
+}
+
+// Show checkin notification
+function showCheckinNotification(data) {
+    const timestamp = data.timestamp?.toDate();
+    const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+    
+    const notification = document.createElement('div');
+    notification.className = 'checkin-notification';
+    notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        padding: 1rem 1.5rem;
+        background: #4CAF50;
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 10001;
+        max-width: 350px;
+        animation: slideInRight 0.3s ease;
+    `;
+    
+    notification.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 0.5rem;">New Checkin</div>
+        <div>${escapeHtml(data.participantName)}</div>
+        <div style="font-size: 0.85em; opacity: 0.9;">${escapeHtml(CHECKIN_TYPE_LABELS[data.checkinType] || data.checkinType)}</div>
+        <div style="font-size: 0.75em; opacity: 0.8; margin-top: 0.25rem;">${escapeHtml(timeStr)}</div>
+        <button onclick="this.parentElement.remove()" style="position: absolute; top: 5px; right: 5px; background: rgba(255,255,255,0.2); border: none; color: white; cursor: pointer; padding: 2px 6px; border-radius: 3px;">×</button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.animation = 'slideOutRight 0.3s ease';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }
+    }, checkinNotificationSettings.duration || 5000);
+}
+
+// Play notification sound
+function playNotificationSound() {
+    // Create a simple beep sound
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+}
+
+// Start barcode scan (camera)
+async function startBarcodeScan() {
+    // This is a placeholder - actual barcode scanning would require a library like QuaggaJS or jsQR
+    showNotification('Barcode camera scanning requires additional setup. Please enter barcode manually.', 'info');
+}
+
+// ============================================
+// CHECKIN STATUS FOR PROFILE
+// ============================================
+
+// ============================================
+// CHECKIN ANALYTICS FOR ADMIN DASHBOARD
+// ============================================
+
+// Load checkin analytics
+async function loadCheckinAnalytics() {
+    if (!window.firebase || !firebase.firestore) return;
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Get all checkins
+        const checkinsSnapshot = await db.collection('checkins').get();
+        const allCheckins = [];
+        checkinsSnapshot.forEach(doc => {
+            allCheckins.push(doc.data());
+        });
+        
+        // Calculate statistics
+        const totalCheckins = allCheckins.length;
+        const uniqueParticipants = new Set(allCheckins.map(c => c.uniqueId)).size;
+        
+        // Count today's checkins
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const checkinsToday = allCheckins.filter(c => {
+            const timestamp = c.timestamp?.toDate();
+            return timestamp && timestamp >= today;
+        }).length;
+        
+        // Update metric cards
+        const totalCheckinsEl = document.getElementById('totalCheckins');
+        const checkedInParticipantsEl = document.getElementById('checkedInParticipants');
+        const checkinsTodayEl = document.getElementById('checkinsToday');
+        
+        if (totalCheckinsEl) totalCheckinsEl.textContent = totalCheckins;
+        if (checkedInParticipantsEl) checkedInParticipantsEl.textContent = uniqueParticipants;
+        if (checkinsTodayEl) checkinsTodayEl.textContent = checkinsToday;
+        
+        // Breakdown by type
+        const typeBreakdown = {};
+        allCheckins.forEach(checkin => {
+            const type = checkin.checkinType || 'unknown';
+            typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
+        });
+        
+        // Display type breakdown
+        const checkinTypeTableBody = document.getElementById('checkinTypeTableBody');
+        if (checkinTypeTableBody) {
+            let html = '';
+            Object.keys(CHECKIN_TYPE_LABELS).forEach(type => {
+                const count = typeBreakdown[type] || 0;
+                const percentage = totalCheckins > 0 ? ((count / totalCheckins) * 100).toFixed(1) : 0;
+                html += `
+                    <tr>
+                        <td>${CHECKIN_TYPE_LABELS[type]}</td>
+                        <td>${count}</td>
+                        <td>${percentage}%</td>
+                    </tr>
+                `;
+            });
+            checkinTypeTableBody.innerHTML = html;
+        }
+        
+        // Recent checkins timeline (last 50)
+        const recentCheckins = allCheckins
+            .sort((a, b) => {
+                const aTime = a.timestamp?.toDate() || new Date(0);
+                const bTime = b.timestamp?.toDate() || new Date(0);
+                return bTime - aTime;
+            })
+            .slice(0, 50);
+        
+        const checkinTimelineTableBody = document.getElementById('checkinTimelineTableBody');
+        if (checkinTimelineTableBody) {
+            let html = '';
+            recentCheckins.forEach(checkin => {
+                const timestamp = checkin.timestamp?.toDate();
+                const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+                html += `
+                    <tr>
+                        <td>${escapeHtml(timeStr)}</td>
+                        <td>${escapeHtml(checkin.participantName || 'Unknown')} (${escapeHtml(checkin.uniqueId || 'N/A')})</td>
+                        <td>${escapeHtml(CHECKIN_TYPE_LABELS[checkin.checkinType] || checkin.checkinType)}</td>
+                        <td>${escapeHtml(checkin.checkedInByName || 'Unknown')}</td>
+                    </tr>
+                `;
+            });
+            checkinTimelineTableBody.innerHTML = html || '<tr><td colspan="4">No checkins yet</td></tr>';
+        }
+        
+    } catch (error) {
+        console.error('Error loading checkin analytics:', error);
+    }
+}
+
+// Load checkin status for profile
+async function loadCheckinStatusForProfile(uniqueIds) {
+    if (!window.firebase || !firebase.firestore) return;
+    
+    const checkinStatusContent = document.getElementById('checkinStatusContent');
+    if (!checkinStatusContent) return;
+    
+    if (!uniqueIds || (Array.isArray(uniqueIds) && uniqueIds.length === 0) || (!Array.isArray(uniqueIds) && !uniqueIds)) {
+        checkinStatusContent.innerHTML = '<p>No Praveshika ID found for checkin status</p>';
+        return;
+    }
+    
+    // Convert to array if single value
+    const uniqueIdArray = Array.isArray(uniqueIds) ? uniqueIds : [uniqueIds];
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Get all checkins for these uniqueIds
+        const checkinPromises = uniqueIdArray.map(uniqueId => 
+            db.collection('checkins')
+                .where('uniqueId', '==', uniqueId)
+                .orderBy('timestamp', 'desc')
+                .get()
+        );
+        
+        const checkinSnapshots = await Promise.all(checkinPromises);
+        
+        // Combine all checkins
+        const allCheckins = [];
+        checkinSnapshots.forEach(snapshot => {
+            snapshot.docs.forEach(doc => {
+                allCheckins.push(doc.data());
+            });
+        });
+        
+        // Group by checkin type
+        const checkinByType = {};
+        Object.keys(CHECKIN_TYPE_LABELS).forEach(type => {
+            checkinByType[type] = allCheckins.filter(c => c.checkinType === type);
+        });
+        
+        // Display checkin status
+        let html = '<div class="checkin-status-grid">';
+        
+        Object.keys(CHECKIN_TYPE_LABELS).forEach(type => {
+            const checkins = checkinByType[type];
+            const latestCheckin = checkins.length > 0 ? checkins[0] : null;
+            const status = latestCheckin ? 'checked-in' : 'not-checked-in';
+            const timestamp = latestCheckin && latestCheckin.timestamp ? 
+                latestCheckin.timestamp.toDate().toLocaleString() : 'Not checked in';
+            
+            html += `
+                <div class="checkin-status-item ${status}">
+                    <div class="checkin-status-type">${CHECKIN_TYPE_LABELS[type]}</div>
+                    <div class="checkin-status-time">${escapeHtml(timestamp)}</div>
+                    ${latestCheckin && latestCheckin.pickupLocation ? 
+                        `<div class="checkin-status-location">Location: ${escapeHtml(latestCheckin.pickupLocation)}</div>` : ''}
+                    ${latestCheckin && latestCheckin.bagCount !== undefined ? 
+                        `<div class="checkin-status-details">Bags: ${latestCheckin.bagCount}, Locker: ${escapeHtml(latestCheckin.lockerId || 'N/A')}</div>` : ''}
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        checkinStatusContent.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading checkin status:', error);
+        checkinStatusContent.innerHTML = '<p>Error loading checkin status</p>';
+    }
+}
+
 
 // Initialize auth UI on page load
 document.addEventListener('DOMContentLoaded', function() {

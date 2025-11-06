@@ -43,6 +43,7 @@
                 </li>
                 <li id="myTransportationNavItem" style="display: none;"><a href="#mytransportation" class="nav-link" data-tab="mytransportation">My Transportation</a></li>
                 <li id="myToursNavItem" style="display: none;"><a href="#mytours" class="nav-link" data-tab="mytours">My Tours</a></li>
+                <li id="checkinNavItem" style="display: none;"><a href="#checkin" class="nav-link" data-tab="checkin">Checkin</a></li>
                 <li id="adminDashboardNavItem" style="display: none;"><a href="#admin-dashboard" class="nav-link" data-tab="admin-dashboard">Admin Dashboard</a></li>
                 <!-- <li><a href="#documents" class="nav-link" data-tab="documents">Documents</a></li> -->
                 <li id="mediaNavItem"><a href="#media" class="nav-link" data-tab="media">Media</a></li>
@@ -843,18 +844,7 @@
                             <div id="zoneCountryDetails" style="display: none; margin-top: 2rem;">
                                 <h4 id="zoneCountryTitle">Countries in Zone</h4>
                                 <button class="btn btn-secondary" onclick="closeZoneCountryDetails()" style="margin-bottom: 1rem;">← Back to Zones</button>
-                                <div class="data-table-container">
-                                    <table class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Country</th>
-                                                <th>Count</th>
-                                                <th>Percentage</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="zoneCountryTableBody">
-                                        </tbody>
-                                    </table>
+                                <div id="zoneCountryTableBody" class="data-table-container">
                                 </div>
                             </div>
                         </div>
@@ -1011,9 +1001,10 @@
                                     <table class="data-table">
                                         <thead style="position: sticky; top: 0; background: white; z-index: 10;">
                                             <tr>
-                                                <th>Pickup Location</th>
-                                                <th>Arrival Date</th>
-                                                <th>Arrival Time</th>
+                                                <th>Place of Arrival</th>
+                                                <th>Date of Arrival</th>
+                                                <th>Time of Arrival</th>
+                                                <th>Mode of Travel</th>
                                                 <th>Name</th>
                                                 <th>Praveshika ID</th>
                                                 <th>Flight/Train Number</th>
@@ -1025,6 +1016,221 @@
                                     </table>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Checkin Analytics Section -->
+                        <div class="analytics-section" style="border-top: 2px solid #e0e0e0; margin-top: 3rem; padding-top: 2rem;">
+                            <h2 style="margin-bottom: 1.5rem;">Checkin Analytics</h2>
+                            
+                            <!-- Checkin Statistics Cards -->
+                            <div class="metrics-cards" style="margin-bottom: 2rem;">
+                                <div class="metric-card">
+                                    <h3>Total Checkins</h3>
+                                    <p class="metric-value" id="totalCheckins">0</p>
+                                </div>
+                                <div class="metric-card">
+                                    <h3>Checked In Participants</h3>
+                                    <p class="metric-value" id="checkedInParticipants">0</p>
+                                </div>
+                                <div class="metric-card">
+                                    <h3>Checkins Today</h3>
+                                    <p class="metric-value" id="checkinsToday">0</p>
+                                </div>
+                            </div>
+
+                            <!-- Checkin Breakdown by Type -->
+                            <div class="analytics-section">
+                                <h3>Checkins by Type</h3>
+                                <div id="checkinTypeBreakdown" class="data-table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Checkin Type</th>
+                                                <th>Count</th>
+                                                <th>Percentage</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="checkinTypeTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Recent Checkins Timeline -->
+                            <div class="analytics-section" style="margin-top: 2rem;">
+                                <h3>Recent Checkins Timeline</h3>
+                                <div id="checkinTimeline" class="data-table-container" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="data-table">
+                                        <thead style="position: sticky; top: 0; background: white; z-index: 10;">
+                                            <tr>
+                                                <th>Timestamp</th>
+                                                <th>Participant</th>
+                                                <th>Type</th>
+                                                <th>Checked In By</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="checkinTimelineTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Export Checkin Data -->
+                            <div class="analytics-section" style="margin-top: 2rem;">
+                                <h3>Export Checkin Data</h3>
+                                <button class="btn btn-primary" onclick="exportCheckinHistory('csv')">Export All Checkins (CSV)</button>
+                                <button class="btn btn-primary" onclick="exportCheckinHistory('pdf')">Export All Checkins (PDF)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Checkin Tab -->
+        <section id="checkin" class="tab-content">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Checkin Management</h2>
+                    <p>Check in participants at various locations</p>
+                </div>
+                <div class="checkin-content">
+                    <div id="checkinLoading" style="text-align: center; padding: 2rem;">
+                        <p>Loading checkin interface...</p>
+                    </div>
+                    <div id="checkinData" style="display: none;">
+                        <!-- Checkin Type Tabs -->
+                        <div class="checkin-type-tabs">
+                            <button class="checkin-type-tab active" data-checkin-type="pickup_location" onclick="switchCheckinType('pickup_location')">Pickup Location</button>
+                            <button class="checkin-type-tab" data-checkin-type="venue_entrance" onclick="switchCheckinType('venue_entrance')">Venue Entrance</button>
+                            <button class="checkin-type-tab" data-checkin-type="cloak_room" onclick="switchCheckinType('cloak_room')">Cloak Room</button>
+                            <button class="checkin-type-tab" data-checkin-type="accommodation" onclick="switchCheckinType('accommodation')">Accommodation</button>
+                            <button class="checkin-type-tab" data-checkin-type="food" onclick="switchCheckinType('food')">Food</button>
+                            <button class="checkin-type-tab" data-checkin-type="post_tour" onclick="switchCheckinType('post_tour')">Post Tour</button>
+                        </div>
+
+                        <!-- Main Checkin Interface -->
+                        <div class="checkin-main-interface">
+                            <!-- Search Section -->
+                            <div class="checkin-search-section">
+                                <h3>Search Participant</h3>
+                                <div class="search-tabs">
+                                    <button class="search-tab-btn active" onclick="switchSearchMode('barcode')">Barcode Scan</button>
+                                    <button class="search-tab-btn" onclick="switchSearchMode('manual')">Manual Entry</button>
+                                    <button class="search-tab-btn" onclick="switchSearchMode('advanced')">Advanced Search</button>
+                                    <button class="search-tab-btn" onclick="switchSearchMode('batch')">Batch Checkin</button>
+                                </div>
+
+                                <!-- Barcode Scan Mode -->
+                                <div id="searchMode-barcode" class="search-mode active">
+                                    <div class="barcode-scanner-section">
+                                        <input type="text" id="barcodeInput" class="form-input" placeholder="Scan or enter barcode/Praveshika ID" autocomplete="off">
+                                        <button class="btn btn-primary" onclick="startBarcodeScan()">📷 Use Camera</button>
+                                        <button class="btn btn-secondary" onclick="searchParticipant()">Search</button>
+                                    </div>
+                                    <video id="barcodeVideo" style="display: none; width: 100%; max-width: 400px; margin-top: 1rem;"></video>
+                                    <canvas id="barcodeCanvas" style="display: none;"></canvas>
+                                </div>
+
+                                <!-- Manual Entry Mode -->
+                                <div id="searchMode-manual" class="search-mode">
+                                    <input type="text" id="manualPraveshikaId" class="form-input" placeholder="Enter Praveshika ID" autocomplete="off">
+                                    <button class="btn btn-primary" onclick="searchByPraveshikaId()">Search</button>
+                                </div>
+
+                                <!-- Advanced Search Mode -->
+                                <div id="searchMode-advanced" class="search-mode">
+                                    <div class="advanced-search-form">
+                                        <input type="text" id="searchByName" class="form-input" placeholder="Search by Name" autocomplete="off">
+                                        <input type="email" id="searchByEmail" class="form-input" placeholder="Search by Email" autocomplete="off">
+                                        <button class="btn btn-primary" onclick="advancedSearch()">Search</button>
+                                    </div>
+                                </div>
+
+                                <!-- Batch Checkin Mode -->
+                                <div id="searchMode-batch" class="search-mode">
+                                    <textarea id="batchInput" class="form-input" rows="5" placeholder="Enter multiple Praveshika IDs (one per line or comma-separated)"></textarea>
+                                    <button class="btn btn-primary" onclick="processBatchCheckin()">Process Batch Checkin</button>
+                                    <div id="batchPreview" style="margin-top: 1rem; display: none;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Participant Info Display -->
+                            <div id="participantInfo" class="participant-info-card" style="display: none;">
+                                <h3>Participant Information</h3>
+                                <div id="participantDetails"></div>
+                            </div>
+
+                            <!-- Checkin Form -->
+                            <div id="checkinForm" class="checkin-form-card" style="display: none;">
+                                <h3>Checkin Details</h3>
+                                <form id="checkinFormElement">
+                                    <div class="form-group">
+                                        <label>Checkin Type: <span id="checkinTypeDisplay"></span></label>
+                                    </div>
+                                    <div class="form-group" id="pickupLocationGroup" style="display: none;">
+                                        <label for="checkinPickupLocation">Pickup Location:</label>
+                                        <input type="text" id="checkinPickupLocation" class="form-input" placeholder="Enter pickup location">
+                                    </div>
+                                    <div class="form-group" id="cloakRoomFields" style="display: none;">
+                                        <label for="checkinBagCount">Number of Bags:</label>
+                                        <input type="number" id="checkinBagCount" class="form-input" min="0" placeholder="Enter bag count">
+                                        <label for="checkinLockerId" style="margin-top: 0.5rem;">Locker ID:</label>
+                                        <input type="text" id="checkinLockerId" class="form-input" placeholder="Enter locker ID">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="checkinNotes">Notes (optional):</label>
+                                        <textarea id="checkinNotes" class="form-input" rows="3" placeholder="Add any notes..."></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Check In</button>
+                                    <button type="button" class="btn btn-secondary" onclick="clearCheckinForm()">Clear</button>
+                                </form>
+                            </div>
+
+                            <!-- Recent Checkins List -->
+                            <div class="recent-checkins-section">
+                                <h3>Recent Checkins</h3>
+                                <div id="recentCheckinsList" class="checkin-list"></div>
+                            </div>
+                        </div>
+
+                        <!-- Checkin History Section -->
+                        <div class="checkin-history-section" style="margin-top: 3rem; border-top: 2px solid #e0e0e0; padding-top: 2rem;">
+                            <h2>Checkin History</h2>
+                            <div class="history-filters">
+                                <div class="filter-group">
+                                    <label>Checkin Type:</label>
+                                    <select id="historyFilterType" class="form-input" onchange="applyHistoryFilters()">
+                                        <option value="">All Types</option>
+                                        <option value="pickup_location">Pickup Location</option>
+                                        <option value="venue_entrance">Venue Entrance</option>
+                                        <option value="cloak_room">Cloak Room</option>
+                                        <option value="accommodation">Accommodation</option>
+                                        <option value="food">Food</option>
+                                        <option value="post_tour">Post Tour</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label>From Date:</label>
+                                    <input type="date" id="historyFilterFromDate" class="form-input" onchange="applyHistoryFilters()">
+                                </div>
+                                <div class="filter-group">
+                                    <label>To Date:</label>
+                                    <input type="date" id="historyFilterToDate" class="form-input" onchange="applyHistoryFilters()">
+                                </div>
+                                <div class="filter-group">
+                                    <label>Search:</label>
+                                    <input type="text" id="historyFilterSearch" class="form-input" placeholder="Name, Email, or Praveshika ID" onchange="applyHistoryFilters()">
+                                </div>
+                                <div class="filter-group">
+                                    <button class="btn btn-secondary" onclick="clearHistoryFilters()">Clear Filters</button>
+                                    <button class="btn btn-primary" onclick="exportCheckinHistory('csv')">Export CSV</button>
+                                    <button class="btn btn-primary" onclick="exportCheckinHistory('pdf')">Export PDF</button>
+                                </div>
+                            </div>
+                            <div id="historyResultsCount" style="margin: 1rem 0;"></div>
+                            <div id="checkinHistoryList" class="checkin-history-table"></div>
+                            <div id="historyPagination" class="pagination"></div>
                         </div>
                     </div>
                 </div>
