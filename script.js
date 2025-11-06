@@ -811,9 +811,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Firebase login
-            if (window.firebase && firebase.auth && firebase.firestore) {
-                showNotification('Logging in...', 'info');
+            // Wait for Firebase to be fully initialized before attempting login
+            waitForFirebase(function() {
+                // Firebase login
+                if (window.firebase && firebase.auth && firebase.firestore) {
+                    showNotification('Logging in...', 'info');
                 
                 // Check if identifier is email or UniqueID
                 const isEmail = isValidEmail(identifier);
@@ -923,10 +925,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 handleLoginError(error);
                             }
                         });
+                } else {
+                    showNotification('Firebase not initialized. Please check your configuration.', 'error');
                 }
-            } else {
-                showNotification('Firebase not initialized. Please check your configuration.', 'error');
-            }
+            }); // waitForFirebase callback
         });
     }
 });
@@ -3605,23 +3607,44 @@ async function loadAdminDashboard(user) {
     
     try {
         const db = firebase.firestore();
+        const CACHE_KEY = 'adminDashboardStatsCache';
+        const CACHE_MAX_AGE = 60 * 60 * 1000; // 1 hour in milliseconds
         
-        // Fetch all registrations
-        const registrationsSnapshot = await db.collection('registrations').get();
-        const registrations = [];
-        registrationsSnapshot.forEach(doc => {
-            registrations.push(doc.data());
-        });
+        // Check cache first
+        const cachedData = getCachedData(CACHE_KEY, CACHE_MAX_AGE);
+        let registrations, users, stats;
         
-        // Fetch all users
-        const usersSnapshot = await db.collection('users').get();
-        const users = [];
-        usersSnapshot.forEach(doc => {
-            users.push(doc.data());
-        });
-        
-        // Calculate statistics
-        const stats = calculateStatistics(registrations, users);
+        if (cachedData) {
+            // Use cached data
+            registrations = cachedData.registrations;
+            users = cachedData.users;
+            stats = cachedData.stats;
+        } else {
+            // Cache expired or missing - fetch fresh data
+            // Fetch all registrations
+            const registrationsSnapshot = await db.collection('registrations').get();
+            registrations = [];
+            registrationsSnapshot.forEach(doc => {
+                registrations.push(doc.data());
+            });
+            
+            // Fetch all users
+            const usersSnapshot = await db.collection('users').get();
+            users = [];
+            usersSnapshot.forEach(doc => {
+                users.push(doc.data());
+            });
+            
+            // Calculate statistics
+            stats = calculateStatistics(registrations, users);
+            
+            // Cache the results
+            setCachedData(CACHE_KEY, {
+                registrations: registrations,
+                users: users,
+                stats: stats
+            });
+        }
         
         // Display statistics
         displayAdminStatistics(stats, registrations);
@@ -4210,13 +4233,19 @@ async function loadTransportationChanges(period) {
     }
     
     try {
-        // For "anytime" or if query fails, use fallback approach
+        // For "anytime" period, use optimized query limited to 1000 most recent changes
         if (!startTime) {
-            // Use fallback approach for "anytime"
-            const allRegistrations = await db.collection('registrations').get();
+            // Use query with orderBy and limit instead of loading all documents
+            // This shows the last 1000 transportation changes, not all historical changes
+            // Note: orderBy only returns documents where the field exists
+            let query = db.collection('registrations')
+                .orderBy('transportationUpdatedAt', 'desc')
+                .limit(1000);
+            
+            const snapshot = await query.get();
             const changes = [];
             
-            allRegistrations.forEach(doc => {
+            snapshot.forEach(doc => {
                 const data = doc.data();
                 if (data.transportationUpdatedAt) {
                     changes.push({
@@ -4231,17 +4260,7 @@ async function loadTransportationChanges(period) {
                 }
             });
             
-            // Sort by update time descending
-            changes.sort((a, b) => {
-                const timeA = a.transportationUpdatedAt.toDate ? a.transportationUpdatedAt.toDate() : new Date(0);
-                const timeB = b.transportationUpdatedAt.toDate ? b.transportationUpdatedAt.toDate() : new Date(0);
-                return timeB - timeA;
-            });
-            
-            // Limit to 1000 for performance
-            const limitedChanges = changes.slice(0, 1000);
-            
-            displayTransportationChanges(limitedChanges);
+            displayTransportationChanges(changes);
             return;
         }
         
@@ -4272,44 +4291,9 @@ async function loadTransportationChanges(period) {
         
     } catch (error) {
         console.error('Error loading transportation changes:', error);
-        // If the query fails (e.g., no index), try a simpler approach
-        try {
-            const allRegistrations = await db.collection('registrations').get();
-            const changes = [];
-            
-            allRegistrations.forEach(doc => {
-                const data = doc.data();
-                if (data.transportationUpdatedAt) {
-                    const updateTime = data.transportationUpdatedAt.toDate ? 
-                        data.transportationUpdatedAt.toDate() : 
-                        null;
-                    
-                    if (!startTime || (updateTime && updateTime >= startTime)) {
-                        changes.push({
-                            name: data.name || data['Full Name'] || 'Unknown',
-                            uniqueId: data.uniqueId || doc.id,
-                            email: data.email || data['Email address'] || '',
-                            pickupLocation: data.pickupLocation || data['Pickup Location'] || 'Not Specified',
-                            arrivalDate: data.arrivalDate || data['Arrival Date'] || '',
-                            arrivalTime: data.arrivalTime || data['Arrival Time'] || '',
-                            transportationUpdatedAt: data.transportationUpdatedAt
-                        });
-                    }
-                }
-            });
-            
-            // Sort by update time descending
-            changes.sort((a, b) => {
-                const timeA = a.transportationUpdatedAt.toDate ? a.transportationUpdatedAt.toDate() : new Date(0);
-                const timeB = b.transportationUpdatedAt.toDate ? b.transportationUpdatedAt.toDate() : new Date(0);
-                return timeB - timeA;
-            });
-            
-            displayTransportationChanges(changes);
-        } catch (fallbackError) {
-            console.error('Fallback error:', fallbackError);
-            showNotification('Error loading transportation changes. Please try again.', 'error');
-        }
+        // If the query fails (e.g., no index), show error message
+        // Note: Firestore requires a composite index for queries with orderBy on different fields
+        showNotification('Error loading transportation changes. The query may require a Firestore index. Please try again or contact support.', 'error');
     }
 }
 
@@ -5875,11 +5859,17 @@ function setupCheckinListeners() {
     const user = firebase.auth().currentUser;
     if (!user) return;
     
-    // Listen for new checkins (using timestamp ordering)
+    // Limit listener scope to last 24 hours to reduce read costs
+    const last24Hours = new Date();
+    last24Hours.setHours(last24Hours.getHours() - 24);
+    const last24HoursTimestamp = firebase.firestore.Timestamp.fromDate(last24Hours);
+    
+    // Listen for new checkins (limited to last 24 hours)
     // Note: This requires a Firestore index on checkins collection with timestamp field
     checkinHistoryListener = db.collection('checkins')
+        .where('timestamp', '>=', last24HoursTimestamp)
         .orderBy('timestamp', 'desc')
-        .limit(1)
+        .limit(50)
         .onSnapshot((snapshot) => {
             if (!checkinNotificationSettings.enabled) return;
             
@@ -5992,27 +5982,69 @@ async function startBarcodeScan() {
 async function loadCheckinAnalytics() {
     if (!window.firebase || !firebase.firestore) return;
     
+    const CACHE_KEY = 'checkinAnalyticsCache';
+    const CACHE_MAX_AGE = 60 * 60 * 1000; // 1 hour in milliseconds
+    
     try {
         const db = firebase.firestore();
         
-        // Get all checkins
-        const checkinsSnapshot = await db.collection('checkins').get();
-        const allCheckins = [];
-        checkinsSnapshot.forEach(doc => {
-            allCheckins.push(doc.data());
-        });
+        // Check cache first
+        const cachedData = getCachedData(CACHE_KEY, CACHE_MAX_AGE);
+        let totalCheckins, uniqueParticipants, typeBreakdown, recentCheckins;
         
-        // Calculate statistics
-        const totalCheckins = allCheckins.length;
-        const uniqueParticipants = new Set(allCheckins.map(c => c.uniqueId)).size;
-        
-        // Count today's checkins
+        // Get today's checkins count using query (always fresh)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const checkinsToday = allCheckins.filter(c => {
-            const timestamp = c.timestamp?.toDate();
-            return timestamp && timestamp >= today;
-        }).length;
+        const todayTimestamp = firebase.firestore.Timestamp.fromDate(today);
+        
+        const todayCheckinsSnapshot = await db.collection('checkins')
+            .where('timestamp', '>=', todayTimestamp)
+            .get();
+        const checkinsToday = todayCheckinsSnapshot.size;
+        
+        if (cachedData) {
+            // Use cached data for totals and breakdowns
+            totalCheckins = cachedData.totalCheckins;
+            uniqueParticipants = cachedData.uniqueParticipants;
+            typeBreakdown = cachedData.typeBreakdown;
+            recentCheckins = cachedData.recentCheckins;
+        } else {
+            // Cache expired or missing - fetch fresh data
+            // Get all checkins for totals and breakdowns
+            const checkinsSnapshot = await db.collection('checkins').get();
+            const allCheckins = [];
+            checkinsSnapshot.forEach(doc => {
+                allCheckins.push(doc.data());
+            });
+            
+            // Calculate statistics
+            totalCheckins = allCheckins.length;
+            uniqueParticipants = new Set(allCheckins.map(c => c.uniqueId)).size;
+            
+            // Breakdown by type
+            typeBreakdown = {};
+            allCheckins.forEach(checkin => {
+                const type = checkin.checkinType || 'unknown';
+                typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
+            });
+            
+            // Recent checkins timeline (last 50)
+            recentCheckins = allCheckins
+                .sort((a, b) => {
+                    const aTime = a.timestamp?.toDate() || new Date(0);
+                    const bTime = b.timestamp?.toDate() || new Date(0);
+                    return bTime - aTime;
+                })
+                .slice(0, 50);
+            
+            // Cache the results
+            setCachedData(CACHE_KEY, {
+                totalCheckins: totalCheckins,
+                uniqueParticipants: uniqueParticipants,
+                typeBreakdown: typeBreakdown,
+                recentCheckins: recentCheckins
+            });
+        }
         
         // Update metric cards
         const totalCheckinsEl = document.getElementById('totalCheckins');
@@ -6022,13 +6054,6 @@ async function loadCheckinAnalytics() {
         if (totalCheckinsEl) totalCheckinsEl.textContent = totalCheckins;
         if (checkedInParticipantsEl) checkedInParticipantsEl.textContent = uniqueParticipants;
         if (checkinsTodayEl) checkinsTodayEl.textContent = checkinsToday;
-        
-        // Breakdown by type
-        const typeBreakdown = {};
-        allCheckins.forEach(checkin => {
-            const type = checkin.checkinType || 'unknown';
-            typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
-        });
         
         // Display type breakdown
         const checkinTypeTableBody = document.getElementById('checkinTypeTableBody');
@@ -6048,15 +6073,7 @@ async function loadCheckinAnalytics() {
             checkinTypeTableBody.innerHTML = html;
         }
         
-        // Recent checkins timeline (last 50)
-        const recentCheckins = allCheckins
-            .sort((a, b) => {
-                const aTime = a.timestamp?.toDate() || new Date(0);
-                const bTime = b.timestamp?.toDate() || new Date(0);
-                return bTime - aTime;
-            })
-            .slice(0, 50);
-        
+        // Display recent checkins timeline
         const checkinTimelineTableBody = document.getElementById('checkinTimelineTableBody');
         if (checkinTimelineTableBody) {
             let html = '';
@@ -6166,6 +6183,48 @@ document.addEventListener('DOMContentLoaded', function() {
 function isValidEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+}
+
+// Cache Helper Functions
+function getCachedData(key, maxAgeMs) {
+    try {
+        const cached = localStorage.getItem(key);
+        if (!cached) return null;
+        
+        const parsed = JSON.parse(cached);
+        const now = Date.now();
+        
+        // Check if cache is expired
+        if (parsed.timestamp && (now - parsed.timestamp) > maxAgeMs) {
+            localStorage.removeItem(key);
+            return null;
+        }
+        
+        return parsed.data;
+    } catch (error) {
+        console.error(`Error reading cache for ${key}:`, error);
+        return null;
+    }
+}
+
+function setCachedData(key, data) {
+    try {
+        const cacheObject = {
+            data: data,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(key, JSON.stringify(cacheObject));
+    } catch (error) {
+        console.error(`Error writing cache for ${key}:`, error);
+        // If storage is full, try to clear old caches
+        try {
+            localStorage.removeItem('checkinAnalyticsCache');
+            localStorage.removeItem('adminDashboardStatsCache');
+            localStorage.setItem(key, JSON.stringify({ data: data, timestamp: Date.now() }));
+        } catch (e) {
+            console.error('Failed to clear cache:', e);
+        }
+    }
 }
 
 function showNotification(message, type = 'info') {
