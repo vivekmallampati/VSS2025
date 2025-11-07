@@ -1183,11 +1183,17 @@
                                 <div id="searchMode-barcode" class="search-mode active">
                                     <div class="barcode-scanner-section">
                                         <input type="text" id="barcodeInput" class="form-input" placeholder="Scan or enter barcode/Praveshika ID" autocomplete="off">
-                                        <button class="btn btn-primary" onclick="startBarcodeScan()">📷 Use Camera</button>
+                                        <button class="btn btn-primary" id="startCameraBtn" onclick="startBarcodeScan()">📷 Use Camera</button>
+                                        <button class="btn btn-danger" id="stopCameraBtn" onclick="stopBarcodeScan()" style="display: none;">Stop Camera</button>
                                         <button class="btn btn-secondary" onclick="searchParticipant()">Search</button>
                                     </div>
-                                    <video id="barcodeVideo" style="display: none; width: 100%; max-width: 400px; margin-top: 1rem;"></video>
-                                    <canvas id="barcodeCanvas" style="display: none;"></canvas>
+                                    <div id="barcodeScannerContainer" style="display: none; margin-top: 1rem;">
+                                        <div id="barcodeScanner" style="width: 100%; max-width: 400px; position: relative;">
+                                            <video id="barcodeVideo" style="width: 100%; border: 2px solid #007bff; border-radius: 8px;"></video>
+                                            <canvas id="barcodeCanvas" style="display: none;"></canvas>
+                                        </div>
+                                        <p style="margin-top: 0.5rem; color: #666; font-size: 0.9rem;">Point camera at barcode/Praveshika ID</p>
+                                    </div>
                                 </div>
 
                                 <!-- Manual Entry Mode -->
@@ -1254,41 +1260,40 @@
 
                         <!-- Checkin History Section -->
                         <div class="checkin-history-section" style="margin-top: 3rem; border-top: 2px solid #e0e0e0; padding-top: 2rem;">
-                            <h2>Checkin History</h2>
-                            <div class="history-filters">
-                                <div class="filter-group">
-                                    <label>Checkin Type:</label>
-                                    <select id="historyFilterType" class="form-input" onchange="applyHistoryFilters()">
-                                        <option value="">All Types</option>
-                                        <option value="pickup_location">Pickup Location</option>
-                                        <option value="venue_entrance">Venue Entrance</option>
-                                        <option value="cloak_room">Cloak Room</option>
-                                        <option value="accommodation">Accommodation</option>
-                                        <option value="food">Food</option>
-                                        <option value="post_tour">Post Tour</option>
-                                    </select>
-                                </div>
-                                <div class="filter-group">
-                                    <label>From Date:</label>
-                                    <input type="date" id="historyFilterFromDate" class="form-input" onchange="applyHistoryFilters()">
-                                </div>
-                                <div class="filter-group">
-                                    <label>To Date:</label>
-                                    <input type="date" id="historyFilterToDate" class="form-input" onchange="applyHistoryFilters()">
-                                </div>
-                                <div class="filter-group">
-                                    <label>Search:</label>
-                                    <input type="text" id="historyFilterSearch" class="form-input" placeholder="Name, Email, or Praveshika ID" onchange="applyHistoryFilters()">
-                                </div>
-                                <div class="filter-group">
-                                    <button class="btn btn-secondary" onclick="clearHistoryFilters()">Clear Filters</button>
-                                    <button class="btn btn-primary" onclick="exportCheckinHistory('csv')">Export CSV</button>
-                                    <button class="btn btn-primary" onclick="exportCheckinHistory('pdf')">Export PDF</button>
-                                </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h2 style="margin: 0;">Checkin History</h2>
+                                <button class="btn btn-secondary" onclick="toggleCheckinHistory()" id="toggleHistoryBtn">
+                                    <span id="historyToggleIcon">▼</span> Show History
+                                </button>
                             </div>
-                            <div id="historyResultsCount" style="margin: 1rem 0;"></div>
-                            <div id="checkinHistoryList" class="checkin-history-table"></div>
-                            <div id="historyPagination" class="pagination"></div>
+                            <div id="checkinHistoryContent" style="display: none;">
+                                <div class="history-filters">
+                                    <div class="filter-group">
+                                        <label>Checkin Type:</label>
+                                        <select id="historyFilterType" class="form-input" onchange="applyHistoryFilters()">
+                                            <option value="">All Types</option>
+                                            <option value="pickup_location">Pickup Location</option>
+                                            <option value="venue_entrance">Venue Entrance</option>
+                                            <option value="cloak_room">Cloak Room</option>
+                                            <option value="accommodation">Accommodation</option>
+                                            <option value="food">Food</option>
+                                            <option value="post_tour">Post Tour</option>
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Search:</label>
+                                        <input type="text" id="historyFilterSearch" class="form-input" placeholder="Name, Email, or Praveshika ID" onchange="applyHistoryFilters()">
+                                    </div>
+                                    <div class="filter-group">
+                                        <button class="btn btn-secondary" onclick="clearHistoryFilters()">Clear Filters</button>
+                                        <button class="btn btn-primary" onclick="exportCheckinHistory('csv')">Export CSV</button>
+                                        <button class="btn btn-primary" onclick="exportCheckinHistory('pdf')">Export PDF</button>
+                                    </div>
+                                </div>
+                                <div id="historyResultsCount" style="margin: 1rem 0;"></div>
+                                <div id="checkinHistoryList" class="checkin-history-table"></div>
+                                <div id="historyPagination" class="pagination"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1442,6 +1447,8 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <!-- Barcode Generation Library -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <!-- Barcode Scanning Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <!-- PDF Generation Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>

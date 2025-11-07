@@ -1651,47 +1651,79 @@ async function handleAuthStateChange(user) {
             mediaNavItem.style.display = 'none';
         }
         
-        // Show protected tabs
-        if (shibirarthiNavItem) {
-            shibirarthiNavItem.style.display = '';
-        }
-        if (myProfileNavItem) {
-            myProfileNavItem.style.display = '';
-            loadUserProfile(user);
-        }
-        if (myTransportationNavItem) {
-            myTransportationNavItem.style.display = '';
-            loadTransportationInfo(user);
-        }
-        if (myToursNavItem) {
-            myToursNavItem.style.display = '';
-            loadToursInfo(user);
-        }
-        
-        // Show checkin tab for superadmin, admin, or volunteers
-        if (checkinNavItem) {
-            if (canPerformCheckinUser) {
-                checkinNavItem.style.display = '';
-            } else {
-                checkinNavItem.style.display = 'none';
+        // If user is admin (but not superadmin), show only checkin and myprofile tabs
+        if (isAdminUser && !isSuperadminUser) {
+            // Hide all tabs except checkin and myprofile for admins
+            if (shibirarthiNavItem) {
+                shibirarthiNavItem.style.display = 'none';
             }
-        }
-        
-        // Show admin dashboard only for superadmins and admins
-        if (adminDashboardNavItem) {
-            if (canViewDashboardUser) {
-                adminDashboardNavItem.style.display = '';
-            } else {
+            if (myProfileNavItem) {
+                myProfileNavItem.style.display = '';
+                loadUserProfile(user);
+            }
+            if (myTransportationNavItem) {
+                myTransportationNavItem.style.display = 'none';
+            }
+            if (myToursNavItem) {
+                myToursNavItem.style.display = 'none';
+            }
+            if (checkinNavItem) {
+                if (canPerformCheckinUser) {
+                    checkinNavItem.style.display = '';
+                } else {
+                    checkinNavItem.style.display = 'none';
+                }
+            }
+            if (adminDashboardNavItem) {
                 adminDashboardNavItem.style.display = 'none';
             }
-        }
-        
-        // Show user management only for superadmins and admins
-        if (userManagementNavItem) {
-            if (isAdminUser) {
-                userManagementNavItem.style.display = '';
-            } else {
+            if (userManagementNavItem) {
                 userManagementNavItem.style.display = 'none';
+            }
+        } else {
+            // For superadmins and regular users, show all appropriate tabs
+            // Show protected tabs
+            if (shibirarthiNavItem) {
+                shibirarthiNavItem.style.display = '';
+            }
+            if (myProfileNavItem) {
+                myProfileNavItem.style.display = '';
+                loadUserProfile(user);
+            }
+            if (myTransportationNavItem) {
+                myTransportationNavItem.style.display = '';
+                loadTransportationInfo(user);
+            }
+            if (myToursNavItem) {
+                myToursNavItem.style.display = '';
+                loadToursInfo(user);
+            }
+            
+            // Show checkin tab for superadmin, admin, or volunteers
+            if (checkinNavItem) {
+                if (canPerformCheckinUser) {
+                    checkinNavItem.style.display = '';
+                } else {
+                    checkinNavItem.style.display = 'none';
+                }
+            }
+            
+            // Show admin dashboard only for superadmins
+            if (adminDashboardNavItem) {
+                if (isSuperadminUser) {
+                    adminDashboardNavItem.style.display = '';
+                } else {
+                    adminDashboardNavItem.style.display = 'none';
+                }
+            }
+            
+            // Show user management only for superadmins
+            if (userManagementNavItem) {
+                if (isSuperadminUser) {
+                    userManagementNavItem.style.display = '';
+                } else {
+                    userManagementNavItem.style.display = 'none';
+                }
             }
         }
     } else {
@@ -6040,6 +6072,11 @@ function switchSearchMode(mode) {
     
     // Clear participant info when switching modes
     clearParticipantInfo();
+    
+    // Stop camera if active
+    if (barcodeScannerActive) {
+        stopBarcodeScan();
+    }
 }
 
 // Search participant by barcode/Praveshika ID
@@ -6127,31 +6164,55 @@ async function advancedSearch() {
     
     try {
         const db = firebase.firestore();
-        let query = db.collection('registrations');
-        
-        if (name) {
-            // Note: Firestore doesn't support full-text search, so we'll do a prefix search
-            // This is a limitation - for better search, consider using Algolia or similar
-            query = query.where('name', '>=', name).where('name', '<=', name + '\uf8ff');
-        }
+        let results = [];
+        let searchType = null;
         
         if (email) {
-            query = query.where('email', '==', email.toLowerCase());
+            // Email search: find all users with matching email (case-insensitive)
+            searchType = 'email';
+            const emailLower = email.toLowerCase();
+            
+            // Fetch all registrations and filter client-side for case-insensitive email match
+            // Note: This approach works but may be slow with large datasets
+            // For production, consider using a search service or indexing
+            const allRegistrations = await db.collection('registrations').limit(1000).get();
+            
+            allRegistrations.docs.forEach(doc => {
+                const data = doc.data();
+                const regEmail = (data.email || data['Email address'] || '').toLowerCase();
+                if (regEmail.includes(emailLower)) {
+                    results.push(doc);
+                }
+            });
+        } else if (name) {
+            // Name search: case-insensitive partial search
+            searchType = 'name';
+            const nameLower = name.toLowerCase();
+            
+            // Fetch all registrations and filter client-side for case-insensitive partial name match
+            const allRegistrations = await db.collection('registrations').limit(1000).get();
+            
+            allRegistrations.docs.forEach(doc => {
+                const data = doc.data();
+                const regName = (data.name || data['Full Name'] || '').toLowerCase();
+                if (regName.includes(nameLower)) {
+                    results.push(doc);
+                }
+            });
         }
         
-        const results = await query.limit(10).get();
-        
-        if (results.empty) {
+        if (results.length === 0) {
             showNotification('No participants found', 'info');
             return;
         }
         
-        if (results.size === 1) {
-            const regData = results.docs[0].data();
-            displayParticipantInfo(regData, regData.uniqueId);
+        if (results.length === 1) {
+            const regData = results[0].data();
+            const uniqueId = regData.uniqueId || results[0].id;
+            displayParticipantInfo(regData, uniqueId);
         } else {
-            // Show list of results
-            displayParticipantSearchResults(results.docs);
+            // Show list of results with appropriate options
+            displayParticipantSearchResults(results, searchType);
         }
     } catch (error) {
         console.error('Error in advanced search:', error);
@@ -6160,22 +6221,49 @@ async function advancedSearch() {
 }
 
 // Display participant search results
-function displayParticipantSearchResults(docs) {
+function displayParticipantSearchResults(docs, searchType) {
     const participantInfo = document.getElementById('participantInfo');
     const participantDetails = document.getElementById('participantDetails');
     
     if (!participantInfo || !participantDetails) return;
     
-    let html = '<div class="participant-search-results"><h4>Multiple results found. Please select:</h4><ul>';
+    const isEmailSearch = searchType === 'email';
+    const uniqueIds = [];
+    
+    let html = `<div class="participant-search-results">
+        <h4>${docs.length} result(s) found${isEmailSearch ? ' with this email' : ''}. Please select:</h4>
+        <ul style="list-style: none; padding: 0;">`;
     
     docs.forEach(doc => {
         const data = doc.data();
         const name = data.name || data['Full Name'] || 'Unknown';
         const uniqueId = data.uniqueId || doc.id;
-        html += `<li><button class="btn btn-link" onclick="selectParticipantFromSearch('${escapeHtml(uniqueId)}')">${escapeHtml(name)} - ${escapeHtml(uniqueId)}</button></li>`;
+        const email = data.email || data['Email address'] || '';
+        uniqueIds.push(uniqueId);
+        
+        html += `
+            <li style="margin: 0.5rem 0; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <button class="btn btn-link" onclick="selectParticipantFromSearch('${escapeHtml(uniqueId)}')" style="text-align: left; width: 100%;">
+                    <strong>${escapeHtml(name)}</strong><br>
+                    <small>${escapeHtml(uniqueId)}${email ? ' - ' + escapeHtml(email) : ''}</small>
+                </button>
+            </li>`;
     });
     
-    html += '</ul></div>';
+    html += '</ul>';
+    
+    // Show batch check-in button for email search with multiple results
+    if (isEmailSearch && docs.length > 1) {
+        html += `
+            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 2px solid #007bff;">
+                <p><strong>Batch Check-in:</strong> Check in all ${docs.length} participants with this email?</p>
+                <button class="btn btn-primary" onclick="batchCheckinFromEmail([${uniqueIds.map(id => `'${escapeHtml(id)}'`).join(',')}])">
+                    Check In All (${docs.length})
+                </button>
+            </div>`;
+    }
+    
+    html += '</div>';
     participantDetails.innerHTML = html;
     participantInfo.style.display = 'block';
 }
@@ -6187,6 +6275,26 @@ async function selectParticipantFromSearch(uniqueId) {
     if (regDoc.exists) {
         displayParticipantInfo(regDoc.data(), uniqueId);
     }
+}
+
+// Batch check-in from email search results
+async function batchCheckinFromEmail(uniqueIds) {
+    if (!uniqueIds || uniqueIds.length === 0) {
+        showNotification('No participants selected for batch check-in', 'error');
+        return;
+    }
+    
+    // Confirm batch check-in
+    const confirmMessage = `Are you sure you want to check in ${uniqueIds.length} participant(s)?`;
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    // Use existing batch check-in function
+    await executeBatchCheckin(uniqueIds);
+    
+    // Clear participant info display
+    clearParticipantInfo();
 }
 
 // Display participant information
@@ -6293,15 +6401,13 @@ async function performCheckin() {
         const regDoc = await db.collection('registrations').doc(currentParticipantUniqueId).get();
         const regData = regDoc.exists ? regDoc.data() : {};
         
-        // Build checkin data
+        // Build checkin data - store only Praveshika ID
         const checkinData = {
             uniqueId: currentParticipantUniqueId,
             checkinType: currentCheckinType,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             checkedInBy: user.uid,
             checkedInByName: checkedInByName,
-            participantName: regData.name || regData['Full Name'] || 'Unknown',
-            participantEmail: regData.email || regData['Email address'] || '',
             notes: document.getElementById('checkinNotes')?.value.trim() || null
         };
         
@@ -6385,7 +6491,7 @@ async function checkCheckinStatus(uniqueId) {
 }
 
 // Load recent checkins
-async function loadRecentCheckins(checkinType, limit = 10) {
+async function loadRecentCheckins(checkinType, limit = 5) {
     if (!window.firebase || !firebase.firestore) return;
     
     const recentCheckinsList = document.getElementById('recentCheckinsList');
@@ -6415,15 +6521,35 @@ async function loadRecentCheckins(checkinType, limit = 10) {
             return;
         }
         
+        // Fetch participant names from registrations
+        const uniqueIds = snapshot.docs.map(doc => doc.data().uniqueId).filter(id => id);
+        const registrationsMap = new Map();
+        
+        if (uniqueIds.length > 0) {
+            const registrationPromises = uniqueIds.map(uniqueId => 
+                db.collection('registrations').doc(uniqueId).get()
+            );
+            const registrationDocs = await Promise.all(registrationPromises);
+            
+            registrationDocs.forEach(regDoc => {
+                if (regDoc.exists) {
+                    const regData = regDoc.data();
+                    const name = regData.name || regData['Full Name'] || 'Unknown';
+                    registrationsMap.set(regDoc.id, name);
+                }
+            });
+        }
+        
         let html = '<ul class="recent-checkins-list">';
         snapshot.docs.forEach(doc => {
             const data = doc.data();
             const timestamp = data.timestamp?.toDate();
             const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+            const participantName = registrationsMap.get(data.uniqueId) || 'Unknown';
             
             html += `
                 <li class="recent-checkin-item">
-                    <div class="checkin-item-name">${escapeHtml(data.participantName)}</div>
+                    <div class="checkin-item-name">${escapeHtml(participantName)}</div>
                     <div class="checkin-item-id">${escapeHtml(data.uniqueId)}</div>
                     <div class="checkin-item-time">${escapeHtml(timeStr)}</div>
                     <div class="checkin-item-by">By: ${escapeHtml(data.checkedInByName)}</div>
@@ -6540,15 +6666,13 @@ async function executeBatchCheckin(ids) {
             
             const regData = regDoc.data();
             
-            // Build checkin data
+            // Build checkin data - store only Praveshika ID
             const checkinData = {
                 uniqueId: uniqueId,
                 checkinType: currentCheckinType,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 checkedInBy: user.uid,
                 checkedInByName: checkedInByName,
-                participantName: regData.name || regData['Full Name'] || 'Unknown',
-                participantEmail: regData.email || regData['Email address'] || '',
                 notes: null
             };
             
@@ -6640,8 +6764,6 @@ async function loadCheckinHistory(page = 1) {
         
         // Get filters
         const filterType = document.getElementById('historyFilterType')?.value || '';
-        const filterFromDate = document.getElementById('historyFilterFromDate')?.value || '';
-        const filterToDate = document.getElementById('historyFilterToDate')?.value || '';
         const filterSearch = document.getElementById('historyFilterSearch')?.value.trim() || '';
         
         let query = db.collection('checkins');
@@ -6651,20 +6773,7 @@ async function loadCheckinHistory(page = 1) {
             query = query.where('checkinType', '==', filterType);
         }
         
-        if (filterFromDate) {
-            const fromDate = new Date(filterFromDate);
-            fromDate.setHours(0, 0, 0, 0);
-            query = query.where('timestamp', '>=', firebase.firestore.Timestamp.fromDate(fromDate));
-        }
-        
-        if (filterToDate) {
-            const toDate = new Date(filterToDate);
-            toDate.setHours(23, 59, 59, 999);
-            query = query.where('timestamp', '<=', firebase.firestore.Timestamp.fromDate(toDate));
-        }
-        
-        // Order by timestamp (requires composite index if filtering by checkinType or date)
-        // Firestore will show an error link if index is needed
+        // Order by timestamp
         query = query.orderBy('timestamp', 'desc');
         
         // Get total count (for pagination)
@@ -6681,14 +6790,35 @@ async function loadCheckinHistory(page = 1) {
         
         const snapshot = await query.get();
         
+        // Fetch participant data from registrations for all checkins
+        const uniqueIds = snapshot.docs.map(doc => doc.data().uniqueId).filter(id => id);
+        const registrationsMap = new Map();
+        
+        if (uniqueIds.length > 0) {
+            const registrationPromises = uniqueIds.map(uniqueId => 
+                db.collection('registrations').doc(uniqueId).get()
+            );
+            const registrationDocs = await Promise.all(registrationPromises);
+            
+            registrationDocs.forEach(regDoc => {
+                if (regDoc.exists) {
+                    const regData = regDoc.data();
+                    const name = regData.name || regData['Full Name'] || 'Unknown';
+                    const email = regData.email || regData['Email address'] || '';
+                    registrationsMap.set(regDoc.id, { name, email });
+                }
+            });
+        }
+        
         // Filter by search term if provided (client-side)
         let filteredDocs = snapshot.docs;
         if (filterSearch) {
             const searchLower = filterSearch.toLowerCase();
             filteredDocs = filteredDocs.filter(doc => {
                 const data = doc.data();
-                const name = (data.participantName || '').toLowerCase();
-                const email = (data.participantEmail || '').toLowerCase();
+                const regInfo = registrationsMap.get(data.uniqueId) || { name: '', email: '' };
+                const name = (regInfo.name || '').toLowerCase();
+                const email = (regInfo.email || '').toLowerCase();
                 const uniqueId = (data.uniqueId || '').toLowerCase();
                 return name.includes(searchLower) || email.includes(searchLower) || uniqueId.includes(searchLower);
             });
@@ -6725,11 +6855,12 @@ async function loadCheckinHistory(page = 1) {
             const data = doc.data();
             const timestamp = data.timestamp?.toDate();
             const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+            const regInfo = registrationsMap.get(data.uniqueId) || { name: 'Unknown', email: '' };
             
             html += `
                 <tr>
                     <td>${escapeHtml(timeStr)}</td>
-                    <td>${escapeHtml(data.participantName || 'Unknown')}</td>
+                    <td>${escapeHtml(regInfo.name)}</td>
                     <td>${escapeHtml(data.uniqueId || 'N/A')}</td>
                     <td>${escapeHtml(CHECKIN_TYPE_LABELS[data.checkinType] || data.checkinType)}</td>
                     <td>${escapeHtml(data.pickupLocation || 'N/A')}</td>
@@ -6763,16 +6894,35 @@ function applyHistoryFilters() {
 // Clear history filters
 function clearHistoryFilters() {
     const filterType = document.getElementById('historyFilterType');
-    const filterFromDate = document.getElementById('historyFilterFromDate');
-    const filterToDate = document.getElementById('historyFilterToDate');
     const filterSearch = document.getElementById('historyFilterSearch');
     
     if (filterType) filterType.value = '';
-    if (filterFromDate) filterFromDate.value = '';
-    if (filterToDate) filterToDate.value = '';
     if (filterSearch) filterSearch.value = '';
     
     loadCheckinHistory(1);
+}
+
+// Toggle checkin history visibility
+function toggleCheckinHistory() {
+    const historyContent = document.getElementById('checkinHistoryContent');
+    const toggleIcon = document.getElementById('historyToggleIcon');
+    const toggleBtn = document.getElementById('toggleHistoryBtn');
+    
+    if (!historyContent || !toggleIcon) return;
+    
+    if (historyContent.style.display === 'none') {
+        historyContent.style.display = 'block';
+        toggleIcon.textContent = '▲';
+        toggleBtn.innerHTML = '<span id="historyToggleIcon">▲</span> Hide History';
+        // Load history if not already loaded
+        if (document.getElementById('checkinHistoryList')?.innerHTML === '') {
+            loadCheckinHistory(1);
+        }
+    } else {
+        historyContent.style.display = 'none';
+        toggleIcon.textContent = '▼';
+        toggleBtn.innerHTML = '<span id="historyToggleIcon">▼</span> Show History';
+    }
 }
 
 // Update history pagination
@@ -6826,8 +6976,6 @@ async function exportCheckinHistory(format) {
         
         // Get all filtered data (not paginated)
         const filterType = document.getElementById('historyFilterType')?.value || '';
-        const filterFromDate = document.getElementById('historyFilterFromDate')?.value || '';
-        const filterToDate = document.getElementById('historyFilterToDate')?.value || '';
         const filterSearch = document.getElementById('historyFilterSearch')?.value.trim() || '';
         
         let query = db.collection('checkins');
@@ -6836,22 +6984,30 @@ async function exportCheckinHistory(format) {
             query = query.where('checkinType', '==', filterType);
         }
         
-        if (filterFromDate) {
-            const fromDate = new Date(filterFromDate);
-            fromDate.setHours(0, 0, 0, 0);
-            query = query.where('timestamp', '>=', firebase.firestore.Timestamp.fromDate(fromDate));
-        }
-        
-        if (filterToDate) {
-            const toDate = new Date(filterToDate);
-            toDate.setHours(23, 59, 59, 999);
-            query = query.where('timestamp', '<=', firebase.firestore.Timestamp.fromDate(toDate));
-        }
-        
         // Order by timestamp
         query = query.orderBy('timestamp', 'desc');
         
         const snapshot = await query.get();
+        
+        // Fetch participant data from registrations
+        const uniqueIds = snapshot.docs.map(doc => doc.data().uniqueId).filter(id => id);
+        const registrationsMap = new Map();
+        
+        if (uniqueIds.length > 0) {
+            const registrationPromises = uniqueIds.map(uniqueId => 
+                db.collection('registrations').doc(uniqueId).get()
+            );
+            const registrationDocs = await Promise.all(registrationPromises);
+            
+            registrationDocs.forEach(regDoc => {
+                if (regDoc.exists) {
+                    const regData = regDoc.data();
+                    const name = regData.name || regData['Full Name'] || 'Unknown';
+                    const email = regData.email || regData['Email address'] || '';
+                    registrationsMap.set(regDoc.id, { name, email });
+                }
+            });
+        }
         
         // Filter by search term
         let docs = snapshot.docs;
@@ -6859,17 +7015,18 @@ async function exportCheckinHistory(format) {
             const searchLower = filterSearch.toLowerCase();
             docs = docs.filter(doc => {
                 const data = doc.data();
-                const name = (data.participantName || '').toLowerCase();
-                const email = (data.participantEmail || '').toLowerCase();
+                const regInfo = registrationsMap.get(data.uniqueId) || { name: '', email: '' };
+                const name = (regInfo.name || '').toLowerCase();
+                const email = (regInfo.email || '').toLowerCase();
                 const uniqueId = (data.uniqueId || '').toLowerCase();
                 return name.includes(searchLower) || email.includes(searchLower) || uniqueId.includes(searchLower);
             });
         }
         
         if (format === 'csv') {
-            exportToCSV(docs);
+            exportToCSV(docs, registrationsMap);
         } else if (format === 'pdf') {
-            exportToPDF(docs);
+            exportToPDF(docs, registrationsMap);
         }
         
     } catch (error) {
@@ -6879,7 +7036,7 @@ async function exportCheckinHistory(format) {
 }
 
 // Export to CSV
-function exportToCSV(docs) {
+function exportToCSV(docs, registrationsMap) {
     const headers = ['Timestamp', 'Participant Name', 'Praveshika ID', 'Email', 'Checkin Type', 'Location', 'Bag Count', 'Locker ID', 'Checked In By', 'Notes'];
     
     let csv = headers.join(',') + '\n';
@@ -6888,12 +7045,13 @@ function exportToCSV(docs) {
         const data = doc.data();
         const timestamp = data.timestamp?.toDate();
         const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+        const regInfo = registrationsMap?.get(data.uniqueId) || { name: '', email: '' };
         
         const row = [
             timeStr,
-            data.participantName || '',
+            regInfo.name || '',
             data.uniqueId || '',
-            data.participantEmail || '',
+            regInfo.email || '',
             CHECKIN_TYPE_LABELS[data.checkinType] || data.checkinType || '',
             data.pickupLocation || '',
             data.bagCount || '',
@@ -6920,7 +7078,7 @@ function exportToCSV(docs) {
 }
 
 // Export to PDF
-function exportToPDF(docs) {
+function exportToPDF(docs, registrationsMap) {
     if (typeof window.jspdf === 'undefined') {
         showNotification('PDF library not loaded', 'error');
         return;
@@ -6962,10 +7120,11 @@ function exportToPDF(docs) {
         const data = docItem.data();
         const timestamp = data.timestamp?.toDate();
         const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+        const regInfo = registrationsMap?.get(data.uniqueId) || { name: '', email: '' };
         
         doc.setFontSize(8);
         doc.text(timeStr.substring(0, 16), margin, y);
-        doc.text((data.participantName || '').substring(0, 20), margin + 40, y);
+        doc.text((regInfo.name || '').substring(0, 20), margin + 40, y);
         doc.text((data.uniqueId || '').substring(0, 15), margin + 80, y);
         doc.text((CHECKIN_TYPE_LABELS[data.checkinType] || '').substring(0, 15), margin + 110, y);
         doc.text((data.checkedInByName || '').substring(0, 20), margin + 140, y);
@@ -7037,9 +7196,24 @@ function setupCheckinListeners() {
 }
 
 // Show checkin notification
-function showCheckinNotification(data) {
+async function showCheckinNotification(data) {
     const timestamp = data.timestamp?.toDate();
     const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+    
+    // Fetch participant name from registrations
+    let participantName = 'Unknown';
+    if (data.uniqueId && window.firebase && firebase.firestore) {
+        try {
+            const db = firebase.firestore();
+            const regDoc = await db.collection('registrations').doc(data.uniqueId).get();
+            if (regDoc.exists) {
+                const regData = regDoc.data();
+                participantName = regData.name || regData['Full Name'] || 'Unknown';
+            }
+        } catch (error) {
+            console.error('Error fetching participant name for notification:', error);
+        }
+    }
     
     const notification = document.createElement('div');
     notification.className = 'checkin-notification';
@@ -7059,7 +7233,7 @@ function showCheckinNotification(data) {
     
     notification.innerHTML = `
         <div style="font-weight: bold; margin-bottom: 0.5rem;">New Checkin</div>
-        <div>${escapeHtml(data.participantName)}</div>
+        <div>${escapeHtml(participantName)}</div>
         <div style="font-size: 0.85em; opacity: 0.9;">${escapeHtml(CHECKIN_TYPE_LABELS[data.checkinType] || data.checkinType)}</div>
         <div style="font-size: 0.75em; opacity: 0.8; margin-top: 0.25rem;">${escapeHtml(timeStr)}</div>
         <button onclick="this.parentElement.remove()" style="position: absolute; top: 5px; right: 5px; background: rgba(255,255,255,0.2); border: none; color: white; cursor: pointer; padding: 2px 6px; border-radius: 3px;">×</button>
@@ -7100,10 +7274,155 @@ function playNotificationSound() {
     oscillator.stop(audioContext.currentTime + 0.5);
 }
 
+// Barcode scanning state
+let barcodeScannerActive = false;
+let barcodeScanningStream = null;
+
 // Start barcode scan (camera)
 async function startBarcodeScan() {
-    // This is a placeholder - actual barcode scanning would require a library like QuaggaJS or jsQR
-    showNotification('Barcode camera scanning requires additional setup. Please enter barcode manually.', 'info');
+    if (typeof Quagga === 'undefined') {
+        showNotification('Barcode scanning library not loaded. Please refresh the page.', 'error');
+        return;
+    }
+    
+    if (barcodeScannerActive) {
+        showNotification('Camera is already active', 'info');
+        return;
+    }
+    
+    try {
+        // Request camera access
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'environment' // Use back camera on mobile devices
+            }
+        });
+        
+        barcodeScanningStream = stream;
+        barcodeScannerActive = true;
+        
+        // Show camera UI
+        const container = document.getElementById('barcodeScannerContainer');
+        const video = document.getElementById('barcodeVideo');
+        const startBtn = document.getElementById('startCameraBtn');
+        const stopBtn = document.getElementById('stopCameraBtn');
+        
+        if (container) container.style.display = 'block';
+        if (startBtn) startBtn.style.display = 'none';
+        if (stopBtn) stopBtn.style.display = 'inline-block';
+        
+        // Set up video stream
+        if (video) {
+            video.srcObject = stream;
+            video.play();
+        }
+        
+        // Initialize QuaggaJS
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: video,
+                constraints: {
+                    width: { min: 640 },
+                    height: { min: 480 },
+                    facingMode: "environment"
+                }
+            },
+            decoder: {
+                readers: [
+                    "code_128_reader",
+                    "ean_reader",
+                    "ean_8_reader",
+                    "code_39_reader",
+                    "code_39_vin_reader",
+                    "codabar_reader",
+                    "upc_reader",
+                    "upc_e_reader",
+                    "i2of5_reader"
+                ]
+            },
+            locate: true
+        }, function(err) {
+            if (err) {
+                console.error('Quagga initialization error:', err);
+                stopBarcodeScan();
+                showNotification('Failed to initialize barcode scanner: ' + err.message, 'error');
+                return;
+            }
+            
+            Quagga.start();
+        });
+        
+        // Listen for barcode detection
+        Quagga.onDetected(function(result) {
+            if (!barcodeScannerActive) return;
+            
+            const code = result.codeResult.code;
+            if (code) {
+                // Stop scanning immediately
+                stopBarcodeScan();
+                
+                // Set the barcode input value
+                const barcodeInput = document.getElementById('barcodeInput');
+                if (barcodeInput) {
+                    barcodeInput.value = code;
+                }
+                
+                // Automatically search for the participant
+                showNotification('Barcode detected: ' + code, 'success');
+                setTimeout(() => {
+                    searchByPraveshikaIdDirect(code);
+                }, 500);
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error starting barcode scan:', error);
+        stopBarcodeScan();
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+            showNotification('Camera access denied. Please allow camera access and try again.', 'error');
+        } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+            showNotification('No camera found. Please connect a camera and try again.', 'error');
+        } else {
+            showNotification('Error accessing camera: ' + error.message, 'error');
+        }
+    }
+}
+
+// Stop barcode scan
+function stopBarcodeScan() {
+    if (!barcodeScannerActive) return;
+    
+    barcodeScannerActive = false;
+    
+    // Stop Quagga
+    try {
+        if (typeof Quagga !== 'undefined') {
+            Quagga.stop();
+        }
+    } catch (e) {
+        console.error('Error stopping Quagga:', e);
+    }
+    
+    // Stop video stream
+    if (barcodeScanningStream) {
+        barcodeScanningStream.getTracks().forEach(track => track.stop());
+        barcodeScanningStream = null;
+    }
+    
+    // Hide camera UI
+    const container = document.getElementById('barcodeScannerContainer');
+    const video = document.getElementById('barcodeVideo');
+    const startBtn = document.getElementById('startCameraBtn');
+    const stopBtn = document.getElementById('stopCameraBtn');
+    
+    if (container) container.style.display = 'none';
+    if (video) {
+        video.srcObject = null;
+    }
+    if (startBtn) startBtn.style.display = 'inline-block';
+    if (stopBtn) stopBtn.style.display = 'none';
 }
 
 // ============================================
@@ -7246,14 +7565,39 @@ async function loadCheckinAnalytics() {
         // Display recent checkins timeline
         const checkinTimelineTableBody = document.getElementById('checkinTimelineTableBody');
         if (checkinTimelineTableBody) {
+            // Fetch participant names from registrations
+            const uniqueIds = recentCheckins.map(c => c.uniqueId).filter(id => id);
+            const registrationsMap = new Map();
+            
+            if (uniqueIds.length > 0 && window.firebase && firebase.firestore) {
+                try {
+                    const db = firebase.firestore();
+                    const registrationPromises = uniqueIds.map(uniqueId => 
+                        db.collection('registrations').doc(uniqueId).get()
+                    );
+                    const registrationDocs = await Promise.all(registrationPromises);
+                    
+                    registrationDocs.forEach(regDoc => {
+                        if (regDoc.exists) {
+                            const regData = regDoc.data();
+                            const name = regData.name || regData['Full Name'] || 'Unknown';
+                            registrationsMap.set(regDoc.id, name);
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error fetching participant names for timeline:', error);
+                }
+            }
+            
             let html = '';
             recentCheckins.forEach(checkin => {
                 const timestamp = safeTimestampToDate(checkin.timestamp);
                 const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+                const participantName = registrationsMap.get(checkin.uniqueId) || 'Unknown';
                 html += `
                     <tr>
                         <td>${escapeHtml(timeStr)}</td>
-                        <td>${escapeHtml(checkin.participantName || 'Unknown')} (${escapeHtml(checkin.uniqueId || 'N/A')})</td>
+                        <td>${escapeHtml(participantName)} (${escapeHtml(checkin.uniqueId || 'N/A')})</td>
                         <td>${escapeHtml(CHECKIN_TYPE_LABELS[checkin.checkinType] || checkin.checkinType)}</td>
                         <td>${escapeHtml(checkin.checkedInByName || 'Unknown')}</td>
                     </tr>
