@@ -4628,6 +4628,96 @@ function displayTransportationChanges(changes) {
     tbody.innerHTML = html;
 }
 
+// Helper function to format date value (handles Excel serial dates, Date objects, strings, etc.)
+function formatDateValue(dateValue) {
+    if (!dateValue) return '';
+    
+    const str = String(dateValue).trim();
+    if (!str) return '';
+    
+    const num = parseFloat(str);
+    
+    // If it's a number that looks like an Excel serial date (between 1 and 100000)
+    if (!isNaN(num) && num > 0 && num < 100000) {
+        // Excel serial date - convert to actual date
+        // Excel epoch is January 1, 1900 (serial number 1)
+        // Excel incorrectly treats 1900 as a leap year, so we adjust
+        const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
+        const days = Math.floor(num);
+        const date = new Date(excelEpoch);
+        date.setDate(date.getDate() + days);
+        
+        // Verify it's a reasonable date (between 1900 and 2100)
+        if (date.getFullYear() >= 1900 && date.getFullYear() < 2100) {
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        }
+    }
+    
+    // If it's a valid date string or Date object
+    const date = new Date(str);
+    if (!isNaN(date.getTime())) {
+        // Check if it's a reasonable date (not year 1900 from Excel conversion)
+        if (date.getFullYear() > 1900 && date.getFullYear() < 2100) {
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        }
+    }
+    
+    // If it looks like a date string already (contains / or -)
+    if (str.match(/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/)) {
+        return str;
+    }
+    
+    // If it's just a number that's too large to be a date, return empty
+    if (!isNaN(num) && num >= 100000) {
+        return '';
+    }
+    
+    return str;
+}
+
+// Helper function to format time value (handles decimal numbers, invalid formats, etc.)
+function formatTimeValue(timeValue) {
+    if (!timeValue) return '';
+    
+    const str = String(timeValue).trim();
+    if (!str) return '';
+    
+    // If it's a decimal number (like 0.33333333333575865), return empty
+    const num = parseFloat(str);
+    if (!isNaN(num) && num >= 0 && num < 1 && str.includes('.')) {
+        return '';
+    }
+    
+    // If it's a number that looks like a time in decimal format (e.g., 14.5 for 14:30)
+    if (!isNaN(num) && num >= 0 && num < 24 && num % 1 !== 0) {
+        const hours = Math.floor(num);
+        const minutes = Math.round((num - hours) * 60);
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    }
+    
+    // If it matches time format (HH:MM or HH:MM:SS)
+    if (str.match(/^\d{1,2}:\d{2}(:\d{2})?$/)) {
+        return str;
+    }
+    
+    // If it's a valid time string, try to parse it
+    const timeMatch = str.match(/(\d{1,2}):?(\d{2})?/);
+    if (timeMatch) {
+        const hours = parseInt(timeMatch[1]);
+        const minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+        if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        }
+    }
+    
+    // If it's an invalid number format, return empty
+    if (!isNaN(num) && (num < 0 || num >= 24)) {
+        return '';
+    }
+    
+    return str;
+}
+
 // Display complex transportation view: sorted by location, date, time
 function displayComplexTransportationView(registrations) {
     const tbody = document.getElementById('complexTransportationTableBody');
@@ -4642,16 +4732,31 @@ function displayComplexTransportationView(registrations) {
             const arrivalTime = reg.arrivalTime || reg['Arrival Time'] || reg['Time of Arrival'] || reg.timeOfArrival;
             return pickup || arrivalDate || arrivalTime;
         })
-        .map(reg => ({
-            name: reg.name || reg['Full Name'] || 'Unknown',
-            uniqueId: reg.uniqueId || '',
-            email: reg.email || reg['Email address'] || '',
-            pickupLocation: reg.pickupLocation || reg['Pickup Location'] || reg['Place of Arrival'] || reg.placeOfArrival || '',
-            arrivalDate: reg.arrivalDate || reg['Arrival Date'] || reg['Date of Arrival'] || reg.dateOfArrival || '',
-            arrivalTime: reg.arrivalTime || reg['Arrival Time'] || reg['Time of Arrival'] || reg.timeOfArrival || '',
-            flightTrainNumber: reg.flightTrainNumber || reg['Flight/Train Number'] || reg['Flight Number'] || reg['Train Number'] || '',
-            modeOfTravel: reg['Mode of Travel'] || reg.modeOfTravel || ''
-        }));
+        .map(reg => {
+            // Get raw values
+            const rawPickupLocation = reg.pickupLocation || reg['Pickup Location'] || reg['Place of Arrival'] || reg.placeOfArrival || '';
+            const rawArrivalDate = reg.arrivalDate || reg['Arrival Date'] || reg['Date of Arrival'] || reg.dateOfArrival || '';
+            const rawArrivalTime = reg.arrivalTime || reg['Arrival Time'] || reg['Time of Arrival'] || reg.timeOfArrival || '';
+            
+            // Clean up pickup location - if it's a number that looks like a date, it's probably wrong
+            let pickupLocation = rawPickupLocation;
+            const pickupNum = parseFloat(rawPickupLocation);
+            if (!isNaN(pickupNum) && pickupNum > 10000 && pickupNum < 100000) {
+                // This looks like a date serial number in the wrong field
+                pickupLocation = '';
+            }
+            
+            return {
+                name: reg.name || reg['Full Name'] || 'Unknown',
+                uniqueId: reg.uniqueId || '',
+                email: reg.email || reg['Email address'] || '',
+                pickupLocation: pickupLocation,
+                arrivalDate: formatDateValue(rawArrivalDate),
+                arrivalTime: formatTimeValue(rawArrivalTime),
+                flightTrainNumber: reg.flightTrainNumber || reg['Flight/Train Number'] || reg['Flight Number'] || reg['Train Number'] || '',
+                modeOfTravel: reg['Mode of Travel'] || reg.modeOfTravel || ''
+            };
+        });
     
     // Sort by: 1) Pickup Location (alphabetical), 2) Arrival Date, 3) Arrival Time
     transportationData.sort((a, b) => {
@@ -6281,6 +6386,40 @@ async function startBarcodeScan() {
 // CHECKIN ANALYTICS FOR ADMIN DASHBOARD
 // ============================================
 
+// Helper function to safely convert timestamp to Date
+function safeTimestampToDate(timestamp) {
+    if (!timestamp) return null;
+    
+    // If it's already a Date object
+    if (timestamp instanceof Date) {
+        return timestamp;
+    }
+    
+    // If it's a Firestore Timestamp (has toDate method)
+    if (typeof timestamp.toDate === 'function') {
+        return timestamp.toDate();
+    }
+    
+    // If it's a number (milliseconds or seconds)
+    if (typeof timestamp === 'number') {
+        // If it's in seconds (less than year 2000 in milliseconds), convert to milliseconds
+        if (timestamp < 946684800000) {
+            return new Date(timestamp * 1000);
+        }
+        return new Date(timestamp);
+    }
+    
+    // If it's a string, try to parse it
+    if (typeof timestamp === 'string') {
+        const parsed = new Date(timestamp);
+        if (!isNaN(parsed.getTime())) {
+            return parsed;
+        }
+    }
+    
+    return null;
+}
+
 // Load checkin analytics
 async function loadCheckinAnalytics() {
     if (!window.firebase || !firebase.firestore) return;
@@ -6334,8 +6473,8 @@ async function loadCheckinAnalytics() {
             // Recent checkins timeline (last 50)
             recentCheckins = allCheckins
                 .sort((a, b) => {
-                    const aTime = a.timestamp?.toDate() || new Date(0);
-                    const bTime = b.timestamp?.toDate() || new Date(0);
+                    const aTime = safeTimestampToDate(a.timestamp) || new Date(0);
+                    const bTime = safeTimestampToDate(b.timestamp) || new Date(0);
                     return bTime - aTime;
                 })
                 .slice(0, 50);
@@ -6381,7 +6520,7 @@ async function loadCheckinAnalytics() {
         if (checkinTimelineTableBody) {
             let html = '';
             recentCheckins.forEach(checkin => {
-                const timestamp = checkin.timestamp?.toDate();
+                const timestamp = safeTimestampToDate(checkin.timestamp);
                 const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
                 html += `
                     <tr>
