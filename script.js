@@ -1090,7 +1090,6 @@ function refreshAssociatedRegistrations(user) {
 // Helper function for successful login
 function handleLoginSuccess(loginForm) {
     showNotification('Logged in successfully!', 'success');
-    closeLogin();
     loginForm.reset();
     updateAuthUI();
     
@@ -1111,6 +1110,9 @@ function handleLoginSuccess(loginForm) {
     setTimeout(() => {
         activateTab('shibirarthi');
     }, 100);
+
+    closeLogin();
+
 }
 
 // Helper function for login errors
