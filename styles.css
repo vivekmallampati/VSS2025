@@ -99,6 +99,20 @@
   animation: fadeInUp 0.4s ease-out;
 }
 
+/* Things to Carry - Left Alignment */
+#things-to-carry.subtab-content {
+  text-align: left;
+}
+
+#things-to-carry .info-section {
+  text-align: left;
+}
+
+#things-to-carry p {
+  text-align: left;
+  margin-left: 0;
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -2143,6 +2157,51 @@ body {
     border: 3px solid var(--primary-brown);
     max-width: 500px;
     margin: 0 auto;
+}
+
+/* Badge Modal - Mobile and Web Responsive */
+.badge-modal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.badge-modal-content {
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: auto;
+    position: relative;
+}
+
+@media (max-width: 768px) {
+    .badge-modal-content {
+        width: 100%;
+        max-width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+        margin: 0;
+        padding: 1rem;
+    }
+    
+    .badge-container {
+        max-width: 100%;
+        padding: 1.5rem;
+    }
+    
+    .badge-content {
+        text-align: center;
+    }
+    
+    .badge-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .badge-actions button {
+        width: 100%;
+    }
 }
 
 .badge-content {

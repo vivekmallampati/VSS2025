@@ -1,17 +1,41 @@
 // Firebase Configuration
 // IMPORTANT: Replace these values with your actual Firebase config
 // Get your config from: Firebase Console > Project Settings > Your apps > Web app
+// 
+// Configuration Priority:
+// 1. Environment variables (VITE_* for Vite, process.env for Node.js)
+// 2. Fallback to hardcoded values (for direct HTML/JS usage)
+//
+// For production, use environment variables or a secure config service
+// Never commit actual credentials to version control
 
 // Guard against duplicate declarations
 if (typeof firebaseConfig === 'undefined') {
+    // Try to get from environment variables (works with build tools)
+    // Note: For direct HTML/JS usage, this will use fallback values
+    // For build tools (Vite, Webpack), environment variables are injected at build time
+    const getEnvVar = (key, fallback) => {
+        // Check for window-level environment (if set by build tool or injected)
+        if (typeof window !== 'undefined' && window.__ENV__ && window.__ENV__[key]) {
+            return window.__ENV__[key];
+        }
+        // Check for Node.js environment variables (server-side only)
+        if (typeof process !== 'undefined' && process.env && process.env[key]) {
+            return process.env[key];
+        }
+        // For client-side direct usage, return fallback
+        // Build tools will replace these at build time if configured
+        return fallback;
+    };
+    
     var firebaseConfig = {
-    apiKey: "AIzaSyCe-asXYBrIwlaL1V4-WaX598R1H9B_E_Y",
-    authDomain: "vss2025-a8b47.firebaseapp.com",
-    projectId: "vss2025-a8b47",
-    storageBucket: "vss2025-a8b47.firebasestorage.app",
-    messagingSenderId: "145421955139",
-    appId: "1:145421955139:web:982246aec184de7f3264f6",
-    measurementId: "G-FQ9MSQ4890"
+        apiKey: getEnvVar('VITE_FIREBASE_API_KEY', "AIzaSyCe-asXYBrIwlaL1V4-WaX598R1H9B_E_Y"),
+        authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN', "vss2025-a8b47.firebaseapp.com"),
+        projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID', "vss2025-a8b47"),
+        storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET', "vss2025-a8b47.firebasestorage.app"),
+        messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID', "145421955139"),
+        appId: getEnvVar('VITE_FIREBASE_APP_ID', "1:145421955139:web:982246aec184de7f3264f6"),
+        measurementId: getEnvVar('VITE_FIREBASE_MEASUREMENT_ID', "G-FQ9MSQ4890")
     };
 }
 
@@ -36,6 +60,15 @@ function initializeFirebase() {
 
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
+        
+        // Set auth persistence to LOCAL (default, but explicit for reliability)
+        if (firebase.auth && firebase.auth().setPersistence) {
+            firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+                .catch((error) => {
+                    console.warn('Error setting auth persistence:', error);
+                });
+        }
+        
         // Set global flags
         if (typeof window !== 'undefined') {
             window.firebaseInitialized = true;

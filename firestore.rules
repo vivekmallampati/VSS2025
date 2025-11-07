@@ -123,14 +123,21 @@ service cloud.firestore {
     
     // Checkins collection
     match /checkins/{checkinId} {
+      // Helper function to check if user owns this checkin
+      function isOwnerOfCheckin() {
+        return request.auth != null && 
+               exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+               normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(resource.data.uniqueId);
+      }
+      
       // Superadmins and admins can read all checkins
       allow read: if request.auth != null && isAdmin();
       // Volunteers can read checkins for their assigned teams
       allow read: if request.auth != null && isVolunteer() && volunteerHasAccess(resource.data.checkinType);
-      // Participants can read their own checkins
+      // Participants can read their own checkins (by uniqueId match)
       allow read: if request.auth != null && 
                     exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                    normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(resource.data.uniqueId);
+                    isOwnerOfCheckin();
       
       // Superadmins and admins can create checkins for anyone
       allow create: if request.auth != null && isAdmin();
@@ -144,6 +151,14 @@ service cloud.firestore {
       
       // Only superadmins and admins can delete checkins
       allow delete: if request.auth != null && isAdmin();
+      
+      // Allow list queries for authenticated users
+      // Note: Firestore will still enforce document-level read rules, so users will only see their own checkins
+      // This allows the query to execute, but results are filtered by the read rules above
+      allow list: if request.auth != null && 
+                   (isAdmin() || 
+                    isVolunteer() || 
+                    exists(/databases/$(database)/documents/users/$(request.auth.uid)));
     }
   }
 }

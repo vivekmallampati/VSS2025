@@ -815,6 +815,14 @@ document.addEventListener('DOMContentLoaded', function() {
             waitForFirebase(function() {
                 // Firebase login
                 if (window.firebase && firebase.auth && firebase.firestore) {
+                    // Ensure auth is ready before attempting login
+                    if (!firebase.auth().currentUser || firebase.auth().currentUser === null) {
+                        // Clear any stale auth state
+                        firebase.auth().signOut().catch(() => {
+                            // Ignore errors if not signed in
+                        });
+                    }
+                    
                     showNotification('Logging in...', 'info');
                 
                 // Check if identifier is email or UniqueID
@@ -1169,23 +1177,31 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         if (!matchingDoc) {
                             showNotification('Verification failed. Praveshika ID not found.', 'error');
-                            return;
+                            return Promise.reject(new Error('Praveshika ID not found'));
                         }
                         
                         const data = matchingDoc.data();
                         const storedEmail = data.email ? data.email.toLowerCase().trim() : '';
                         
+                        // Validate that the email exists in the registration
+                        if (!storedEmail) {
+                            showNotification('Email not found in registration for this Praveshika ID.', 'error');
+                            return Promise.reject(new Error('Email not found'));
+                        }
+                        
                         // Validate that the email matches the one stored for this Praveshika ID
-                        if (!storedEmail || storedEmail !== normalizedEmail) {
+                        if (storedEmail !== normalizedEmail) {
                             showNotification('Email does not match the one associated with this Praveshika ID.', 'error');
-                            return;
+                            return Promise.reject(new Error('Email mismatch'));
                         }
                         
                         // Check if Firebase Auth account already exists for this email
+                        // This is the critical check - if account exists, DO NOT proceed to password setup
                         return firebase.auth().fetchSignInMethodsForEmail(data.email || email)
                             .then((signInMethods) => {
+                                // If signInMethods array has any methods, account exists
                                 if (signInMethods && signInMethods.length > 0) {
-                                    // Account already exists
+                                    // Account already exists - DO NOT proceed to password setup
                                     showNotification('An account with this email already exists. Please login instead.', 'error');
                                     // Close register modal and open login modal
                                     closeRegister();
@@ -1197,10 +1213,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                         }
                                         openLogin();
                                     }, 300);
-                                    return;
+                                    return Promise.reject(new Error('Account already exists'));
                                 }
                                 
-                                // Account doesn't exist - proceed with registration
+                                // No sign-in methods found - account doesn't exist, proceed with registration
                                 // Verification successful - show password setup
                                 pendingRegistration = {
                                     name: data.name || '',
@@ -1212,6 +1228,36 @@ document.addEventListener('DOMContentLoaded', function() {
                                 document.getElementById('registerVerifyForm').style.display = 'none';
                                 document.getElementById('registerPasswordForm').style.display = 'block';
                                 showNotification('Verification successful! Please set a password.', 'success');
+                                return Promise.resolve();
+                            })
+                            .catch((fetchError) => {
+                                // Handle errors from fetchSignInMethodsForEmail
+                                console.error('Error checking email existence:', fetchError);
+                                
+                                // If the error indicates email is already in use, handle it
+                                if (fetchError.code === 'auth/email-already-in-use' || 
+                                    fetchError.message && fetchError.message.includes('already in use')) {
+                                    showNotification('An account with this email already exists. Please login instead.', 'error');
+                                    closeRegister();
+                                    setTimeout(() => {
+                                        const loginIdentifier = document.getElementById('loginIdentifier');
+                                        if (loginIdentifier) {
+                                            loginIdentifier.value = data.email || email;
+                                        }
+                                        openLogin();
+                                    }, 300);
+                                    return Promise.reject(fetchError);
+                                }
+                                
+                                // For other errors (like network issues), still show error but don't proceed
+                                let errorMsg = 'Unable to verify email. Please try again.';
+                                if (fetchError.code === 'auth/invalid-email') {
+                                    errorMsg = 'Invalid email address.';
+                                } else if (fetchError.message) {
+                                    errorMsg = fetchError.message;
+                                }
+                                showNotification(errorMsg, 'error');
+                                return Promise.reject(fetchError);
                             });
                     })
                     .catch(err => {
@@ -1263,11 +1309,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Create Firebase Auth account
+            // Final check before creating account - verify email is still not in use
+            // This catches any edge cases where email was registered between verify and password setup
             if (window.firebase && firebase.auth) {
-                showNotification('Creating your account...', 'info');
+                showNotification('Verifying email availability...', 'info');
                 
-                firebase.auth().createUserWithEmailAndPassword(pendingRegistration.email, password)
+                firebase.auth().fetchSignInMethodsForEmail(pendingRegistration.email)
+                    .then((signInMethods) => {
+                        if (signInMethods && signInMethods.length > 0) {
+                            // Account was created between verify and password setup - show error
+                            showNotification('An account with this email already exists. Please login instead.', 'error');
+                            // Save email before clearing pendingRegistration
+                            const emailToUse = pendingRegistration ? pendingRegistration.email : '';
+                            // Reset registration form back to verify step
+                            document.getElementById('registerVerifyForm').style.display = 'block';
+                            document.getElementById('registerPasswordForm').style.display = 'none';
+                            pendingRegistration = null;
+                            // Close register modal and open login modal
+                            setTimeout(() => {
+                                closeRegister();
+                                setTimeout(() => {
+                                    const loginIdentifier = document.getElementById('loginIdentifier');
+                                    if (loginIdentifier && emailToUse) {
+                                        loginIdentifier.value = emailToUse;
+                                    }
+                                    openLogin();
+                                }, 300);
+                            }, 2000);
+                            return Promise.reject(new Error('Account already exists'));
+                        }
+                        
+                        // Email is still available - proceed with account creation
+                        showNotification('Creating your account...', 'info');
+                        
+                        return firebase.auth().createUserWithEmailAndPassword(pendingRegistration.email, password);
+                    })
                     .then((userCredential) => {
                         const user = userCredential.user;
                         
@@ -1396,14 +1472,26 @@ document.addEventListener('DOMContentLoaded', function() {
                         console.error('Registration error:', error);
                         let errorMessage = 'Registration failed. ';
                         
-                        if (error.code === 'auth/email-already-in-use') {
-                            errorMessage += 'This email is already registered. Please login instead.';
+                        if (error.code === 'auth/email-already-in-use' || error.message === 'Account already exists') {
+                            // This should rarely happen now since we check at verify step and before creation
+                            // But handle it gracefully if it does
+                            errorMessage = 'This email is already registered. Please login instead.';
+                            // Save email before clearing pendingRegistration
+                            const emailToUse = pendingRegistration ? pendingRegistration.email : '';
+                            // Reset registration form back to verify step
+                            document.getElementById('registerVerifyForm').style.display = 'block';
+                            document.getElementById('registerPasswordForm').style.display = 'none';
+                            pendingRegistration = null;
                             // Display error in modal
                             showRegisterError(errorMessage);
                             // Close register modal and open login modal after a short delay
                             setTimeout(() => {
                                 closeRegister();
                                 setTimeout(() => {
+                                    const loginIdentifier = document.getElementById('loginIdentifier');
+                                    if (loginIdentifier && emailToUse) {
+                                        loginIdentifier.value = emailToUse;
+                                    }
                                     openLogin();
                                     showNotification(errorMessage, 'error');
                                 }, 300);
@@ -3319,49 +3407,49 @@ function loadToursInfo(user) {
                 
                 // Display tour information
                 const tourValueLower = tourValue.toLowerCase();
+                
+                // Handle Kandukurthi - default to Yadadri and show note
+                let showKandukurthiNote = false;
                 let activeTab = 'none';
-                if (tourValueLower.includes('srisailam')) {
+                if (tourValueLower.includes('kandakurthi')) {
+                    showKandukurthiNote = true;
+                    activeTab = 'yadadri';
+                } else if (tourValueLower.includes('srisailam')) {
                     activeTab = 'srisailam';
-                } else if (tourValueLower.includes('kandakurthi')) {
-                    activeTab = 'kandakurthi';
                 } else if (tourValueLower.includes('yadadri') || tourValueLower.includes('bhagyanagar')) {
                     activeTab = 'yadadri';
                 }
                 
-                // Display tours with tabs
+                // Display only the selected tour with Change Tour option
+                let tourDisplayName = 'None';
+                let tourDescription = 'No post shibir tour selected.';
+                let tourImage = '';
+                
+                if (activeTab === 'srisailam') {
+                    tourDisplayName = 'Srisailam';
+                    tourDescription = 'Information about the Srisailam tour will be displayed here.';
+                    tourImage = '<img src="docs/Srisailam.jpg" alt="Srisailam" class="tour-image" onerror="this.style.display=\'none\'">';
+                } else if (activeTab === 'yadadri') {
+                    tourDisplayName = 'Yadadri Mandir and local sites in Bhagyanagar';
+                    tourDescription = 'Information about Yadadri Mandir and local sites in Bhagyanagar tour will be displayed here.';
+                }
+                
                 toursInfo.innerHTML = `
-                    <div class="tours-tabs">
-                        <button class="tour-tab ${activeTab === 'none' ? 'active' : ''}" onclick="switchTourTab('none')">None</button>
-                        <button class="tour-tab ${activeTab === 'srisailam' ? 'active' : ''}" onclick="switchTourTab('srisailam')">Srisailam</button>
-                        <button class="tour-tab ${activeTab === 'kandakurthi' ? 'active' : ''}" onclick="switchTourTab('kandakurthi')">Kandakurthi</button>
-                        <button class="tour-tab ${activeTab === 'yadadri' ? 'active' : ''}" onclick="switchTourTab('yadadri')">Yadadri</button>
-                    </div>
-                    <div class="tour-tab-content">
-                        <div id="tourTabNone" class="tour-tab-pane ${activeTab === 'none' ? 'active' : ''}" style="display: ${activeTab === 'none' ? 'block' : 'none'};">
-                            <div class="tour-content">
-                                <p class="tour-message">Shubh Yatra</p>
-                                <p class="tour-description">No post shibir tour selected.</p>
+                    <div class="tour-display-section">
+                        <h3>Your Selected Tour</h3>
+                        ${showKandukurthiNote ? `
+                            <div class="tour-notice" style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 10px; padding: 1.5rem; margin-bottom: 2rem;">
+                                <p style="color: #856404; font-weight: 600; margin-bottom: 0.5rem;">⚠️ Important Notice</p>
+                                <p style="color: #856404; margin: 0;">We regret to inform you that the tour to Kandakurthi has to be cancelled as the project undertaken there is not yet complete. You have been added to Yadadri Mandir and local sites in Bhagyanagar tour. If you plan to change, please scroll to bottom to change.</p>
                             </div>
+                        ` : ''}
+                        <div class="tour-content-display">
+                            ${tourImage}
+                            <h4 style="color: var(--primary-brown); margin-top: 1rem;">${escapeHtml(tourDisplayName)}</h4>
+                            <p class="tour-description">${tourDescription}</p>
                         </div>
-                        <div id="tourTabSrisailam" class="tour-tab-pane ${activeTab === 'srisailam' ? 'active' : ''}" style="display: ${activeTab === 'srisailam' ? 'block' : 'none'};">
-                            <div class="tour-content">
-                                <img src="docs/Srisailam.jpg" alt="Srisailam" class="tour-image" onerror="this.style.display='none'">
-                                <p class="tour-description">Information about the Srisailam tour will be displayed here.</p>
-                                ${tourValue ? `<p class="tour-description">Selected: ${escapeHtml(tourValue)}</p>` : ''}
-                            </div>
-                        </div>
-                        <div id="tourTabKandakurthi" class="tour-tab-pane ${activeTab === 'kandakurthi' ? 'active' : ''}" style="display: ${activeTab === 'kandakurthi' ? 'block' : 'none'};">
-                            <div class="tour-content">
-                                <img src="docs/Kandakurthi.jpg" alt="Kandakurthi" class="tour-image" onerror="this.style.display='none'">
-                                <p class="tour-description">Information about the Kandakurthi tour will be displayed here.</p>
-                                ${tourValue ? `<p class="tour-description">Selected: ${escapeHtml(tourValue)}</p>` : ''}
-                            </div>
-                        </div>
-                        <div id="tourTabYadadri" class="tour-tab-pane ${activeTab === 'yadadri' ? 'active' : ''}" style="display: ${activeTab === 'yadadri' ? 'block' : 'none'};">
-                            <div class="tour-content">
-                                <p class="tour-description">Information about Yadadri Mandir and local sites in Bhagyanagar tour will be displayed here.</p>
-                                ${tourValue ? `<p class="tour-description">Selected: ${escapeHtml(tourValue)}</p>` : ''}
-                            </div>
+                        <div class="tour-actions" style="margin-top: 2rem; padding-top: 2rem; border-top: 2px solid var(--light-cream);">
+                            <button class="btn btn-primary" onclick="editToursInfo('${result.uniqueId}')">Change Tour</button>
                         </div>
                     </div>
                 `;
@@ -3476,7 +3564,6 @@ function openToursEditForm(uniqueId) {
                             <select id="postShibirTour" class="form-control">
                                 <option value="None" ${currentTour === 'None' ? 'selected' : ''}>None</option>
                                 <option value="Srisailam" ${currentTour.toString().toLowerCase().includes('srisailam') ? 'selected' : ''}>Srisailam</option>
-                                <option value="Kandakurthi" ${currentTour.toString().toLowerCase().includes('kandakurthi') ? 'selected' : ''}>Kandakurthi</option>
                                 <option value="Yadadri Mandir and local sites in Bhagyanagar" ${currentTour.toString().toLowerCase().includes('yadadri') || currentTour.toString().toLowerCase().includes('bhagyanagar') ? 'selected' : ''}>Yadadri Mandir and local sites in Bhagyanagar</option>
                             </select>
                         </div>
@@ -4453,7 +4540,7 @@ function showBadge(name, country, shreni, barcode, uniqueId) {
     // Create badge modal
     const modal = document.createElement('div');
     modal.id = 'badgeModal';
-    modal.className = 'modal';
+    modal.className = 'modal badge-modal';
     modal.style.display = 'block';
     document.body.style.overflow = 'hidden';
 
@@ -4465,7 +4552,7 @@ function showBadge(name, country, shreni, barcode, uniqueId) {
         const logoSrc = logoDataUrl || 'docs/logo.png'; // Fallback to original if conversion fails
         
         modal.innerHTML = `
-            <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-content badge-modal-content">
                 <span class="close" onclick="closeBadge()">&times;</span>
                 <h2>VSS2025 Badge</h2>
                 <div id="badgeContainer" class="badge-container">
@@ -4517,7 +4604,7 @@ function showBadge(name, country, shreni, barcode, uniqueId) {
         console.error('Error loading logo:', error);
         // Create modal without logo if image loading fails
         modal.innerHTML = `
-            <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-content badge-modal-content">
                 <span class="close" onclick="closeBadge()">&times;</span>
                 <h2>VSS2025 Badge</h2>
                 <div id="badgeContainer" class="badge-container">
