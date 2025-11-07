@@ -4491,8 +4491,11 @@ function createBreakdownHTML(breakdown, total) {
 function getTimeRange(timeStr) {
     if (!timeStr) return 'Unknown';
     
+    // Convert to string in case it's a number, Date, or other type
+    const timeString = String(timeStr);
+    
     // Try to extract hour from time string (format: HH:MM or HH:MM:SS)
-    const timeMatch = timeStr.match(/(\d{1,2}):\d{2}/);
+    const timeMatch = timeString.match(/(\d{1,2}):\d{2}/);
     if (!timeMatch) return 'Unknown';
     
     const hour = parseInt(timeMatch[1]);
@@ -4653,15 +4656,15 @@ function displayComplexTransportationView(registrations) {
     // Sort by: 1) Pickup Location (alphabetical), 2) Arrival Date, 3) Arrival Time
     transportationData.sort((a, b) => {
         // First by pickup location
-        const locationCompare = (a.pickupLocation || '').localeCompare(b.pickupLocation || '');
+        const locationCompare = String(a.pickupLocation || '').localeCompare(String(b.pickupLocation || ''));
         if (locationCompare !== 0) return locationCompare;
         
         // Then by arrival date
-        const dateCompare = (a.arrivalDate || '').localeCompare(b.arrivalDate || '');
+        const dateCompare = String(a.arrivalDate || '').localeCompare(String(b.arrivalDate || ''));
         if (dateCompare !== 0) return dateCompare;
         
         // Finally by arrival time
-        return (a.arrivalTime || '').localeCompare(b.arrivalTime || '');
+        return String(a.arrivalTime || '').localeCompare(String(b.arrivalTime || ''));
     });
     
     let html = '';
@@ -4996,7 +4999,9 @@ function downloadBadgeAsJPG(name, country, shreni, barcode) {
 
 // Helper function to escape HTML
 function escapeHtml(text) {
-    if (!text) return '';
+    if (text == null) return ''; // Handle null and undefined
+    // Convert to string to handle numbers, Date objects, and other types
+    const textStr = String(text);
     const map = {
         '&': '&amp;',
         '<': '&lt;',
@@ -5004,7 +5009,7 @@ function escapeHtml(text) {
         '"': '&quot;',
         "'": '&#039;'
     };
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return textStr.replace(/[&<>"']/g, m => map[m]);
 }
 
 // Close badge modal when clicking outside
