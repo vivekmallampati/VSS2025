@@ -230,18 +230,21 @@ function activateTab(tabName, skipAuthCheck = false) {
     
     // Check if trying to access protected tab without authentication
     if (!skipAuthCheck && isProtectedTab(tabName) && !canAccessProtectedTab(tabName)) {
-        showNotification('Please login to access this page.', 'info');
-        window.history.pushState(null, null, '#home');
-        activateTab('home', true); // Skip auth check for home
+        // showNotification('Please login to access this page.', 'info');
+        // window.history.pushState(null, null, '#home');
+        setTimeout(() => {
+                    loginModalOpened = false;
+                }, 1000);
+        activateTab('shibirarthi', true); // Skip auth check for home
         // Prevent duplicate login modal opens
-        if (!loginModalOpened) {
-            loginModalOpened = true;
-            openLogin();
-            // Reset flag after a delay
-            setTimeout(() => {
-                loginModalOpened = false;
-            }, 1000);
-        }
+        // if (!loginModalOpened) {
+        //     loginModalOpened = true;
+        //     // openLogin();
+        //     // Reset flag after a delay
+        //     setTimeout(() => {
+        //         loginModalOpened = false;
+        //     }, 1000);
+        // }
         return;
     }
     
@@ -2352,7 +2355,7 @@ function switchTransportationTab(index) {
 // Helper function to create transportation card HTML for a single person (as tab pane - no collapse)
 function createTransportationCardHTML(transportationData, index, isExpanded = false) {
     const { name, uniqueId, pickupLocation, arrivalDate, arrivalTime, flightTrainNumber,
-            returnDate, returnTime, returnFlightTrainNumber } = transportationData;
+            returnDate, returnTime, returnFlightTrainNumber, pickupNeeded, dropoffNeeded } = transportationData;
     
     const safeName = escapeHtml(name || '');
     const safeUniqueId = escapeHtml(uniqueId || '');
@@ -2360,6 +2363,10 @@ function createTransportationCardHTML(transportationData, index, isExpanded = fa
     const hasArrivalInfo = pickupLocation || arrivalDate || arrivalTime || flightTrainNumber;
     const hasReturnInfo = returnDate || returnTime || returnFlightTrainNumber;
     const hasAnyInfo = hasArrivalInfo || hasReturnInfo;
+    
+    // Check if pickup/dropoff was explicitly set to "No"
+    const pickupNeededNo = pickupNeeded === 'No' || pickupNeeded === 'no';
+    const dropoffNeededNo = dropoffNeeded === 'No' || dropoffNeeded === 'no';
     
     // Display name - use uniqueId if name is missing or just "User {uniqueId}"
     const displayName = name && !name.startsWith('User ') ? name : (uniqueId || 'Unknown User');
@@ -2376,7 +2383,13 @@ function createTransportationCardHTML(transportationData, index, isExpanded = fa
                 <div class="transportation-sections-container">
                     <div class="transportation-section" data-section="arrival" data-tab-index="${index}">
                         <h4 class="section-title">🛬 Arrival Information</h4>
-                        ${hasArrivalInfo ? `
+                        ${pickupNeededNo ? `
+                        <p class="no-info" style="color: #666; font-style: italic;">No arrival request. Please click "Add Arrival" to change.</p>
+                        ` : hasArrivalInfo ? `
+                        <div class="info-item">
+                            <span class="info-label">Pickup Needed:</span>
+                            <span class="info-value">${formatValue(pickupNeeded) || 'Not specified'}</span>
+                        </div>
                         <div class="info-item">
                             <span class="info-label">Pickup Location:</span>
                             <span class="info-value">${formatValue(pickupLocation) || 'Not specified'}</span>
@@ -2393,11 +2406,17 @@ function createTransportationCardHTML(transportationData, index, isExpanded = fa
                             <span class="info-label">Flight/Train Number:</span>
                             <span class="info-value">${formatValue(flightTrainNumber) || 'Not specified'}</span>
                         </div>
-                        ` : '<p class="no-info">No arrival information provided</p>'}
+                        ` : '<p class="no-info">No arrival information provided <span style="background-color: #ff4444; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; margin-left: 8px;">Missing Info</span></p>'}
                     </div>
                     <div class="transportation-section" data-section="return" data-tab-index="${index}">
                         <h4 class="section-title">🛫 Return Information</h4>
-                        ${hasReturnInfo ? `
+                        ${dropoffNeededNo ? `
+                        <p class="no-info" style="color: #666; font-style: italic;">No departure request. Please click "Add Return" to change.</p>
+                        ` : hasReturnInfo ? `
+                        <div class="info-item">
+                            <span class="info-label">Drop Off Needed:</span>
+                            <span class="info-value">${formatValue(dropoffNeeded) || 'Not specified'}</span>
+                        </div>
                         <div class="info-item">
                             <span class="info-label">Date:</span>
                             <span class="info-value">${formatValue(returnDate) || 'Not specified'}</span>
@@ -2410,7 +2429,7 @@ function createTransportationCardHTML(transportationData, index, isExpanded = fa
                             <span class="info-label">Flight/Train Number:</span>
                             <span class="info-value">${formatValue(returnFlightTrainNumber) || 'Not specified'}</span>
                         </div>
-                        ` : '<p class="no-info">No return information provided</p>'}
+                        ` : '<p class="no-info">No return information provided <span style="background-color: #ff4444; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; margin-left: 8px;">Missing Info</span></p>'}
                     </div>
                 </div>
             </div>
@@ -2579,14 +2598,16 @@ function loadTransportationInfo(user) {
                                 // Try to get name from registration, then from associatedRegistrations, then use uniqueId as fallback
                                 const name = regData.name || regData['Full Name'] || nameLookup[uid] || `User ${uid}`;
                                 
-                                // Map Excel field names to display names (handle various possible field names)
-                                const pickupLocation = regData.pickupLocation || regData['Pickup Location'] || regData['PickupLocation'] || '';
-                                const arrivalDate = regData.arrivalDate || regData['Arrival Date'] || regData['ArrivalDate'] || '';
-                                const arrivalTime = regData.arrivalTime || regData['Arrival Time'] || regData['ArrivalTime'] || '';
-                                const flightTrainNumber = regData.flightTrainNumber || regData['Flight/Train Number'] || regData['FlightTrainNumber'] || regData['Flight Number'] || '';
-                                const returnDate = regData.returnDate || regData['Return Date'] || regData['ReturnDate'] || '';
-                                const returnTime = regData.returnTime || regData['Return Time'] || regData['ReturnTime'] || '';
-                                const returnFlightTrainNumber = regData.returnFlightTrainNumber || regData['Return Flight/Train Number'] || regData['ReturnFlightTrainNumber'] || '';
+                                // Map Excel field names to display names (prioritize form response field names)
+                                const pickupLocation = regData['Place of Arrival'] || regData.pickupLocation || regData['Pickup Location'] || regData['PickupLocation'] || '';
+                                const arrivalDate = regData['Date of Arrival'] || regData.arrivalDate || regData['Arrival Date'] || regData['ArrivalDate'] || '';
+                                const arrivalTime = regData['Time of Arrival'] || regData.arrivalTime || regData['Arrival Time'] || regData['ArrivalTime'] || '';
+                                const flightTrainNumber = regData['Arrival Flight/Train Number'] || regData.flightTrainNumber || regData['Flight/Train Number'] || regData['FlightTrainNumber'] || regData['Flight Number'] || '';
+                                const returnDate = regData['Date of Departure Train/Flight'] || regData.returnDate || regData['Return Date'] || regData['ReturnDate'] || '';
+                                const returnTime = regData['Time of Departure Train/Flight'] || regData.returnTime || regData['Return Time'] || regData['ReturnTime'] || '';
+                                const returnFlightTrainNumber = regData['Departure Flight/Train Number'] || regData.returnFlightTrainNumber || regData['Return Flight/Train Number'] || regData['ReturnFlightTrainNumber'] || '';
+                                const pickupNeeded = regData['Do you need a pickup on arrival?'] || regData.pickupNeeded || '';
+                                const dropoffNeeded = regData['Do you need a drop off for departure?'] || regData.dropoffNeeded || '';
                                 
                                 return {
                                     uniqueId: uid,
@@ -2597,7 +2618,9 @@ function loadTransportationInfo(user) {
                                     flightTrainNumber,
                                     returnDate,
                                     returnTime,
-                                    returnFlightTrainNumber
+                                    returnFlightTrainNumber,
+                                    pickupNeeded,
+                                    dropoffNeeded
                                 };
                             } else {
                                 // Use name from associatedRegistrations if available, otherwise use uniqueId as identifier
@@ -2611,7 +2634,9 @@ function loadTransportationInfo(user) {
                                     flightTrainNumber: '',
                                     returnDate: '',
                                     returnTime: '',
-                                    returnFlightTrainNumber: ''
+                                    returnFlightTrainNumber: '',
+                                    pickupNeeded: '',
+                                    dropoffNeeded: ''
                                 };
                             }
                         })
@@ -2692,23 +2717,39 @@ function editTransportationSection(uniqueId, section) {
             .then((regDoc) => {
                 const data = regDoc.exists ? regDoc.data() : {};
                 
-                const pickupLocation = data.pickupLocation || data['Pickup Location'] || data['PickupLocation'] || '';
-                const arrivalDate = data.arrivalDate || data['Arrival Date'] || data['ArrivalDate'] || '';
-                const arrivalTime = data.arrivalTime || data['Arrival Time'] || data['ArrivalTime'] || '';
-                const flightTrainNumber = data.flightTrainNumber || data['Flight/Train Number'] || data['FlightTrainNumber'] || data['Flight Number'] || '';
-                const returnDate = data.returnDate || data['Return Date'] || data['ReturnDate'] || '';
-                const returnTime = data.returnTime || data['Return Time'] || data['ReturnTime'] || '';
-                const returnFlightTrainNumber = data.returnFlightTrainNumber || data['Return Flight/Train Number'] || data['ReturnFlightTrainNumber'] || '';
+                // Prioritize form response field names: "Place of Arrival", "Date of Arrival", "Time of Arrival", "Arrival Flight/Train Number"
+                const pickupLocation = data['Place of Arrival'] || data.pickupLocation || data['Pickup Location'] || data['PickupLocation'] || '';
+                const arrivalDate = data['Date of Arrival'] || data.arrivalDate || data['Arrival Date'] || data['ArrivalDate'] || '';
+                const arrivalTime = data['Time of Arrival'] || data.arrivalTime || data['Arrival Time'] || data['ArrivalTime'] || '';
+                const flightTrainNumber = data['Arrival Flight/Train Number'] || data.flightTrainNumber || data['Flight/Train Number'] || data['FlightTrainNumber'] || data['Flight Number'] || '';
+                const returnDate = data['Date of Departure Train/Flight'] || data.returnDate || data['Return Date'] || data['ReturnDate'] || '';
+                const returnTime = data['Time of Departure Train/Flight'] || data.returnTime || data['Return Time'] || data['ReturnTime'] || '';
+                const returnFlightTrainNumber = data['Departure Flight/Train Number'] || data.returnFlightTrainNumber || data['Return Flight/Train Number'] || data['ReturnFlightTrainNumber'] || '';
+                const pickupNeeded = data['Do you need a pickup on arrival?'] || data.pickupNeeded || '';
+                const dropoffNeeded = data['Do you need a drop off for departure?'] || data.dropoffNeeded || '';
 
                 if (section === 'arrival') {
+                    // Determine if pickup is needed (default to 'Yes' if fields are filled, 'No' if empty)
+                    const needsPickup = pickupNeeded === 'Yes' || pickupNeeded === 'yes' || (pickupNeeded === '' && (pickupLocation || arrivalDate || arrivalTime || flightTrainNumber));
+                    const showArrivalFields = needsPickup;
+                    
                     transportationInfo.innerHTML = `
                         <h3>Edit Arrival Information</h3>
                         <form id="transportationForm" class="transportation-form">
                             <div class="transportation-section-form">
                                 <h4>Arrival Details</h4>
-                                <p class="form-note">All fields are required.</p>
                                 <div class="form-group">
-                                    <label for="pickupLocation">Pickup Location: <span class="required">*</span></label>
+                                    <label for="pickupNeeded">Do you need a pickup on arrival? <span class="required">*</span></label>
+                                    <select id="pickupNeeded" onchange="toggleArrivalFields(); validateTransportationSection('arrival');" required>
+                                        <option value="">Select an option</option>
+                                        <option value="Yes" ${pickupNeeded === 'Yes' || pickupNeeded === 'yes' || (pickupNeeded === '' && showArrivalFields) ? 'selected' : ''}>Yes</option>
+                                        <option value="No" ${pickupNeeded === 'No' || pickupNeeded === 'no' ? 'selected' : ''}>No</option>
+                                    </select>
+                                </div>
+                                <div id="arrivalFieldsContainer" style="display: ${showArrivalFields ? 'block' : 'none'};">
+                                    <p class="form-note">All fields below are required if you need pickup.</p>
+                                    <div class="form-group">
+                                        <label for="pickupLocation">Pickup Location: <span class="required">*</span></label>
                                     <select id="pickupLocation" onchange="handlePickupLocationChange(); validateTransportationSection('arrival');" required>
                                         <option value="">Select pickup location</option>
                                         <option value="Rajiv Gandhi International Airport (RGIA)" ${pickupLocation === 'Rajiv Gandhi International Airport (RGIA)' ? 'selected' : ''}>Rajiv Gandhi International Airport (RGIA)</option>
@@ -2737,6 +2778,7 @@ function editTransportationSection(uniqueId, section) {
                                     <label for="flightTrainNumber">Flight/Train Number: <span class="required">*</span></label>
                                     <input type="text" id="flightTrainNumber" value="${flightTrainNumber}" placeholder="e.g., AI 202, 12345" onchange="validateTransportationSection('arrival')" required>
                                 </div>
+                                </div>
                             </div>
                             <div class="form-actions">
                                 <button type="submit" class="btn btn-primary">💾 Save Arrival Details</button>
@@ -2745,14 +2787,27 @@ function editTransportationSection(uniqueId, section) {
                         </form>
                     `;
                 } else {
+                    // Determine if dropoff is needed (default to 'Yes' if fields are filled, 'No' if empty)
+                    const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (returnDate || returnTime || returnFlightTrainNumber));
+                    const showReturnFields = needsDropoff;
+                    
                     transportationInfo.innerHTML = `
                         <h3>Edit Return Information</h3>
                         <form id="transportationForm" class="transportation-form">
                             <div class="transportation-section-form">
                                 <h4>Return Details</h4>
-                                <p class="form-note">All fields are required.</p>
                                 <div class="form-group">
-                                    <label for="returnDate">Return Date: <span class="required">*</span></label>
+                                    <label for="dropoffNeeded">Do you need a drop off for departure? <span class="required">*</span></label>
+                                    <select id="dropoffNeeded" onchange="toggleReturnFields(); validateTransportationSection('return');" required>
+                                        <option value="">Select an option</option>
+                                        <option value="Yes" ${dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && showReturnFields) ? 'selected' : ''}>Yes</option>
+                                        <option value="No" ${dropoffNeeded === 'No' || dropoffNeeded === 'no' ? 'selected' : ''}>No</option>
+                                    </select>
+                                </div>
+                                <div id="returnFieldsContainer" style="display: ${showReturnFields ? 'block' : 'none'};">
+                                    <p class="form-note">All fields below are required if you need drop off.</p>
+                                    <div class="form-group">
+                                        <label for="returnDate">Return Date: <span class="required">*</span></label>
                                     <input type="date" id="returnDate" value="${returnDate}" onchange="validateTransportationSection('return')" required>
                                 </div>
                                 <div class="form-group">
@@ -2762,6 +2817,7 @@ function editTransportationSection(uniqueId, section) {
                                 <div class="form-group">
                                     <label for="returnFlightTrainNumber">Return Flight/Train Number: <span class="required">*</span></label>
                                     <input type="text" id="returnFlightTrainNumber" value="${returnFlightTrainNumber}" placeholder="e.g., AI 203, 12346" onchange="validateTransportationSection('return')" required>
+                                </div>
                                 </div>
                             </div>
                             <div class="form-actions">
@@ -2785,32 +2841,48 @@ function editTransportationSection(uniqueId, section) {
                         
                         // Validate all required fields before saving
                         if (section === 'arrival') {
-                            const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
-                            const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
-                            const pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
-                            const arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
-                            const arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
-                            const flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
-                            
-                            if (!pickupLocation || !arrivalDate || !arrivalTime || !flightTrainNumber) {
-                                showNotification('Please fill all arrival details: Pickup Location, Date, Time, and Flight/Train Number are required.', 'error');
-                                validateTransportationSection('arrival');
+                            const pickupNeeded = document.getElementById('pickupNeeded')?.value.trim() || '';
+                            if (!pickupNeeded) {
+                                showNotification('Please answer whether you need a pickup on arrival.', 'error');
                                 return;
                             }
                             
-                            if (pickupLocationSelect === 'Other' && !pickupLocationOther) {
-                                showNotification('Please specify the other pickup location.', 'error');
-                                return;
+                            if (pickupNeeded === 'Yes') {
+                                const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
+                                const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
+                                const pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
+                                const arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
+                                const arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
+                                const flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
+                                
+                                if (!pickupLocation || !arrivalDate || !arrivalTime || !flightTrainNumber) {
+                                    showNotification('Please fill all arrival details: Pickup Location, Date, Time, and Flight/Train Number are required.', 'error');
+                                    validateTransportationSection('arrival');
+                                    return;
+                                }
+                                
+                                if (pickupLocationSelect === 'Other' && !pickupLocationOther) {
+                                    showNotification('Please specify the other pickup location.', 'error');
+                                    return;
+                                }
                             }
                         } else if (section === 'return') {
-                            const returnDate = document.getElementById('returnDate')?.value.trim() || '';
-                            const returnTime = document.getElementById('returnTime')?.value.trim() || '';
-                            const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
-                            
-                            if (!returnDate || !returnTime || !returnFlightTrainNumber) {
-                                showNotification('Please fill all return details: Date, Time, and Flight/Train Number are required.', 'error');
-                                validateTransportationSection('return');
+                            const dropoffNeeded = document.getElementById('dropoffNeeded')?.value.trim() || '';
+                            if (!dropoffNeeded) {
+                                showNotification('Please answer whether you need a drop off for departure.', 'error');
                                 return;
+                            }
+                            
+                            if (dropoffNeeded === 'Yes') {
+                                const returnDate = document.getElementById('returnDate')?.value.trim() || '';
+                                const returnTime = document.getElementById('returnTime')?.value.trim() || '';
+                                const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
+                                
+                                if (!returnDate || !returnTime || !returnFlightTrainNumber) {
+                                    showNotification('Please fill all return details: Date, Time, and Flight/Train Number are required.', 'error');
+                                    validateTransportationSection('return');
+                                    return;
+                                }
                             }
                         }
                         
@@ -2836,22 +2908,40 @@ function editTransportation(uniqueId) {
             .then((regDoc) => {
                 const data = regDoc.exists ? regDoc.data() : {};
                 
-                const pickupLocation = data.pickupLocation || data['Pickup Location'] || data['PickupLocation'] || '';
-                const arrivalDate = data.arrivalDate || data['Arrival Date'] || data['ArrivalDate'] || '';
-                const arrivalTime = data.arrivalTime || data['Arrival Time'] || data['ArrivalTime'] || '';
-                const flightTrainNumber = data.flightTrainNumber || data['Flight/Train Number'] || data['FlightTrainNumber'] || data['Flight Number'] || '';
-                const returnDate = data.returnDate || data['Return Date'] || data['ReturnDate'] || '';
-                const returnTime = data.returnTime || data['Return Time'] || data['ReturnTime'] || '';
-                const returnFlightTrainNumber = data.returnFlightTrainNumber || data['Return Flight/Train Number'] || data['ReturnFlightTrainNumber'] || '';
+                // Prioritize form response field names: "Place of Arrival", "Date of Arrival", "Time of Arrival", "Arrival Flight/Train Number"
+                const pickupLocation = data['Place of Arrival'] || data.pickupLocation || data['Pickup Location'] || data['PickupLocation'] || '';
+                const arrivalDate = data['Date of Arrival'] || data.arrivalDate || data['Arrival Date'] || data['ArrivalDate'] || '';
+                const arrivalTime = data['Time of Arrival'] || data.arrivalTime || data['Arrival Time'] || data['ArrivalTime'] || '';
+                const flightTrainNumber = data['Arrival Flight/Train Number'] || data.flightTrainNumber || data['Flight/Train Number'] || data['FlightTrainNumber'] || data['Flight Number'] || '';
+                const returnDate = data['Date of Departure Train/Flight'] || data.returnDate || data['Return Date'] || data['ReturnDate'] || '';
+                const returnTime = data['Time of Departure Train/Flight'] || data.returnTime || data['Return Time'] || data['ReturnTime'] || '';
+                const returnFlightTrainNumber = data['Departure Flight/Train Number'] || data.returnFlightTrainNumber || data['Return Flight/Train Number'] || data['ReturnFlightTrainNumber'] || '';
+                const pickupNeeded = data['Do you need a pickup on arrival?'] || data.pickupNeeded || '';
+                const dropoffNeeded = data['Do you need a drop off for departure?'] || data.dropoffNeeded || '';
+                
+                // Determine if pickup/dropoff is needed (default to 'Yes' if fields are filled, 'No' if empty)
+                const needsPickup = pickupNeeded === 'Yes' || pickupNeeded === 'yes' || (pickupNeeded === '' && (pickupLocation || arrivalDate || arrivalTime || flightTrainNumber));
+                const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (returnDate || returnTime || returnFlightTrainNumber));
+                const showArrivalFields = needsPickup;
+                const showReturnFields = needsDropoff;
 
                 transportationInfo.innerHTML = `
                     <h3>Edit Transportation Details</h3>
                     <form id="transportationForm" class="transportation-form">
                         <div class="transportation-section-form">
                             <h4>🛬 Arrival Information</h4>
-                            <p class="form-note">If you enter any arrival detail, all arrival fields are required.</p>
                             <div class="form-group">
-                                <label for="pickupLocation">Pickup Location:</label>
+                                <label for="pickupNeeded">Do you need a pickup on arrival?</label>
+                                <select id="pickupNeeded" onchange="toggleArrivalFields(); validateTransportationSection('arrival');">
+                                    <option value="">Select an option</option>
+                                    <option value="Yes" ${pickupNeeded === 'Yes' || pickupNeeded === 'yes' || (pickupNeeded === '' && showArrivalFields) ? 'selected' : ''}>Yes</option>
+                                    <option value="No" ${pickupNeeded === 'No' || pickupNeeded === 'no' ? 'selected' : ''}>No</option>
+                                </select>
+                            </div>
+                            <div id="arrivalFieldsContainer" style="display: ${showArrivalFields ? 'block' : 'none'};">
+                                <p class="form-note">If you enter any arrival detail, all arrival fields are required.</p>
+                                <div class="form-group">
+                                    <label for="pickupLocation">Pickup Location:</label>
                                 <select id="pickupLocation" onchange="handlePickupLocationChange(); validateTransportationSection('arrival');">
                                     <option value="">Select pickup location</option>
                                     <option value="Rajiv Gandhi International Airport (RGIA)" ${pickupLocation === 'Rajiv Gandhi International Airport (RGIA)' ? 'selected' : ''}>Rajiv Gandhi International Airport (RGIA)</option>
@@ -2880,12 +2970,22 @@ function editTransportation(uniqueId) {
                                 <label for="flightTrainNumber">Flight/Train Number:</label>
                                 <input type="text" id="flightTrainNumber" value="${flightTrainNumber}" placeholder="e.g., AI 202, 12345" onchange="validateTransportationSection('arrival')">
                             </div>
+                            </div>
                         </div>
                         <div class="transportation-section-form">
                             <h4>🛫 Return Information</h4>
-                            <p class="form-note">If you enter any return detail, all return fields are required.</p>
                             <div class="form-group">
-                                <label for="returnDate">Return Date:</label>
+                                <label for="dropoffNeeded">Do you need a drop off for departure?</label>
+                                <select id="dropoffNeeded" onchange="toggleReturnFields(); validateTransportationSection('return');">
+                                    <option value="">Select an option</option>
+                                    <option value="Yes" ${dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && showReturnFields) ? 'selected' : ''}>Yes</option>
+                                    <option value="No" ${dropoffNeeded === 'No' || dropoffNeeded === 'no' ? 'selected' : ''}>No</option>
+                                </select>
+                            </div>
+                            <div id="returnFieldsContainer" style="display: ${showReturnFields ? 'block' : 'none'};">
+                                <p class="form-note">If you enter any return detail, all return fields are required.</p>
+                                <div class="form-group">
+                                    <label for="returnDate">Return Date:</label>
                                 <input type="date" id="returnDate" value="${returnDate}" onchange="validateTransportationSection('return')">
                             </div>
                             <div class="form-group">
@@ -2895,6 +2995,7 @@ function editTransportation(uniqueId) {
                             <div class="form-group">
                                 <label for="returnFlightTrainNumber">Return Flight/Train Number:</label>
                                 <input type="text" id="returnFlightTrainNumber" value="${returnFlightTrainNumber}" placeholder="e.g., AI 203, 12346" onchange="validateTransportationSection('return')">
+                            </div>
                             </div>
                         </div>
                         <div class="form-actions">
@@ -2917,32 +3018,41 @@ function editTransportation(uniqueId) {
                         e.preventDefault();
                         
                         // Validate before saving
-                        const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
-                        const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
-                        const pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
-                        const arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
-                        const arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
-                        const flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
-                        const returnDate = document.getElementById('returnDate')?.value.trim() || '';
-                        const returnTime = document.getElementById('returnTime')?.value.trim() || '';
-                        const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
+                        const pickupNeeded = document.getElementById('pickupNeeded')?.value.trim() || '';
+                        const dropoffNeeded = document.getElementById('dropoffNeeded')?.value.trim() || '';
                         
-                        // Check arrival validation
-                        const hasArrivalPartial = pickupLocation || arrivalDate || arrivalTime || flightTrainNumber;
-                        const hasArrivalAll = pickupLocation && arrivalDate && arrivalTime && flightTrainNumber;
-                        if (hasArrivalPartial && !hasArrivalAll) {
-                            showNotification('Please fill all arrival details (Pickup Location, Date, Time, and Flight/Train Number) or leave all empty.', 'error');
-                            validateTransportationSection('arrival');
-                            return;
+                        if (pickupNeeded === 'Yes') {
+                            const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
+                            const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
+                            const pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
+                            const arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
+                            const arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
+                            const flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
+                            
+                            // Check arrival validation
+                            if (!pickupLocation || !arrivalDate || !arrivalTime || !flightTrainNumber) {
+                                showNotification('Please fill all arrival details (Pickup Location, Date, Time, and Flight/Train Number) when pickup is needed.', 'error');
+                                validateTransportationSection('arrival');
+                                return;
+                            }
+                            
+                            if (pickupLocationSelect === 'Other' && !pickupLocationOther) {
+                                showNotification('Please specify the other pickup location.', 'error');
+                                return;
+                            }
                         }
                         
-                        // Check return validation
-                        const hasReturnPartial = returnDate || returnTime || returnFlightTrainNumber;
-                        const hasReturnAll = returnDate && returnTime && returnFlightTrainNumber;
-                        if (hasReturnPartial && !hasReturnAll) {
-                            showNotification('Please fill all return details (Date, Time, and Flight/Train Number) or leave all empty.', 'error');
-                            validateTransportationSection('return');
-                            return;
+                        if (dropoffNeeded === 'Yes') {
+                            const returnDate = document.getElementById('returnDate')?.value.trim() || '';
+                            const returnTime = document.getElementById('returnTime')?.value.trim() || '';
+                            const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
+                            
+                            // Check return validation
+                            if (!returnDate || !returnTime || !returnFlightTrainNumber) {
+                                showNotification('Please fill all return details (Date, Time, and Flight/Train Number) when drop off is needed.', 'error');
+                                validateTransportationSection('return');
+                                return;
+                            }
                         }
                         
                         // All validations passed, save
@@ -2964,15 +3074,31 @@ function saveTransportationInfo(uniqueId) {
         return;
     }
 
-    const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
-    const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
-    const pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
-    const arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
-    const arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
-    const flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
-    const returnDate = document.getElementById('returnDate')?.value.trim() || '';
-    const returnTime = document.getElementById('returnTime')?.value.trim() || '';
-    const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
+    const pickupNeeded = document.getElementById('pickupNeeded')?.value.trim() || '';
+    const dropoffNeeded = document.getElementById('dropoffNeeded')?.value.trim() || '';
+    
+    let pickupLocation = '';
+    let arrivalDate = '';
+    let arrivalTime = '';
+    let flightTrainNumber = '';
+    let returnDate = '';
+    let returnTime = '';
+    let returnFlightTrainNumber = '';
+    
+    if (pickupNeeded === 'Yes') {
+        const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
+        const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
+        pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
+        arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
+        arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
+        flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
+    }
+    
+    if (dropoffNeeded === 'Yes') {
+        returnDate = document.getElementById('returnDate')?.value.trim() || '';
+        returnTime = document.getElementById('returnTime')?.value.trim() || '';
+        returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
+    }
 
     const user = firebase.auth().currentUser;
     if (!user) {
@@ -3019,10 +3145,23 @@ function saveTransportationInfo(uniqueId) {
                             returnDate: returnDate || '',
                             returnTime: returnTime || '',
                             returnFlightTrainNumber: returnFlightTrainNumber || '',
+                            pickupNeeded: pickupNeeded || '',
+                            dropoffNeeded: dropoffNeeded || '',
                             transportationUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         };
                         
-                        // Update Excel column names (with special characters) only if they exist
+                        // Update form response field names (prioritize these)
+                        updateData['Place of Arrival'] = pickupLocation || '';
+                        updateData['Date of Arrival'] = arrivalDate || '';
+                        updateData['Time of Arrival'] = arrivalTime || '';
+                        updateData['Arrival Flight/Train Number'] = flightTrainNumber || '';
+                        updateData['Do you need a pickup on arrival?'] = pickupNeeded || '';
+                        updateData['Date of Departure Train/Flight'] = returnDate || '';
+                        updateData['Time of Departure Train/Flight'] = returnTime || '';
+                        updateData['Departure Flight/Train Number'] = returnFlightTrainNumber || '';
+                        updateData['Do you need a drop off for departure?'] = dropoffNeeded || '';
+                        
+                        // Update Excel column names (with special characters) only if they exist (for backward compatibility)
                         // Use set() with merge instead of update() to handle special characters
                         const fieldsToUpdate = {};
                         
@@ -3096,35 +3235,64 @@ function saveTransportationSection(uniqueId, section) {
     let returnTime = '';
     let returnFlightTrainNumber = '';
     let pickupLocation = '';
+    let pickupNeeded = '';
+    let dropoffNeeded = '';
 
     if (section === 'arrival') {
-        const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
-        const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
-        pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
-        arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
-        arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
-        flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
-        
-        // Validate all arrival fields are filled (including pickup location)
-        if (!pickupLocation || !arrivalDate || !arrivalTime || !flightTrainNumber) {
-            showNotification('Please fill all arrival details: Pickup Location, Date, Time, and Flight/Train Number are required.', 'error');
+        pickupNeeded = document.getElementById('pickupNeeded')?.value.trim() || '';
+        if (!pickupNeeded) {
+            showNotification('Please answer whether you need a pickup on arrival.', 'error');
             return;
         }
         
-        // Validate "Other" option requires text input
-        if (pickupLocationSelect === 'Other' && !pickupLocationOther) {
-            showNotification('Please specify the other pickup location.', 'error');
-            return;
+        if (pickupNeeded === 'Yes') {
+            const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
+            const pickupLocationOther = document.getElementById('pickupLocationOther')?.value.trim() || '';
+            pickupLocation = pickupLocationSelect === 'Other' ? pickupLocationOther : pickupLocationSelect;
+            arrivalDate = document.getElementById('arrivalDate')?.value.trim() || '';
+            arrivalTime = document.getElementById('arrivalTime')?.value.trim() || '';
+            flightTrainNumber = document.getElementById('flightTrainNumber')?.value.trim() || '';
+            
+            // Validate all arrival fields are filled (including pickup location)
+            if (!pickupLocation || !arrivalDate || !arrivalTime || !flightTrainNumber) {
+                showNotification('Please fill all arrival details: Pickup Location, Date, Time, and Flight/Train Number are required.', 'error');
+                return;
+            }
+            
+            // Validate "Other" option requires text input
+            if (pickupLocationSelect === 'Other' && !pickupLocationOther) {
+                showNotification('Please specify the other pickup location.', 'error');
+                return;
+            }
+        } else {
+            // If No, clear all arrival fields
+            pickupLocation = '';
+            arrivalDate = '';
+            arrivalTime = '';
+            flightTrainNumber = '';
         }
     } else if (section === 'return') {
-        returnDate = document.getElementById('returnDate')?.value.trim() || '';
-        returnTime = document.getElementById('returnTime')?.value.trim() || '';
-        returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
-        
-        // Validate all return fields are filled
-        if (!returnDate || !returnTime || !returnFlightTrainNumber) {
-            showNotification('Please fill all return details: Date, Time, and Flight/Train Number are required.', 'error');
+        dropoffNeeded = document.getElementById('dropoffNeeded')?.value.trim() || '';
+        if (!dropoffNeeded) {
+            showNotification('Please answer whether you need a drop off for departure.', 'error');
             return;
+        }
+        
+        if (dropoffNeeded === 'Yes') {
+            returnDate = document.getElementById('returnDate')?.value.trim() || '';
+            returnTime = document.getElementById('returnTime')?.value.trim() || '';
+            returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
+            
+            // Validate all return fields are filled
+            if (!returnDate || !returnTime || !returnFlightTrainNumber) {
+                showNotification('Please fill all return details: Date, Time, and Flight/Train Number are required.', 'error');
+                return;
+            }
+        } else {
+            // If No, clear all return fields
+            returnDate = '';
+            returnTime = '';
+            returnFlightTrainNumber = '';
         }
     }
 
@@ -3198,8 +3366,16 @@ function saveTransportationSection(uniqueId, section) {
                             updateData.arrivalDate = arrivalDate;
                             updateData.arrivalTime = arrivalTime;
                             updateData.flightTrainNumber = flightTrainNumber;
+                            updateData.pickupNeeded = pickupNeeded;
                             
-                            // Update Excel column names if they exist
+                            // Update form response field names (prioritize these)
+                            updateData['Place of Arrival'] = pickupLocation;
+                            updateData['Date of Arrival'] = arrivalDate;
+                            updateData['Time of Arrival'] = arrivalTime;
+                            updateData['Arrival Flight/Train Number'] = flightTrainNumber;
+                            updateData['Do you need a pickup on arrival?'] = pickupNeeded;
+                            
+                            // Update Excel column names if they exist (for backward compatibility)
                             if (existingData.hasOwnProperty('Pickup Location')) {
                                 updateData['Pickup Location'] = pickupLocation;
                             }
@@ -3216,8 +3392,15 @@ function saveTransportationSection(uniqueId, section) {
                             updateData.returnDate = returnDate;
                             updateData.returnTime = returnTime;
                             updateData.returnFlightTrainNumber = returnFlightTrainNumber;
+                            updateData.dropoffNeeded = dropoffNeeded;
                             
-                            // Update Excel column names if they exist
+                            // Update form response field names (prioritize these)
+                            updateData['Date of Departure Train/Flight'] = returnDate;
+                            updateData['Time of Departure Train/Flight'] = returnTime;
+                            updateData['Departure Flight/Train Number'] = returnFlightTrainNumber;
+                            updateData['Do you need a drop off for departure?'] = dropoffNeeded;
+                            
+                            // Update Excel column names if they exist (for backward compatibility)
                             if (existingData.hasOwnProperty('Return Date')) {
                                 updateData['Return Date'] = returnDate;
                             }
@@ -3267,6 +3450,100 @@ function handlePickupLocationChange() {
             otherContainer.style.display = 'none';
             otherInput.required = false;
             otherInput.value = '';
+        }
+    }
+}
+
+// Toggle arrival fields based on pickup needed answer
+function toggleArrivalFields() {
+    const pickupNeeded = document.getElementById('pickupNeeded');
+    const arrivalFieldsContainer = document.getElementById('arrivalFieldsContainer');
+    
+    if (pickupNeeded && arrivalFieldsContainer) {
+        const needsPickup = pickupNeeded.value === 'Yes';
+        
+        if (needsPickup) {
+            arrivalFieldsContainer.style.display = 'block';
+            // Make fields required
+            const pickupLocation = document.getElementById('pickupLocation');
+            const arrivalDate = document.getElementById('arrivalDate');
+            const arrivalTime = document.getElementById('arrivalTime');
+            const flightTrainNumber = document.getElementById('flightTrainNumber');
+            if (pickupLocation) pickupLocation.required = true;
+            if (arrivalDate) arrivalDate.required = true;
+            if (arrivalTime) arrivalTime.required = true;
+            if (flightTrainNumber) flightTrainNumber.required = true;
+        } else {
+            arrivalFieldsContainer.style.display = 'none';
+            // Make fields not required and clear them
+            const pickupLocation = document.getElementById('pickupLocation');
+            const arrivalDate = document.getElementById('arrivalDate');
+            const arrivalTime = document.getElementById('arrivalTime');
+            const flightTrainNumber = document.getElementById('flightTrainNumber');
+            if (pickupLocation) {
+                pickupLocation.required = false;
+                pickupLocation.value = '';
+            }
+            if (arrivalDate) {
+                arrivalDate.required = false;
+                arrivalDate.value = '';
+            }
+            if (arrivalTime) {
+                arrivalTime.required = false;
+                arrivalTime.value = '';
+            }
+            if (flightTrainNumber) {
+                flightTrainNumber.required = false;
+                flightTrainNumber.value = '';
+            }
+            // Also clear "Other" location if visible
+            const pickupLocationOther = document.getElementById('pickupLocationOther');
+            if (pickupLocationOther) {
+                pickupLocationOther.value = '';
+            }
+            const pickupLocationOtherContainer = document.getElementById('pickupLocationOtherContainer');
+            if (pickupLocationOtherContainer) {
+                pickupLocationOtherContainer.style.display = 'none';
+            }
+        }
+    }
+}
+
+// Toggle return fields based on dropoff needed answer
+function toggleReturnFields() {
+    const dropoffNeeded = document.getElementById('dropoffNeeded');
+    const returnFieldsContainer = document.getElementById('returnFieldsContainer');
+    
+    if (dropoffNeeded && returnFieldsContainer) {
+        const needsDropoff = dropoffNeeded.value === 'Yes';
+        
+        if (needsDropoff) {
+            returnFieldsContainer.style.display = 'block';
+            // Make fields required
+            const returnDate = document.getElementById('returnDate');
+            const returnTime = document.getElementById('returnTime');
+            const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber');
+            if (returnDate) returnDate.required = true;
+            if (returnTime) returnTime.required = true;
+            if (returnFlightTrainNumber) returnFlightTrainNumber.required = true;
+        } else {
+            returnFieldsContainer.style.display = 'none';
+            // Make fields not required and clear them
+            const returnDate = document.getElementById('returnDate');
+            const returnTime = document.getElementById('returnTime');
+            const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber');
+            if (returnDate) {
+                returnDate.required = false;
+                returnDate.value = '';
+            }
+            if (returnTime) {
+                returnTime.required = false;
+                returnTime.value = '';
+            }
+            if (returnFlightTrainNumber) {
+                returnFlightTrainNumber.required = false;
+                returnFlightTrainNumber.value = '';
+            }
         }
     }
 }
@@ -3809,7 +4086,7 @@ function saveToursInfo(uniqueId) {
         
         showNotification('Saving tour information...', 'info');
 
-        // First verify the user's uniqueId matches (security check)
+        // First verify the user's uniqueId matches (security check - allow any uniqueId associated with this email)
         db.collection('users').doc(user.uid).get()
             .then((userDoc) => {
                 if (!userDoc.exists) {
@@ -3817,14 +4094,45 @@ function saveToursInfo(uniqueId) {
                 }
                 const userData = userDoc.data();
                 const userUniqueId = userData.uniqueId;
+                const userEmail = userData.email || user.email || '';
+                const normalizedEmail = userEmail.toLowerCase().trim();
                 
-                // Verify the uniqueId matches (normalized comparison)
-                if (normalizePraveshikaId(userUniqueId) !== normalizePraveshikaId(uniqueId)) {
-                    throw new Error('You can only update your own tour information.');
+                // Check if the uniqueId is associated with this user's email
+                // First check if it's the primary uniqueId
+                let isAuthorized = false;
+                if (userUniqueId && normalizePraveshikaId(userUniqueId) === normalizePraveshikaId(uniqueId)) {
+                    isAuthorized = true;
                 }
+                
+                // If not primary, check emailToUids collection and associated registrations
+                const checkAuthPromise = !isAuthorized 
+                    ? db.collection('emailToUids').doc(normalizedEmail).get()
+                        .then((emailToUidsDoc) => {
+                            if (emailToUidsDoc.exists) {
+                                const emailToUidsData = emailToUidsDoc.data();
+                                const uidsFromEmailToUids = emailToUidsData.uids || [];
+                                isAuthorized = uidsFromEmailToUids.some(uid => 
+                                    normalizePraveshikaId(uid) === normalizePraveshikaId(uniqueId)
+                                );
+                            }
+                            
+                            // Also check associated registrations
+                            if (!isAuthorized) {
+                                const associatedRegistrations = userData.associatedRegistrations || [];
+                                isAuthorized = associatedRegistrations.some(reg => 
+                                    reg.uniqueId && normalizePraveshikaId(reg.uniqueId) === normalizePraveshikaId(uniqueId)
+                                );
+                            }
+                            
+                            if (!isAuthorized) {
+                                throw new Error('You can only update tour information for accounts associated with your email.');
+                            }
+                            return isAuthorized;
+                        })
+                    : Promise.resolve(true);
 
                 // Get the existing document to preserve all fields
-                return db.collection('registrations').doc(uniqueId).get()
+                return checkAuthPromise.then(() => db.collection('registrations').doc(uniqueId).get())
                     .then((doc) => {
                         if (!doc.exists) {
                             throw new Error('Registration not found');

@@ -15,6 +15,41 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId == registrationId;
     }
     
+    // Helper function to check if uniqueId is associated with user's email via emailToUids
+    function isUniqueIdAssociatedWithEmail(uniqueId) {
+      let userEmail = exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        ? (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email != null 
+           ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email.lower() 
+           : (request.auth.token.email != null ? request.auth.token.email.lower() : ''))
+        : (request.auth.token.email != null ? request.auth.token.email.lower() : '');
+      
+      return userEmail != '' &&
+             exists(/databases/$(database)/documents/emailToUids/$(userEmail)) &&
+             get(/databases/$(database)/documents/emailToUids/$(userEmail)).data.uids != null &&
+             checkUniqueIdInArray(get(/databases/$(database)/documents/emailToUids/$(userEmail)).data.uids, uniqueId);
+    }
+    
+    // Helper function to check if uniqueId is in the uids array (checks first 10 elements)
+    function checkUniqueIdInArray(uids, uniqueId) {
+      let normalizedTargetId = normalizeId(uniqueId);
+      return (uids.size() > 0 && uids[0] != null && (uids[0] == uniqueId || normalizeId(uids[0]) == normalizedTargetId)) ||
+             (uids.size() > 1 && uids[1] != null && (uids[1] == uniqueId || normalizeId(uids[1]) == normalizedTargetId)) ||
+             (uids.size() > 2 && uids[2] != null && (uids[2] == uniqueId || normalizeId(uids[2]) == normalizedTargetId)) ||
+             (uids.size() > 3 && uids[3] != null && (uids[3] == uniqueId || normalizeId(uids[3]) == normalizedTargetId)) ||
+             (uids.size() > 4 && uids[4] != null && (uids[4] == uniqueId || normalizeId(uids[4]) == normalizedTargetId)) ||
+             (uids.size() > 5 && uids[5] != null && (uids[5] == uniqueId || normalizeId(uids[5]) == normalizedTargetId)) ||
+             (uids.size() > 6 && uids[6] != null && (uids[6] == uniqueId || normalizeId(uids[6]) == normalizedTargetId)) ||
+             (uids.size() > 7 && uids[7] != null && (uids[7] == uniqueId || normalizeId(uids[7]) == normalizedTargetId)) ||
+             (uids.size() > 8 && uids[8] != null && (uids[8] == uniqueId || normalizeId(uids[8]) == normalizedTargetId)) ||
+             (uids.size() > 9 && uids[9] != null && (uids[9] == uniqueId || normalizeId(uids[9]) == normalizedTargetId));
+    }
+    
+    // Helper function to check if uniqueId is in user's associated registrations
+    function isUniqueIdInAssociatedRegistrations(uniqueId) {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.associatedRegistrations != null;
+    }
+    
     // Helper function to normalize Praveshika ID for comparison
     function normalizeId(id) {
       return id.lower().replaceAll('/', '').replaceAll('-', '');
@@ -72,13 +107,22 @@ service cloud.firestore {
                        (isOwnerOfRegistration(uniqueId) ||
                         // Also check normalized comparison for flexible matching
                         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                         normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(uniqueId))) &&
+                         normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(uniqueId)) ||
+                        // Check if uniqueId is associated with user's email via emailToUids
+                        isUniqueIdAssociatedWithEmail(uniqueId) ||
+                        // Check if uniqueId is in user's associated registrations
+                        isUniqueIdInAssociatedRegistrations(uniqueId)) &&
                        // Allow updating transportation-related fields and tour selection
                        request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['pickupLocation', 'Pickup Location', 'arrivalDate', 'Arrival Date',
-                                  'arrivalTime', 'Arrival Time', 'flightTrainNumber', 'Flight/Train Number',
-                                  'returnDate', 'Return Date', 'returnTime', 'Return Time',
-                                  'returnFlightTrainNumber', 'Return Flight/Train Number',
+                         .hasOnly(['pickupLocation', 'Pickup Location', 'Place of Arrival',
+                                  'arrivalDate', 'Arrival Date', 'Date of Arrival',
+                                  'arrivalTime', 'Arrival Time', 'Time of Arrival',
+                                  'flightTrainNumber', 'Flight/Train Number', 'Arrival Flight/Train Number',
+                                  'returnDate', 'Return Date', 'Date of Departure Train/Flight',
+                                  'returnTime', 'Return Time', 'Time of Departure Train/Flight',
+                                  'returnFlightTrainNumber', 'Return Flight/Train Number', 'Departure Flight/Train Number',
+                                  'pickupNeeded', 'Do you need a pickup on arrival?',
+                                  'dropoffNeeded', 'Do you need a drop off for departure?',
                                   'transportationUpdatedAt', 'postShibirTour', 'Post Shibir Tour', 'Post Shibir Tours', 
                                   'Please select a post shibir tour option', 'toursUpdatedAt']) &&
                        // Ensure critical fields are not modified
