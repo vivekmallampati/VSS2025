@@ -45,6 +45,7 @@
                 <li id="myToursNavItem" style="display: none;"><a href="#mytours" class="nav-link" data-tab="mytours">My Tours</a></li>
                 <li id="checkinNavItem" style="display: none;"><a href="#checkin" class="nav-link" data-tab="checkin">Checkin</a></li>
                 <li id="adminDashboardNavItem" style="display: none;"><a href="#admin-dashboard" class="nav-link" data-tab="admin-dashboard">Admin Dashboard</a></li>
+                <li id="userManagementNavItem" style="display: none;"><a href="#user-management" class="nav-link" data-tab="user-management">User Management</a></li>
                 <!-- <li><a href="#documents" class="nav-link" data-tab="documents">Documents</a></li> -->
                 <li id="mediaNavItem"><a href="#media" class="nav-link" data-tab="media">Media</a></li>
                 <!-- <li><a href="#donate" class="nav-link" data-tab="donate">Donate</a></li> -->
@@ -1080,6 +1081,63 @@
                                 <h3>Export Checkin Data</h3>
                                 <button class="btn btn-primary" onclick="exportCheckinHistory('csv')">Export All Checkins (CSV)</button>
                                 <button class="btn btn-primary" onclick="exportCheckinHistory('pdf')">Export All Checkins (PDF)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- User Management Tab -->
+        <section id="user-management" class="tab-content">
+            <div class="container">
+                <div class="section-header">
+                    <h2>User Management</h2>
+                    <p>Create and manage volunteer and admin users</p>
+                </div>
+                <div class="user-management-content">
+                    <div id="userManagementLoading" style="text-align: center; padding: 2rem;">
+                        <p>Loading user management...</p>
+                    </div>
+                    
+                    <div id="userManagementData" style="display: none;">
+                        <!-- Create New User Form -->
+                        <div class="user-creation-form" style="background: #f5f5f5; padding: 2rem; border-radius: 8px; margin-bottom: 2rem;">
+                            <h3>Create New User</h3>
+                            <form id="userCreationForm" onsubmit="handleUserCreationSubmit(event)">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                    <div class="form-group">
+                                        <label for="newUserName">Name: <span style="color: red;">*</span></label>
+                                        <input type="text" id="newUserName" class="form-input" placeholder="Full name" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="newUserEmail">Email: <span style="color: #666;">(optional)</span></label>
+                                        <input type="email" id="newUserEmail" class="form-input" placeholder="email@example.com">
+                                    </div>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                    <div class="form-group">
+                                        <label for="newUserId">ID: <span style="color: red;">*</span></label>
+                                        <input type="text" id="newUserId" class="form-input" placeholder="Unique ID" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="newUserRole">Role: <span style="color: red;">*</span></label>
+                                        <select id="newUserRole" class="form-input" required>
+                                            <option value="volunteer">Volunteer</option>
+                                            <option value="admin">Admin</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Create User</button>
+                            </form>
+                            <div id="userCreationMessage" class="user-creation-message" style="display: none; margin-top: 1rem;"></div>
+                        </div>
+
+                        <!-- Existing Users List -->
+                        <div class="user-management-list">
+                            <h3>Existing Users (Volunteers & Admins)</h3>
+                            <div id="userManagementList" class="data-table-container">
+                                <p>Loading users...</p>
                             </div>
                         </div>
                     </div>
