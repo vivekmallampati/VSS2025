@@ -34,7 +34,7 @@ function waitForFirebase(callback, maxRetries = 50) {
 }
 
 // Protected tabs that require authentication
-const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours', 'checkin', 'admin-dashboard'];
+const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours', 'checkin', 'admin-dashboard', 'user-management'];
 
 // Helper function to check if a tab is protected
 function isProtectedTab(tabName) {
@@ -73,6 +73,10 @@ async function isSuperadmin(user) {
         const userData = userDoc.data();
         return userData.role === 'superadmin';
     } catch (error) {
+        // Silently return false for permission errors (happens during user creation flow)
+        if (error.code === 'permission-denied') {
+            return false;
+        }
         console.error('Error checking superadmin status:', error);
         return false;
     }
@@ -95,6 +99,10 @@ async function isAdmin(user) {
         const userData = userDoc.data();
         return userData.role === 'superadmin' || userData.role === 'admin';
     } catch (error) {
+        // Silently return false for permission errors (happens during user creation flow)
+        if (error.code === 'permission-denied') {
+            return false;
+        }
         console.error('Error checking admin status:', error);
         return false;
     }
@@ -117,6 +125,10 @@ async function isVolunteer(user) {
         const userData = userDoc.data();
         return userData.role === 'volunteer';
     } catch (error) {
+        // Silently return false for permission errors (happens during user creation flow)
+        if (error.code === 'permission-denied') {
+            return false;
+        }
         console.error('Error checking volunteer status:', error);
         return false;
     }
@@ -139,6 +151,10 @@ async function getVolunteerTeams(user) {
         const userData = userDoc.data();
         return userData.volunteerTeams || [];
     } catch (error) {
+        // Silently return empty array for permission errors (happens during user creation flow)
+        if (error.code === 'permission-denied') {
+            return [];
+        }
         console.error('Error getting volunteer teams:', error);
         return [];
     }
@@ -146,7 +162,7 @@ async function getVolunteerTeams(user) {
 
 // Helper function to check if user can view dashboard
 async function canViewDashboard(user) {
-    return await isSuperadmin(user);
+    return await isAdmin(user);
 }
 
 // Helper function to check if user can perform checkin
@@ -284,6 +300,9 @@ function activateTab(tabName, skipAuthCheck = false) {
                         break;
                     case 'admin-dashboard':
                         loadAdminDashboard(user);
+                        break;
+                    case 'user-management':
+                        loadUserManagementPage(user);
                         break;
                 }
             }
@@ -869,12 +888,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         .catch((error) => {
                             // Check if user doesn't exist
                             if (error.code === 'auth/user-not-found') {
-                                showNotification('No account found. Please register first.', 'error');
-                                // Close login and open register modal
-                                closeLogin();
-                                setTimeout(() => {
-                                    openRegister();
-                                }, 300);
+                                showNotification('No account found with this email. Contact your administrator if you are a volunteer/admin.', 'error');
+                            } else if (error.code === 'auth/wrong-password') {
+                                showNotification('Incorrect password. Please try again.', 'error');
                             } else {
                                 handleLoginError(error);
                             }
@@ -884,8 +900,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     const db = firebase.firestore();
                     const normalizedId = normalizePraveshikaId(identifier);
                     
-                    // Helper function to find email by normalized Praveshika ID
-                    // Prioritizes registrations collection (publicly readable) to avoid security issues
+                    // Helper function to find email by normalized Praveshika ID or User ID
+                    // Checks both registrations (for shibirarthi) and users (for volunteers/admins)
                     function findEmailByPraveshikaId(normalizedId) {
                         // First: Try checking registrations collection with normalizedId field (most efficient)
                         return db.collection('registrations').where('normalizedId', '==', normalizedId).limit(1).get()
@@ -913,7 +929,23 @@ document.addEventListener('DOMContentLoaded', function() {
                             })
                             .then((email) => {
                                 if (email) return email;
-                                // Third: Search all registration documents by normalizing document IDs (fallback for old data)
+                                // Third: Check users collection for volunteers/admins by uniqueId
+                                return db.collection('users').where('uniqueId', '==', identifier).limit(1).get()
+                                    .then((userQuerySnapshot) => {
+                                        if (!userQuerySnapshot.empty) {
+                                            const userData = userQuerySnapshot.docs[0].data();
+                                            // For volunteers/admins, use their email or generate placeholder
+                                            if (userData.role === 'volunteer' || userData.role === 'admin') {
+                                                // If they have a real email, use it; otherwise use placeholder format
+                                                return userData.email || `${userData.uniqueId}@placeholder.local`;
+                                            }
+                                        }
+                                        return null;
+                                    });
+                            })
+                            .then((email) => {
+                                if (email) return email;
+                                // Fourth: Search all registration documents by normalizing document IDs (fallback for old data)
                                 return db.collection('registrations').get()
                                     .then((allDocs) => {
                                         for (const doc of allDocs.docs) {
@@ -938,13 +970,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     findEmailByPraveshikaId(normalizedId)
                         .then((email) => {
                             if (!email) {
-                                showNotification('No account found for this Praveshika ID. Please register first.', 'error');
-                                // Close login and open register modal
-                                closeLogin();
-                                setTimeout(() => {
-                                    openRegister();
-                                }, 300);
-                                throw { code: 'auth/user-not-found', message: 'No email found for this Praveshika ID.' };
+                                showNotification('ID not found. Volunteers/Admins: Contact your administrator. Shibirarthi: Register first.', 'error');
+                                throw { code: 'auth/user-not-found', message: 'No email found for this ID.' };
                             }
                             // Login with the found email
                             return firebase.auth().signInWithEmailAndPassword(email, password);
@@ -953,14 +980,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             handleLoginSuccess(loginForm);
                         })
                         .catch((error) => {
-                            // Check if user doesn't exist
+                            // Check if user doesn't exist or wrong password
                             if (error.code === 'auth/user-not-found') {
-                                showNotification('No account found. Please register first.', 'error');
-                                // Close login and open register modal
-                                closeLogin();
-                                setTimeout(() => {
-                                    openRegister();
-                                }, 300);
+                                // Don't redirect to register - could be volunteer/admin
+                                showNotification('ID not found. Contact your administrator if you are a volunteer/admin.', 'error');
+                            } else if (error.code === 'auth/wrong-password') {
+                                showNotification('Incorrect password. Please try again.', 'error');
                             } else {
                                 handleLoginError(error);
                             }
@@ -1585,6 +1610,7 @@ async function handleAuthStateChange(user) {
     const myToursNavItem = document.getElementById('myToursNavItem');
     const checkinNavItem = document.getElementById('checkinNavItem');
     const adminDashboardNavItem = document.getElementById('adminDashboardNavItem');
+    const userManagementNavItem = document.getElementById('userManagementNavItem');
     
     if (user) {
         // Check user roles
@@ -1648,12 +1674,21 @@ async function handleAuthStateChange(user) {
             }
         }
         
-        // Show admin dashboard only for superadmins (not admin)
+        // Show admin dashboard only for superadmins and admins
         if (adminDashboardNavItem) {
             if (canViewDashboardUser) {
                 adminDashboardNavItem.style.display = '';
             } else {
                 adminDashboardNavItem.style.display = 'none';
+            }
+        }
+        
+        // Show user management only for superadmins and admins
+        if (userManagementNavItem) {
+            if (isAdminUser) {
+                userManagementNavItem.style.display = '';
+            } else {
+                userManagementNavItem.style.display = 'none';
             }
         }
     } else {
@@ -1692,6 +1727,9 @@ async function handleAuthStateChange(user) {
         }
         if (adminDashboardNavItem) {
             adminDashboardNavItem.style.display = 'none';
+        }
+        if (userManagementNavItem) {
+            userManagementNavItem.style.display = 'none';
         }
         
         // If user is on protected tab, redirect to home
@@ -2293,6 +2331,11 @@ function loadUserProfile(user) {
                     });
             })
             .catch((error) => {
+                // Silently ignore permission errors (happens during user creation flow)
+                if (error.code === 'permission-denied') {
+                    profileInfo.innerHTML = '<p>Loading...</p>';
+                    return;
+                }
                 console.error('Error loading profile:', error);
                 profileInfo.innerHTML = '<p>Error loading profile information.</p>';
             });
@@ -2665,6 +2708,11 @@ function loadTransportationInfo(user) {
                 `;
             })
             .catch((error) => {
+                // Silently ignore permission errors (happens during user creation flow)
+                if (error.code === 'permission-denied') {
+                    transportationInfo.innerHTML = '<p>Loading...</p>';
+                    return;
+                }
                 console.error('Error loading transportation info:', error);
                 transportationInfo.innerHTML = '<p>Error loading transportation information.</p>';
             });
@@ -3654,6 +3702,11 @@ function loadToursInfo(user) {
                 `;
             })
             .catch((error) => {
+                // Silently ignore permission errors (happens during user creation flow)
+                if (error.code === 'permission-denied') {
+                    toursInfo.innerHTML = '<p>Loading...</p>';
+                    return;
+                }
                 console.error('Error loading tours info:', error);
                 toursInfo.innerHTML = '<p>Error loading tour information.</p>';
             });
@@ -3872,9 +3925,9 @@ function saveToursInfo(uniqueId) {
 
 // Admin Dashboard Functions
 async function loadAdminDashboard(user) {
-    // Verify user is superadmin
-    const isAdmin = await isSuperadmin(user);
-    if (!isAdmin) {
+    // Verify user is admin (superadmin or admin)
+    const isAdminUser = await isAdmin(user);
+    if (!isAdminUser) {
         const loadingDiv = document.getElementById('adminDashboardLoading');
         if (loadingDiv) {
             loadingDiv.innerHTML = '<p style="color: red;">Access denied. You do not have permission to view this dashboard.</p>';
@@ -3955,6 +4008,373 @@ async function loadAdminDashboard(user) {
     } catch (error) {
         console.error('Error loading admin dashboard:', error);
         loadingDiv.innerHTML = '<p style="color: red;">Error loading dashboard data. Please try again.</p>';
+    }
+}
+
+// User Management Functions
+
+// Generate a secure random password
+function generateSecurePassword(length = 12) {
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+    let password = '';
+    const crypto = window.crypto || window.msCrypto;
+    
+    if (crypto && crypto.getRandomValues) {
+        const values = new Uint32Array(length);
+        crypto.getRandomValues(values);
+        for (let i = 0; i < length; i++) {
+            password += charset[values[i] % charset.length];
+        }
+    } else {
+        // Fallback for older browsers
+        for (let i = 0; i < length; i++) {
+            password += charset[Math.floor(Math.random() * charset.length)];
+        }
+    }
+    
+    return password;
+}
+
+// Create a new user (volunteer or admin)
+async function createNewUser(name, email, uniqueId, role) {
+    if (!window.firebase || !firebase.auth || !firebase.firestore) {
+        throw new Error('Firebase not initialized');
+    }
+    
+    // Verify current user is admin
+    const currentUser = firebase.auth().currentUser;
+    if (!currentUser) {
+        throw new Error('Not authenticated');
+    }
+    
+    const isAdminUser = await isAdmin(currentUser);
+    if (!isAdminUser) {
+        throw new Error('Permission denied. Only admins can create users.');
+    }
+    
+    // Validate inputs
+    if (!name || !name.trim()) {
+        throw new Error('Name is required');
+    }
+    if (!uniqueId || !uniqueId.trim()) {
+        throw new Error('ID is required');
+    }
+    if (!role || (role !== 'volunteer' && role !== 'admin')) {
+        throw new Error('Role must be either "volunteer" or "admin"');
+    }
+    
+    // Validate email format if provided
+    if (email && email.trim()) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            throw new Error('Invalid email format');
+        }
+    }
+    
+    const trimmedEmail = email ? email.trim() : '';
+    const trimmedName = name.trim();
+    const trimmedUniqueId = uniqueId.trim();
+    
+    // Generate secure random password
+    const tempPassword = generateSecurePassword(12);
+    
+    try {
+        // Store current auth credentials to restore later
+        const currentUserEmail = currentUser.email;
+        
+        // If no email provided, generate a placeholder email using the uniqueId
+        const userEmail = trimmedEmail || `${trimmedUniqueId}@placeholder.local`;
+        
+        // Create the user account
+        // NOTE: This will sign out the current user and sign in the new user
+        const userCredential = await firebase.auth().createUserWithEmailAndPassword(userEmail, tempPassword);
+        const newUser = userCredential.user;
+        
+        // Create user document in Firestore
+        const db = firebase.firestore();
+        await db.collection('users').doc(newUser.uid).set({
+            email: trimmedEmail || null,
+            name: trimmedName,
+            uniqueId: trimmedUniqueId,
+            role: role,
+            country: 'Bharat',
+            shreni: 'Volunteer',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: currentUser.uid
+        });
+        
+        // Also create a registration record for volunteers/admins
+        // This allows them to have profile information like shibirarthi
+        const normalizedId = trimmedUniqueId.toLowerCase().replace(/[/-]/g, '');
+        await db.collection('registrations').doc(trimmedUniqueId).set({
+            uniqueId: trimmedUniqueId,
+            normalizedId: normalizedId,
+            name: trimmedName,
+            email: trimmedEmail || null,
+            country: 'Bharat',
+            Country: 'Bharat',
+            shreni: 'Volunteer',
+            Shreni: 'Volunteer',
+            role: role,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: currentUser.uid
+        });
+        
+        // Sign out the newly created user
+        await firebase.auth().signOut();
+        
+        // Send password reset email to the new user (only if email provided)
+        if (trimmedEmail) {
+            try {
+                await firebase.auth().sendPasswordResetEmail(trimmedEmail);
+            } catch (emailError) {
+                console.warn('Could not send password reset email:', emailError);
+            }
+        }
+        
+        return {
+            success: true,
+            uid: newUser.uid,
+            email: trimmedEmail || 'No email provided',
+            name: trimmedName,
+            uniqueId: trimmedUniqueId,
+            role: role,
+            temporaryPassword: tempPassword,
+            needsReauth: true,
+            adminEmail: currentUserEmail
+        };
+        
+    } catch (error) {
+        console.error('Error creating user:', error);
+        
+        // Handle specific error cases
+        if (error.code === 'auth/email-already-in-use') {
+            throw new Error('This email is already registered');
+        } else if (error.code === 'auth/invalid-email') {
+            throw new Error('Invalid email address');
+        } else if (error.code === 'auth/weak-password') {
+            throw new Error('Password is too weak');
+        } else {
+            throw new Error(error.message || 'Failed to create user');
+        }
+    }
+}
+
+// Load and display user management UI
+async function loadUserManagement() {
+    if (!window.firebase || !firebase.firestore) {
+        console.error('Firebase not initialized');
+        return;
+    }
+    
+    try {
+        const currentUser = firebase.auth().currentUser;
+        if (!currentUser) return;
+        
+        // Verify user is admin
+        const isAdminUser = await isAdmin(currentUser);
+        if (!isAdminUser) return;
+        
+        const db = firebase.firestore();
+        
+        // Fetch all users with role (volunteers and admins)
+        const usersSnapshot = await db.collection('users')
+            .where('role', 'in', ['volunteer', 'admin'])
+            .get();
+        
+        const users = [];
+        usersSnapshot.forEach(doc => {
+            const data = doc.data();
+            users.push({
+                uid: doc.id,
+                ...data
+            });
+        });
+        
+        // Sort by creation date (newest first)
+        users.sort((a, b) => {
+            if (a.createdAt && b.createdAt) {
+                return b.createdAt.toMillis() - a.createdAt.toMillis();
+            }
+            return 0;
+        });
+        
+        displayUserManagementUI(users);
+        
+    } catch (error) {
+        console.error('Error loading user management:', error);
+    }
+}
+
+// Load the User Management page
+async function loadUserManagementPage(user) {
+    // Verify user is admin
+    const isAdminUser = await isAdmin(user);
+    if (!isAdminUser) {
+        const loadingDiv = document.getElementById('userManagementLoading');
+        if (loadingDiv) {
+            loadingDiv.innerHTML = '<p style="color: red;">Access denied. You do not have permission to view this page.</p>';
+        }
+        return;
+    }
+    
+    const loadingDiv = document.getElementById('userManagementLoading');
+    const dataDiv = document.getElementById('userManagementData');
+    
+    if (!loadingDiv || !dataDiv) return;
+    
+    loadingDiv.style.display = 'block';
+    dataDiv.style.display = 'none';
+    
+    if (!window.firebase || !firebase.firestore) {
+        loadingDiv.innerHTML = '<p style="color: red;">Firebase not initialized.</p>';
+        return;
+    }
+    
+    try {
+        // Load user management data
+        await loadUserManagement();
+        
+        // Show data div, hide loading
+        loadingDiv.style.display = 'none';
+        dataDiv.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error loading user management page:', error);
+        loadingDiv.innerHTML = '<p style="color: red;">Error loading user management. Please try again.</p>';
+    }
+}
+
+// Display user management UI
+function displayUserManagementUI(users) {
+    // We'll insert this into the admin dashboard
+    // The HTML structure will be added to index.html
+    const userListContainer = document.getElementById('userManagementList');
+    if (!userListContainer) return;
+    
+    if (users.length === 0) {
+        userListContainer.innerHTML = '<p>No users found.</p>';
+        return;
+    }
+    
+    let html = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>ID</th>
+                    <th>Role</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    users.forEach(user => {
+        const createdDate = user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : 'N/A';
+        const roleBadgeClass = user.role === 'admin' ? 'role-badge-admin' : 'role-badge-volunteer';
+        
+        html += `
+            <tr>
+                <td>${escapeHtml(user.name || 'N/A')}</td>
+                <td>${escapeHtml(user.email || 'N/A')}</td>
+                <td>${escapeHtml(user.uniqueId || '-')}</td>
+                <td><span class="role-badge ${roleBadgeClass}">${escapeHtml(user.role || 'N/A')}</span></td>
+                <td>${createdDate}</td>
+            </tr>
+        `;
+    });
+    
+    html += `
+            </tbody>
+        </table>
+    `;
+    
+    userListContainer.innerHTML = html;
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
+// Handle user creation form submission
+async function handleUserCreationSubmit(event) {
+    event.preventDefault();
+    
+    const nameInput = document.getElementById('newUserName');
+    const emailInput = document.getElementById('newUserEmail');
+    const idInput = document.getElementById('newUserId');
+    const roleSelect = document.getElementById('newUserRole');
+    const submitButton = event.target.querySelector('button[type="submit"]');
+    const messageContainer = document.getElementById('userCreationMessage');
+    
+    if (!nameInput || !emailInput || !roleSelect) {
+        console.error('Form inputs not found');
+        return;
+    }
+    
+    const name = nameInput.value.trim();
+    const email = emailInput.value.trim();
+    const uniqueId = idInput ? idInput.value.trim() : '';
+    const role = roleSelect.value;
+    
+    // Disable form during submission
+    if (submitButton) submitButton.disabled = true;
+    if (messageContainer) {
+        messageContainer.style.display = 'block';
+        messageContainer.className = 'user-creation-message info';
+        messageContainer.textContent = 'Creating user...';
+    }
+    
+    try {
+        const result = await createNewUser(name, email, uniqueId, role);
+        
+        // Show success message with important note about re-authentication
+        if (messageContainer) {
+            messageContainer.className = 'user-creation-message success';
+            const emailDisplay = result.email !== 'No email provided' 
+                ? `<strong>Email:</strong> ${escapeHtml(result.email)}<br>` 
+                : '<strong>Email:</strong> Not provided<br>';
+            const emailSentNote = result.email !== 'No email provided'
+                ? `<em>A password reset email has been sent to ${escapeHtml(result.email)}.</em><br><br>`
+                : '<em>No email provided - user must use the temporary password shown below.</em><br><br>';
+            
+            messageContainer.innerHTML = `
+                <strong>Success!</strong> User created successfully.<br>
+                <strong>Name:</strong> ${escapeHtml(result.name)}<br>
+                <strong>ID:</strong> ${escapeHtml(result.uniqueId)}<br>
+                ${emailDisplay}
+                <strong>Temporary Password:</strong> <code>${escapeHtml(result.temporaryPassword)}</code><br>
+                ${emailSentNote}
+                <strong style="color: #ff6b35;">Note:</strong> You have been signed out. Please log back in to continue.<br>
+                <button class="btn btn-primary" onclick="window.location.reload()">Reload and Login</button>
+            `;
+        }
+        
+        // Clear form
+        nameInput.value = '';
+        emailInput.value = '';
+        if (idInput) idInput.value = '';
+        roleSelect.value = 'volunteer';
+        
+    } catch (error) {
+        console.error('Error creating user:', error);
+        
+        if (messageContainer) {
+            messageContainer.className = 'user-creation-message error';
+            messageContainer.innerHTML = `<strong>Error:</strong> ${escapeHtml(error.message)}`;
+        }
+    } finally {
+        if (submitButton) submitButton.disabled = false;
     }
 }
 

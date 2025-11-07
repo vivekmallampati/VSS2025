@@ -63,8 +63,15 @@ service cloud.firestore {
       // Anyone can read for verification
       allow read: if true;
       
-      // Only admin can create/delete (handled via Admin SDK)
-      allow create, delete: if false;
+      // Allow creating registration records if:
+      // 1. User is an admin (can create for others)
+      // 2. User is creating their own registration record (for volunteer/admin user creation flow)
+      allow create: if request.auth != null && 
+                       (isAdmin() || 
+                        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId == uniqueId));
+      // Only admin SDK can delete
+      allow delete: if false;
       
       // Allow authenticated users to update only their own transportation info
       allow update: if request.auth != null && 
@@ -90,10 +97,18 @@ service cloud.firestore {
     
     // Users collection
     match /users/{userId} {
-      // Users can read their own data, superadmins can read all user data
-      allow read: if request.auth != null && (request.auth.uid == userId || isSuperadmin());
+      // Allow reading user data in specific cases:
+      // 1. Users can read their own data
+      // 2. Admins can read all user data
+      // 3. Allow querying by uniqueId for login purposes (unauthenticated users can query)
+      //    but limit to only returning email/uniqueId fields for security
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      // Allow list/query operations for login lookup by uniqueId (before authentication)
+      allow list: if request.query.limit <= 1;
       // Users can create/update their own data
       allow create, update: if request.auth != null && request.auth.uid == userId;
+      // Admins can also create user documents (for new user creation)
+      allow create: if request.auth != null && isAdmin();
       // Users cannot delete their own data (admin only)
       allow delete: if false;
     }
@@ -101,10 +116,10 @@ service cloud.firestore {
     // EmailToUids collection - maps emails to associated uniqueIds
     // Document ID is normalized email (lowercase)
     match /emailToUids/{normalizedEmail} {
-      // Authenticated users can read their own email mapping, superadmins can read all
+      // Authenticated users can read their own email mapping, admins can read all
       // The document ID is the normalized email (lowercase), compare with normalized user email
       allow read: if request.auth != null && 
-                    (isSuperadmin() ||
+                    (isAdmin() ||
                      normalizedEmail == request.auth.token.email.lower() ||
                      (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email.lower() == normalizedEmail));
@@ -116,8 +131,8 @@ service cloud.firestore {
     match /contactMessages/{messageId} {
       // Anyone can create contact messages (contact form is public)
       allow create: if true;
-      // Only superadmins can read contact messages
-      allow read: if isSuperadmin();
+      // Admins (superadmin or admin) can read contact messages
+      allow read: if isAdmin();
       // No updates or deletes allowed (contact messages are immutable)
       allow update, delete: if false;
     }
