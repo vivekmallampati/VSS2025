@@ -2684,9 +2684,14 @@ body {
 }
 
 .user-profile-card-actions {
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
+    margin: 0 auto 1rem auto;
+    padding: 1rem 0;
     border-bottom: 2px solid var(--light-cream);
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
 }
 
 .btn-sm {

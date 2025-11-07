@@ -73,13 +73,14 @@ service cloud.firestore {
                         // Also check normalized comparison for flexible matching
                         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
                          normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(uniqueId))) &&
-                       // Only allow updating transportation-related fields (tours are read-only)
+                       // Allow updating transportation-related fields and tour selection
                        request.resource.data.diff(resource.data).affectedKeys()
                          .hasOnly(['pickupLocation', 'Pickup Location', 'arrivalDate', 'Arrival Date',
                                   'arrivalTime', 'Arrival Time', 'flightTrainNumber', 'Flight/Train Number',
                                   'returnDate', 'Return Date', 'returnTime', 'Return Time',
                                   'returnFlightTrainNumber', 'Return Flight/Train Number',
-                                  'transportationUpdatedAt']) &&
+                                  'transportationUpdatedAt', 'postShibirTour', 'Post Shibir Tour', 'Post Shibir Tours', 
+                                  'Please select a post shibir tour option', 'toursUpdatedAt']) &&
                        // Ensure critical fields are not modified
                        request.resource.data.uniqueId == resource.data.uniqueId &&
                        request.resource.data.normalizedId == resource.data.normalizedId &&

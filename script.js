@@ -214,13 +214,34 @@ function canAccessProtectedTab(tabName) {
 }
 
 // Global function to activate a tab and update URL
+// Track if we're still initializing auth to prevent premature login prompts
+let authInitializing = true;
+let loginModalOpened = false;
+
 function activateTab(tabName, skipAuthCheck = false) {
+    // During initialization, skip auth check to prevent premature login prompts
+    // Wait for auth state to be determined first
+    if (!skipAuthCheck && authInitializing && isProtectedTab(tabName)) {
+        // Don't open login modal during initialization - just redirect to home
+        window.history.pushState(null, null, '#home');
+        activateTab('home', true); // Skip auth check for home
+        return;
+    }
+    
     // Check if trying to access protected tab without authentication
     if (!skipAuthCheck && isProtectedTab(tabName) && !canAccessProtectedTab(tabName)) {
         showNotification('Please login to access this page.', 'info');
         window.history.pushState(null, null, '#home');
         activateTab('home', true); // Skip auth check for home
-        openLogin();
+        // Prevent duplicate login modal opens
+        if (!loginModalOpened) {
+            loginModalOpened = true;
+            openLogin();
+            // Reset flag after a delay
+            setTimeout(() => {
+                loginModalOpened = false;
+            }, 1000);
+        }
         return;
     }
     
@@ -307,7 +328,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Wait for Firebase to be initialized before checking auth state
     waitForFirebase(function() {
         if (window.firebase && firebase.auth) {
-            firebase.auth().onAuthStateChanged((user) => {
+            // Mark that we're initializing - this prevents premature login prompts
+            authInitializing = true;
+            
+            // Use a one-time listener or check current user immediately
+            const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                // Mark initialization as complete
+                authInitializing = false;
+                
                 // Small delay to ensure UI is updated
                 setTimeout(() => {
                     if (initialHash) {
@@ -316,9 +344,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         activateTab('home');
                     }
                 }, 100);
+                
+                // Unsubscribe after first auth state change to prevent duplicate calls
+                unsubscribe();
             });
         } else {
-            // If Firebase not available, just activate based on hash
+            // If Firebase not available, mark as initialized and activate based on hash
+            authInitializing = false;
             if (initialHash) {
                 activateTab(initialHash);
             } else {
@@ -1519,156 +1551,154 @@ function updateAuthUI() {
     // Wait for Firebase to be initialized
     waitForFirebase(function() {
         if (window.firebase && firebase.auth) {
-            firebase.auth().onAuthStateChanged(async (user) => {
-            const loginBtn = document.querySelector('.header-actions .login-btn');
-            const homeNavItem = document.getElementById('homeNavItem');
-            const aboutNavItem = document.getElementById('aboutNavItem');
-            const mediaNavItem = document.getElementById('mediaNavItem');
-            const shibirarthiNavItem = document.getElementById('shibirarthiNavItem');
-            const myProfileNavItem = document.getElementById('myProfileNavItem');
-            const myTransportationNavItem = document.getElementById('myTransportationNavItem');
-            const myToursNavItem = document.getElementById('myToursNavItem');
-            const checkinNavItem = document.getElementById('checkinNavItem');
-            const adminDashboardNavItem = document.getElementById('adminDashboardNavItem');
+            // Check current user first to avoid waiting for auth state change
+            const currentUser = firebase.auth().currentUser;
+            if (currentUser) {
+                // User is already logged in, update UI immediately
+                handleAuthStateChange(currentUser);
+            }
             
-            if (user) {
-                // Check user roles
-                const isSuperadminUser = await isSuperadmin(user);
-                const isAdminUser = await isAdmin(user);
-                const canPerformCheckinUser = await canPerformCheckin(user);
-                const canViewDashboardUser = await canViewDashboard(user);
-                
-                // User is logged in
-                if (loginBtn) {
-                    loginBtn.textContent = 'Logout';
-                    loginBtn.onclick = () => {
-                        // Check if user is on protected tab, redirect to home if so
-                        const currentHash = window.location.hash.substring(1);
-                        if (isProtectedTab(currentHash)) {
-                            window.history.pushState(null, null, '#home');
-                            activateTab('home');
-                        }
-                        
-                        firebase.auth().signOut().then(() => {
-                            showNotification('Logged out successfully.', 'success');
-                            updateAuthUI();
-                        });
-                    };
-                }
-                
-                // Hide public tabs (Home, About, Media) when logged in
-                if (homeNavItem) {
-                    homeNavItem.style.display = 'none';
-                }
-                if (aboutNavItem) {
-                    aboutNavItem.style.display = 'none';
-                }
-                if (mediaNavItem) {
-                    mediaNavItem.style.display = 'none';
-                }
-                
-                // Show protected tabs
-                if (shibirarthiNavItem) {
-                    shibirarthiNavItem.style.display = '';
-                }
-                if (myProfileNavItem) {
-                    myProfileNavItem.style.display = '';
-                    loadUserProfile(user);
-                }
-                if (myTransportationNavItem) {
-                    myTransportationNavItem.style.display = '';
-                    loadTransportationInfo(user);
-                }
-                if (myToursNavItem) {
-                    myToursNavItem.style.display = '';
-                    loadToursInfo(user);
-                }
-                
-                // Show checkin tab for superadmin, admin, or volunteers
-                if (checkinNavItem) {
-                    if (canPerformCheckinUser) {
-                        checkinNavItem.style.display = '';
-                    } else {
-                        checkinNavItem.style.display = 'none';
-                    }
-                }
-                
-                // Show admin dashboard only for superadmins (not admin)
-                if (adminDashboardNavItem) {
-                    if (canViewDashboardUser) {
-                        adminDashboardNavItem.style.display = '';
-                    } else {
-                        adminDashboardNavItem.style.display = 'none';
-                    }
-                }
-            } else {
-                // User is logged out
-                if (loginBtn) {
-                    loginBtn.textContent = 'Login';
-                    loginBtn.onclick = openLogin;
-                }
-                
-                // Show public tabs (Home, About, Media) when logged out
-                if (homeNavItem) {
-                    homeNavItem.style.display = '';
-                }
-                if (aboutNavItem) {
-                    aboutNavItem.style.display = '';
-                }
-                if (mediaNavItem) {
-                    mediaNavItem.style.display = '';
-                }
-                
-                // Hide protected tabs
-                if (shibirarthiNavItem) {
-                    shibirarthiNavItem.style.display = 'none';
-                }
-                if (myProfileNavItem) {
-                    myProfileNavItem.style.display = 'none';
-                }
-                if (myTransportationNavItem) {
-                    myTransportationNavItem.style.display = 'none';
-                }
-                if (myToursNavItem) {
-                    myToursNavItem.style.display = 'none';
-                }
-                if (checkinNavItem) {
-                    checkinNavItem.style.display = 'none';
-                }
-                if (adminDashboardNavItem) {
-                    adminDashboardNavItem.style.display = 'none';
-                }
-                
-                // If user is on protected tab, redirect to home
+            // Set up listener for future auth state changes
+            firebase.auth().onAuthStateChanged(async (user) => {
+                handleAuthStateChange(user);
+            });
+        }
+    });
+}
+
+// Helper function to handle auth state changes
+async function handleAuthStateChange(user) {
+    // Mark initialization as complete when we get auth state
+    if (authInitializing) {
+        authInitializing = false;
+    }
+    
+    const loginBtn = document.querySelector('.header-actions .login-btn');
+    const homeNavItem = document.getElementById('homeNavItem');
+    const aboutNavItem = document.getElementById('aboutNavItem');
+    const mediaNavItem = document.getElementById('mediaNavItem');
+    const shibirarthiNavItem = document.getElementById('shibirarthiNavItem');
+    const myProfileNavItem = document.getElementById('myProfileNavItem');
+    const myTransportationNavItem = document.getElementById('myTransportationNavItem');
+    const myToursNavItem = document.getElementById('myToursNavItem');
+    const checkinNavItem = document.getElementById('checkinNavItem');
+    const adminDashboardNavItem = document.getElementById('adminDashboardNavItem');
+    
+    if (user) {
+        // Check user roles
+        const isSuperadminUser = await isSuperadmin(user);
+        const isAdminUser = await isAdmin(user);
+        const canPerformCheckinUser = await canPerformCheckin(user);
+        const canViewDashboardUser = await canViewDashboard(user);
+        
+        // User is logged in
+        if (loginBtn) {
+            loginBtn.textContent = 'Logout';
+            loginBtn.onclick = () => {
+                // Check if user is on protected tab, redirect to home if so
                 const currentHash = window.location.hash.substring(1);
                 if (isProtectedTab(currentHash)) {
                     window.history.pushState(null, null, '#home');
                     activateTab('home');
                 }
-            }
-            });
-        } else {
-            // Firebase not available - show public tabs, hide protected tabs
-            const homeNavItem = document.getElementById('homeNavItem');
-            const aboutNavItem = document.getElementById('aboutNavItem');
-            const mediaNavItem = document.getElementById('mediaNavItem');
-            const shibirarthiNavItem = document.getElementById('shibirarthiNavItem');
-            const myProfileNavItem = document.getElementById('myProfileNavItem');
-            const myTransportationNavItem = document.getElementById('myTransportationNavItem');
-            const myToursNavItem = document.getElementById('myToursNavItem');
-            const checkinNavItem = document.getElementById('checkinNavItem');
-            const adminDashboardNavItem = document.getElementById('adminDashboardNavItem');
-            if (homeNavItem) homeNavItem.style.display = '';
-            if (aboutNavItem) aboutNavItem.style.display = '';
-            if (mediaNavItem) mediaNavItem.style.display = '';
-            if (shibirarthiNavItem) shibirarthiNavItem.style.display = 'none';
-            if (myProfileNavItem) myProfileNavItem.style.display = 'none';
-            if (myTransportationNavItem) myTransportationNavItem.style.display = 'none';
-            if (myToursNavItem) myToursNavItem.style.display = 'none';
-            if (checkinNavItem) checkinNavItem.style.display = 'none';
-            if (adminDashboardNavItem) adminDashboardNavItem.style.display = 'none';
+                
+                firebase.auth().signOut().then(() => {
+                    showNotification('Logged out successfully.', 'success');
+                    updateAuthUI();
+                });
+            };
         }
-    });
+        
+        // Hide public tabs (Home, About, Media) when logged in
+        if (homeNavItem) {
+            homeNavItem.style.display = 'none';
+        }
+        if (aboutNavItem) {
+            aboutNavItem.style.display = 'none';
+        }
+        if (mediaNavItem) {
+            mediaNavItem.style.display = 'none';
+        }
+        
+        // Show protected tabs
+        if (shibirarthiNavItem) {
+            shibirarthiNavItem.style.display = '';
+        }
+        if (myProfileNavItem) {
+            myProfileNavItem.style.display = '';
+            loadUserProfile(user);
+        }
+        if (myTransportationNavItem) {
+            myTransportationNavItem.style.display = '';
+            loadTransportationInfo(user);
+        }
+        if (myToursNavItem) {
+            myToursNavItem.style.display = '';
+            loadToursInfo(user);
+        }
+        
+        // Show checkin tab for superadmin, admin, or volunteers
+        if (checkinNavItem) {
+            if (canPerformCheckinUser) {
+                checkinNavItem.style.display = '';
+            } else {
+                checkinNavItem.style.display = 'none';
+            }
+        }
+        
+        // Show admin dashboard only for superadmins (not admin)
+        if (adminDashboardNavItem) {
+            if (canViewDashboardUser) {
+                adminDashboardNavItem.style.display = '';
+            } else {
+                adminDashboardNavItem.style.display = 'none';
+            }
+        }
+    } else {
+        // User is logged out
+        if (loginBtn) {
+            loginBtn.textContent = 'Login';
+            loginBtn.onclick = openLogin;
+        }
+        
+        // Show public tabs (Home, About, Media) when logged out
+        if (homeNavItem) {
+            homeNavItem.style.display = '';
+        }
+        if (aboutNavItem) {
+            aboutNavItem.style.display = '';
+        }
+        if (mediaNavItem) {
+            mediaNavItem.style.display = '';
+        }
+        
+        // Hide protected tabs
+        if (shibirarthiNavItem) {
+            shibirarthiNavItem.style.display = 'none';
+        }
+        if (myProfileNavItem) {
+            myProfileNavItem.style.display = 'none';
+        }
+        if (myTransportationNavItem) {
+            myTransportationNavItem.style.display = 'none';
+        }
+        if (myToursNavItem) {
+            myToursNavItem.style.display = 'none';
+        }
+        if (checkinNavItem) {
+            checkinNavItem.style.display = 'none';
+        }
+        if (adminDashboardNavItem) {
+            adminDashboardNavItem.style.display = 'none';
+        }
+        
+        // If user is on protected tab, redirect to home
+        const currentHash = window.location.hash.substring(1);
+        if (isProtectedTab(currentHash)) {
+            window.history.pushState(null, null, '#home');
+            activateTab('home');
+        }
+    }
 }
 
 // Helper function to extract profile data from registration document
@@ -3345,111 +3375,278 @@ function validateTransportationSection(section) {
     }
 }
 
-// Load tours information - now in separate tab
+// Helper function to create tours tab button HTML
+function createToursTabHTML(toursData, index, isActive = false) {
+    const displayName = escapeHtml(toursData.name || `ID: ${toursData.uniqueId}`);
+    return `
+        <button class="profile-tab-btn ${isActive ? 'active' : ''}" 
+                onclick="switchToursTab(${index})" 
+                data-tab-index="${index}">
+            ${displayName}
+        </button>
+    `;
+}
+
+// Function to switch tours tabs
+function switchToursTab(index) {
+    const toursInfo = document.getElementById('toursInfo');
+    if (!toursInfo) return;
+    
+    // Remove active class from all tab buttons within tours section
+    const tabButtons = toursInfo.querySelectorAll('.profile-tab-btn');
+    tabButtons.forEach(btn => btn.classList.remove('active'));
+    
+    // Hide all tours tab panes
+    const tabPanes = toursInfo.querySelectorAll('.tours-tab-pane');
+    tabPanes.forEach(pane => {
+        pane.classList.remove('active');
+        pane.style.display = 'none';
+    });
+    
+    // Show selected tab pane
+    const selectedPane = document.getElementById(`toursTab${index}`);
+    if (selectedPane) {
+        selectedPane.classList.add('active');
+        selectedPane.style.display = 'block';
+    }
+    
+    // Activate selected tab button
+    const selectedButton = toursInfo.querySelector(`.profile-tab-btn[data-tab-index="${index}"]`);
+    if (selectedButton) {
+        selectedButton.classList.add('active');
+    }
+}
+
+// Helper function to create tours card HTML for a single person
+function createToursCardHTML(toursData, index, isActive = false) {
+    const { uniqueId, name, postShibirTour } = toursData;
+    
+    // Get post shibir tour field
+    const tourValue = postShibirTour ? postShibirTour.toString().trim() : '';
+    const tourValueLower = tourValue.toLowerCase();
+    
+    // Handle Kandukurthi - default to Yadadri and show note
+    let showKandukurthiNote = false;
+    let activeTab = 'none';
+    if (tourValueLower.includes('kandakurthi')) {
+        showKandukurthiNote = true;
+        activeTab = 'yadadri';
+    } else if (tourValueLower.includes('srisailam')) {
+        activeTab = 'srisailam';
+    } else if (tourValueLower.includes('yadadri') || tourValueLower.includes('bhagyanagar')) {
+        activeTab = 'yadadri';
+    }
+    
+    // Display only the selected tour with Change Tour option
+    let tourDisplayName = 'None';
+    let tourDescription = 'No post shibir tour selected.';
+    let tourImage = '';
+    
+    if (activeTab === 'srisailam') {
+        tourDisplayName = 'Srisailam';
+        tourDescription = 'Information about the Srisailam tour will be displayed here.';
+        tourImage = '<img src="docs/Srisailam.jpg" alt="Srisailam" class="tour-image" onerror="this.style.display=\'none\'">';
+    } else if (activeTab === 'yadadri') {
+        tourDisplayName = 'Yadadri Mandir and local sites in Bhagyanagar';
+        tourDescription = 'Information about Yadadri Mandir and local sites in Bhagyanagar tour will be displayed here.';
+    }
+    
+    return `
+        <div class="tours-tab-pane ${isActive ? 'active' : ''}" id="toursTab${index}" style="display: ${isActive ? 'block' : 'none'};">
+            <div class="tour-display-section">
+                <h3>Your Selected Tour</h3>
+                ${showKandukurthiNote ? `
+                    <div class="tour-notice" style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 10px; padding: 1.5rem; margin-bottom: 2rem;">
+                        <p style="color: #856404; font-weight: 600; margin-bottom: 0.5rem;">⚠️ Important Notice</p>
+                        <p style="color: #856404; margin: 0;">We regret to inform you that the tour to Kandakurthi has to be cancelled as the project undertaken there is not yet complete. You have been added to Yadadri Mandir and local sites in Bhagyanagar tour. If you plan to change, please scroll to bottom to change.</p>
+                    </div>
+                ` : ''}
+                <div class="tour-content-display">
+                    ${tourImage}
+                    <h4 style="color: var(--primary-brown); margin-top: 1rem;">${escapeHtml(tourDisplayName)}</h4>
+                    <p class="tour-description">${tourDescription}</p>
+                </div>
+                <div class="tour-actions" style="margin-top: 2rem; padding-top: 2rem; border-top: 2px solid var(--light-cream);">
+                    <button class="btn btn-primary" onclick="editToursInfo('${uniqueId}')">Change Tour</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Load tours information - now per ID like My Transportation and My Profile
 function loadToursInfo(user) {
     const toursInfo = document.getElementById('toursInfo');
     if (!toursInfo) return;
     
     if (window.firebase && firebase.firestore) {
         const db = firebase.firestore();
-        // First get user's uniqueId
+        
+        // First get user document
         db.collection('users').doc(user.uid).get()
             .then((userDoc) => {
-                if (userDoc.exists && userDoc.data().uniqueId) {
-                    const uniqueId = userDoc.data().uniqueId;
-                    // Get registration details
-                    return db.collection('registrations').doc(uniqueId).get()
-                        .then((regDoc) => {
-                            return { uniqueId, regDoc, user };
-                        })
-                        .catch((error) => {
-                            console.error('Error reading registration for tours:', error);
-                            return { uniqueId, regDoc: null, user };
-                        });
-                }
-                return { uniqueId: null, regDoc: null, user };
-            })
-            .catch((error) => {
-                console.error('Error loading tours info (initial fetch):', error);
-                return { uniqueId: null, regDoc: null, user };
-            })
-            .then((result) => {
-                if (!result || !result.uniqueId) {
-                    profileToursSection.style.display = 'none';
+                if (!userDoc.exists) {
+                    toursInfo.innerHTML = '<p>Tours information not found.</p>';
                     return;
                 }
                 
-                const { regDoc } = result;
-                const data = regDoc && regDoc.exists ? regDoc.data() : {};
+                const userData = userDoc.data();
+                const primaryUniqueId = userData.uniqueId;
+                const userEmail = userData.email || user.email || '';
+                const normalizedEmail = userEmail.toLowerCase().trim();
                 
-                // Get post shibir tour field
-                let postShibirTour = data.postShibirTour || 
-                                    data['Post Shibir Tour'] || 
-                                    data['Post Shibir Tours'] ||
-                                    data['Please select a post shibir tour option'] ||
-                                    null;
-                
-                // Fallback: try to find any field containing "tour" and "post"/"shibir"
-                if (!postShibirTour) {
-                    const allKeys = Object.keys(data);
-                    const tourKey = allKeys.find(key => {
-                        const lowerKey = key.toLowerCase();
-                        return (lowerKey.includes('tour') && (lowerKey.includes('post') || lowerKey.includes('shibir'))) ||
-                               (lowerKey.includes('post') && lowerKey.includes('shibir'));
+                // Check emailToUids collection to get all uniqueIds for this email
+                return db.collection('emailToUids').doc(normalizedEmail).get()
+                    .then((emailToUidsDoc) => {
+                        let allUniqueIds = [];
+                        
+                        // Get uniqueIds from emailToUids if it exists
+                        if (emailToUidsDoc.exists) {
+                            const emailToUidsData = emailToUidsDoc.data();
+                            const uidsFromEmailToUids = emailToUidsData.uids || [];
+                            allUniqueIds = [...uidsFromEmailToUids];
+                        }
+                        
+                        // Always include primary uniqueId
+                        if (primaryUniqueId && !allUniqueIds.includes(primaryUniqueId)) {
+                            allUniqueIds.push(primaryUniqueId);
+                        }
+                        
+                        // If still no uniqueIds, fall back to associated registrations
+                        if (allUniqueIds.length === 0) {
+                            const associatedRegistrations = userData.associatedRegistrations || [];
+                            associatedRegistrations.forEach(reg => {
+                                if (reg.uniqueId && !allUniqueIds.includes(reg.uniqueId)) {
+                                    allUniqueIds.push(reg.uniqueId);
+                                }
+                            });
+                        }
+                        
+                        return { userData, allUniqueIds };
+                    })
+                    .catch((error) => {
+                        console.error('Error checking emailToUids in loadToursInfo:', error);
+                        // Continue with existing associatedRegistrations if emailToUids check fails
+                        const associatedRegistrations = userData.associatedRegistrations || [];
+                        const currentUniqueIds = associatedRegistrations.map(reg => reg.uniqueId).filter(Boolean);
+                        if (primaryUniqueId && !currentUniqueIds.includes(primaryUniqueId)) {
+                            currentUniqueIds.push(primaryUniqueId);
+                        }
+                        return { userData, allUniqueIds: currentUniqueIds };
                     });
-                    
-                    if (tourKey) {
-                        postShibirTour = data[tourKey];
+            })
+            .then(({ userData, allUniqueIds }) => {
+                if (!userData) {
+                    toursInfo.innerHTML = '<p>Tours information not found.</p>';
+                    return;
+                }
+                
+                // Collect all uniqueIds to fetch
+                const uniqueIdsToFetch = allUniqueIds.length > 0 ? [...allUniqueIds] : [];
+                const primaryUniqueId = userData.uniqueId;
+                if (primaryUniqueId && !uniqueIdsToFetch.includes(primaryUniqueId)) {
+                    uniqueIdsToFetch.push(primaryUniqueId);
+                }
+                
+                // If still no uniqueIds, show error
+                if (uniqueIdsToFetch.length === 0) {
+                    toursInfo.innerHTML = '<p>Error: User unique ID not found.</p>';
+                    return;
+                }
+                
+                // Get associated registrations for name lookup fallback
+                const associatedRegistrations = userData.associatedRegistrations || [];
+                const nameLookup = {};
+                associatedRegistrations.forEach(reg => {
+                    if (reg.uniqueId && reg.name) {
+                        nameLookup[reg.uniqueId] = reg.name;
                     }
+                });
+                
+                // Fetch all registration documents for tours info
+                const registrationPromises = uniqueIdsToFetch.map(uid => {
+                    return db.collection('registrations').doc(uid).get()
+                        .then(regDoc => {
+                            if (regDoc.exists) {
+                                const regData = regDoc.data();
+                                // Try to get name from registration, then from associatedRegistrations, then use uniqueId as fallback
+                                const name = regData.name || regData['Full Name'] || nameLookup[uid] || `User ${uid}`;
+                                
+                                // Get post shibir tour field
+                                let postShibirTour = regData.postShibirTour || 
+                                                    regData['Post Shibir Tour'] || 
+                                                    regData['Post Shibir Tours'] ||
+                                                    regData['Please select a post shibir tour option'] ||
+                                                    null;
+                                
+                                // Fallback: try to find any field containing "tour" and "post"/"shibir"
+                                if (!postShibirTour) {
+                                    const allKeys = Object.keys(regData);
+                                    const tourKey = allKeys.find(key => {
+                                        const lowerKey = key.toLowerCase();
+                                        return (lowerKey.includes('tour') && (lowerKey.includes('post') || lowerKey.includes('shibir'))) ||
+                                               (lowerKey.includes('post') && lowerKey.includes('shibir'));
+                                    });
+                                    
+                                    if (tourKey) {
+                                        postShibirTour = regData[tourKey];
+                                    }
+                                }
+                                
+                                return {
+                                    uniqueId: uid,
+                                    name: name,
+                                    postShibirTour: postShibirTour
+                                };
+                            } else {
+                                // Use name from associatedRegistrations if available, otherwise use uniqueId as identifier
+                                const name = nameLookup[uid] || `User ${uid}`;
+                                return {
+                                    uniqueId: uid,
+                                    name: name,
+                                    postShibirTour: null
+                                };
+                            }
+                        })
+                        .catch(error => {
+                            console.error(`Error fetching registration for ${uid}:`, error);
+                            // Use name from associatedRegistrations if available, otherwise use uniqueId as identifier
+                            const name = nameLookup[uid] || `User ${uid}`;
+                            return {
+                                uniqueId: uid,
+                                name: name,
+                                postShibirTour: null
+                            };
+                        });
+                });
+                
+                return Promise.all(registrationPromises);
+            })
+            .then((toursDataArray) => {
+                // Filter out null results and ensure we have valid data with uniqueId
+                const validData = toursDataArray.filter(data => data && data.uniqueId);
+                
+                if (validData.length === 0) {
+                    toursInfo.innerHTML = '<p>No users found associated with this account.</p>';
+                    return;
                 }
                 
-                const tourValue = postShibirTour ? postShibirTour.toString().trim() : '';
+                // Create tabs and tab panes for each person
+                const tabsHTML = validData.map((data, index) => 
+                    createToursTabHTML(data, index, index === 0)
+                ).join('');
                 
-                // Display tour information
-                const tourValueLower = tourValue.toLowerCase();
-                
-                // Handle Kandukurthi - default to Yadadri and show note
-                let showKandukurthiNote = false;
-                let activeTab = 'none';
-                if (tourValueLower.includes('kandakurthi')) {
-                    showKandukurthiNote = true;
-                    activeTab = 'yadadri';
-                } else if (tourValueLower.includes('srisailam')) {
-                    activeTab = 'srisailam';
-                } else if (tourValueLower.includes('yadadri') || tourValueLower.includes('bhagyanagar')) {
-                    activeTab = 'yadadri';
-                }
-                
-                // Display only the selected tour with Change Tour option
-                let tourDisplayName = 'None';
-                let tourDescription = 'No post shibir tour selected.';
-                let tourImage = '';
-                
-                if (activeTab === 'srisailam') {
-                    tourDisplayName = 'Srisailam';
-                    tourDescription = 'Information about the Srisailam tour will be displayed here.';
-                    tourImage = '<img src="docs/Srisailam.jpg" alt="Srisailam" class="tour-image" onerror="this.style.display=\'none\'">';
-                } else if (activeTab === 'yadadri') {
-                    tourDisplayName = 'Yadadri Mandir and local sites in Bhagyanagar';
-                    tourDescription = 'Information about Yadadri Mandir and local sites in Bhagyanagar tour will be displayed here.';
-                }
+                const panesHTML = validData.map((data, index) => 
+                    createToursCardHTML(data, index, index === 0)
+                ).join('');
                 
                 toursInfo.innerHTML = `
-                    <div class="tour-display-section">
-                        <h3>Your Selected Tour</h3>
-                        ${showKandukurthiNote ? `
-                            <div class="tour-notice" style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 10px; padding: 1.5rem; margin-bottom: 2rem;">
-                                <p style="color: #856404; font-weight: 600; margin-bottom: 0.5rem;">⚠️ Important Notice</p>
-                                <p style="color: #856404; margin: 0;">We regret to inform you that the tour to Kandakurthi has to be cancelled as the project undertaken there is not yet complete. You have been added to Yadadri Mandir and local sites in Bhagyanagar tour. If you plan to change, please scroll to bottom to change.</p>
-                            </div>
-                        ` : ''}
-                        <div class="tour-content-display">
-                            ${tourImage}
-                            <h4 style="color: var(--primary-brown); margin-top: 1rem;">${escapeHtml(tourDisplayName)}</h4>
-                            <p class="tour-description">${tourDescription}</p>
+                    <div class="profile-tabs-container">
+                        <div class="profile-tabs">
+                            ${tabsHTML}
                         </div>
-                        <div class="tour-actions" style="margin-top: 2rem; padding-top: 2rem; border-top: 2px solid var(--light-cream);">
-                            <button class="btn btn-primary" onclick="editToursInfo('${result.uniqueId}')">Change Tour</button>
+                        <div class="profile-tab-content">
+                            ${panesHTML}
                         </div>
                     </div>
                 `;
@@ -3633,10 +3830,13 @@ function saveToursInfo(uniqueId) {
                         
                         const existingData = doc.data();
                         
-                        // Prepare update data - primary field is postShibirTour (camelCase)
+                        // Prepare update data - update both camelCase and original field names
                         const updateData = {
                             ...existingData,
                             postShibirTour: postShibirTour,
+                            'Post Shibir Tour': postShibirTour,
+                            'Post Shibir Tours': postShibirTour,
+                            'Please select a post shibir tour option': postShibirTour,
                             toursUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         };
                         
@@ -5201,6 +5401,14 @@ function clearParticipantInfo() {
 function setupCheckinForm() {
     const form = document.getElementById('checkinFormElement');
     if (!form) return;
+    
+    // Prevent duplicate event listeners by checking if form already has listener
+    if (form.dataset.checkinFormSetup === 'true') {
+        return;
+    }
+    
+    // Mark form as set up
+    form.dataset.checkinFormSetup = 'true';
     
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
