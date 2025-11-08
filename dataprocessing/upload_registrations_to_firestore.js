@@ -70,6 +70,54 @@ function normalizeValue(value) {
     return String(value).trim();
 }
 
+// Helper function to convert Excel serial date to date string (MM/DD/YYYY)
+function convertExcelDate(excelDate) {
+    if (!excelDate) return '';
+    
+    const str = String(excelDate).trim();
+    if (!str) return '';
+    
+    // If it's already a date string (contains / or -), return as is
+    if (str.match(/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/)) {
+        return str;
+    }
+    
+    // Try to parse as number (Excel serial date)
+    const num = parseFloat(str);
+    if (isNaN(num) || num <= 0 || num > 1000000) {
+        // Not a valid Excel serial date number, return original
+        return str;
+    }
+    
+    // Excel serial date conversion
+    // Excel epoch: Serial 1 = January 1, 1900
+    // Excel incorrectly treats 1900 as a leap year (it wasn't), so we need to adjust
+    // The most reliable conversion accounts for this bug
+    const serial = Math.floor(num);
+    
+    // Standard conversion: Excel serial to JavaScript Date
+    // Excel serial 1 = Jan 1, 1900
+    // But Excel counts Feb 29, 1900 (which didn't exist), so dates after Feb 28, 1900 are off by 1
+    // For dates in 2025 (serial ~46000+), we can use: date = Jan 1, 1900 + (serial - 1) days
+    // But we need to subtract 1 more day to account for the leap year bug
+    const baseDate = new Date(1900, 0, 1); // January 1, 1900
+    const daysSince1900 = serial - 1; // Serial 1 = day 0
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() + daysSince1900 - 1); // Subtract 1 to account for Excel's leap year bug
+    
+    // Verify it's a reasonable date (between 1900 and 2100)
+    if (date.getFullYear() >= 1900 && date.getFullYear() < 2100) {
+        // Format as MM/DD/YYYY
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${month}/${day}/${year}`;
+    }
+    
+    // If conversion failed, return original string
+    return str;
+}
+
 // Helper function to check if transportation data exists
 function hasTransportationData(row) {
     return !!(normalizeValue(row['Date of Arrival']) || 
@@ -157,14 +205,14 @@ async function importData() {
                 otherDetails: normalizeValue(row['Any Other Details']),
                 
                 // Transportation - Arrival
-                arrivalDate: normalizeValue(row['Date of Arrival']),
+                arrivalDate: convertExcelDate(row['Date of Arrival']),
                 arrivalTime: normalizeValue(row['Time of Arrival']),
                 arrivalPlace: normalizeValue(row['Place of Arrival']),
                 arrivalFlightTrain: normalizeValue(row['Arrival Flight/Train Number']),
                 pickupNeeded: normalizeValue(row['Do you need a pickup on arrival?']),
                 
                 // Transportation - Departure
-                departureDate: normalizeValue(row['Date of Departure Train/Flight']),
+                departureDate: convertExcelDate(row['Date of Departure Train/Flight']),
                 departureTime: normalizeValue(row['Time of Departure Train/Flight']),
                 departurePlace: normalizeValue(row['Place of Departure Train/Flight']),
                 departureFlightTrain: normalizeValue(row['Departure Flight/Train Number']),
