@@ -41,7 +41,7 @@ function isProtectedTab(tabName) {
     return PROTECTED_TABS.includes(tabName);
 }
 
-// Helper function to check if user is a superadmin
+// Generic helper to fetch user data from Firestore
 // 
 // TO SETUP INITIAL SUPERADMIN:
 // 1. User must first register an account through the normal registration flow
@@ -57,9 +57,9 @@ function isProtectedTab(tabName) {
 //   const db = admin.firestore();
 //   await db.collection('users').doc(USER_UID).update({ role: 'superadmin' });
 //
-async function isSuperadmin(user) {
+async function getUserData(user) {
     if (!user || !window.firebase || !firebase.firestore) {
-        return false;
+        return null;
     }
     
     try {
@@ -67,97 +67,42 @@ async function isSuperadmin(user) {
         const userDoc = await db.collection('users').doc(user.uid).get();
         
         if (!userDoc.exists) {
-            return false;
+            return null;
         }
         
-        const userData = userDoc.data();
-        return userData.role === 'superadmin';
+        return userDoc.data();
     } catch (error) {
-        // Silently return false for permission errors (happens during user creation flow)
+        // Silently return null for permission errors (happens during user creation flow)
         if (error.code === 'permission-denied') {
-            return false;
+            return null;
         }
-        console.error('Error checking superadmin status:', error);
-        return false;
+        console.error('Error fetching user data:', error);
+        return null;
     }
+}
+
+// Helper function to check if user is a superadmin
+async function isSuperadmin(user) {
+    const userData = await getUserData(user);
+    return userData?.role === 'superadmin';
 }
 
 // Helper function to check if user is an admin (superadmin or admin)
 async function isAdmin(user) {
-    if (!user || !window.firebase || !firebase.firestore) {
-        return false;
-    }
-    
-    try {
-        const db = firebase.firestore();
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        
-        if (!userDoc.exists) {
-            return false;
-        }
-        
-        const userData = userDoc.data();
-        return userData.role === 'superadmin' || userData.role === 'admin';
-    } catch (error) {
-        // Silently return false for permission errors (happens during user creation flow)
-        if (error.code === 'permission-denied') {
-            return false;
-        }
-        console.error('Error checking admin status:', error);
-        return false;
-    }
+    const userData = await getUserData(user);
+    return userData?.role === 'superadmin' || userData?.role === 'admin';
 }
 
 // Helper function to check if user is a volunteer
 async function isVolunteer(user) {
-    if (!user || !window.firebase || !firebase.firestore) {
-        return false;
-    }
-    
-    try {
-        const db = firebase.firestore();
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        
-        if (!userDoc.exists) {
-            return false;
-        }
-        
-        const userData = userDoc.data();
-        return userData.role === 'volunteer';
-    } catch (error) {
-        // Silently return false for permission errors (happens during user creation flow)
-        if (error.code === 'permission-denied') {
-            return false;
-        }
-        console.error('Error checking volunteer status:', error);
-        return false;
-    }
+    const userData = await getUserData(user);
+    return userData?.role === 'volunteer';
 }
 
 // Helper function to get volunteer teams
 async function getVolunteerTeams(user) {
-    if (!user || !window.firebase || !firebase.firestore) {
-        return [];
-    }
-    
-    try {
-        const db = firebase.firestore();
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        
-        if (!userDoc.exists) {
-            return [];
-        }
-        
-        const userData = userDoc.data();
-        return userData.volunteerTeams || [];
-    } catch (error) {
-        // Silently return empty array for permission errors (happens during user creation flow)
-        if (error.code === 'permission-denied') {
-            return [];
-        }
-        console.error('Error getting volunteer teams:', error);
-        return [];
-    }
+    const userData = await getUserData(user);
+    return userData?.volunteerTeams || [];
 }
 
 // Helper function to check if user can view dashboard
@@ -388,19 +333,48 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Login Modal Functionality
-function openLogin() {
-    const modal = document.getElementById('loginModal');
+// Generic modal utility functions
+function openModal(modalId, options = {}) {
+    const { onOpen = null, closeOtherModals = [] } = options;
+    const modal = document.getElementById(modalId);
+    if (!modal) {
+        console.error(`Modal ${modalId} not found!`);
+        return;
+    }
+    
+    // Close other modals if specified
+    closeOtherModals.forEach(otherModalId => {
+        const otherModal = document.getElementById(otherModalId);
+        if (otherModal) {
+            otherModal.style.display = 'none';
+        }
+    });
+    
     modal.style.display = 'block';
     document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    
+    if (onOpen) onOpen();
+}
+
+function closeModal(modalId, options = {}) {
+    const { onClose = null } = options;
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto'; // Restore scrolling
+        if (onClose) onClose();
+    }
+}
+
+// Login Modal Functionality
+function openLogin() {
+    openModal('loginModal');
 }
 
 function closeLogin() {
-    const modal = document.getElementById('loginModal');
-    modal.style.display = 'none';
-    document.body.style.overflow = 'auto'; // Restore scrolling
-    // Reset to login form when closing
-    showLoginForm();
+    closeModal('loginModal', {
+        onClose: () => showLoginForm()
+    });
 }
 
 // Reset register form (defined early so it can be called elsewhere)
@@ -437,26 +411,16 @@ function showRegisterError(message) {
 
 // Register Modal Functionality
 function openRegister() {
-    const modal = document.getElementById('registerModal');
-    if (!modal) {
-        console.error('Register modal not found!');
-        return;
-    }
-    // Ensure login modal is closed first
-    const loginModal = document.getElementById('loginModal');
-    if (loginModal) {
-        loginModal.style.display = 'none';
-    }
-    modal.style.display = 'block';
-    document.body.style.overflow = 'hidden';
-    resetRegisterForm(); // Reset form when opening
+    openModal('registerModal', {
+        closeOtherModals: ['loginModal'],
+        onOpen: () => resetRegisterForm()
+    });
 }
 
 function closeRegister() {
-    const modal = document.getElementById('registerModal');
-    modal.style.display = 'none';
-    document.body.style.overflow = 'auto';
-    resetRegisterForm(); // Reset form when closing
+    closeModal('registerModal', {
+        onClose: () => resetRegisterForm()
+    });
 }
 
 // Close modal when clicking outside of it
@@ -889,11 +853,13 @@ document.addEventListener('DOMContentLoaded', function() {
                             handleLoginSuccess(loginForm);
                         })
                         .catch((error) => {
-                            // Check if user doesn't exist
+                            // Check if user doesn't exist or invalid credentials
                             if (error.code === 'auth/user-not-found') {
-                                showNotification('No account found with this email. Contact your administrator if you are a volunteer/admin.', 'error');
+                                showNotification('Email not found. Please register first or contact your administrator.', 'error');
                             } else if (error.code === 'auth/wrong-password') {
                                 showNotification('Incorrect password. Please try again.', 'error');
+                            } else if (error.code === 'auth/invalid-login-credentials' || error.code === 'auth/invalid-credential') {
+                                showNotification('Email not found or incorrect password. Please check your credentials.', 'error');
                             } else {
                                 handleLoginError(error);
                             }
@@ -989,6 +955,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 showNotification('ID not found. Contact your administrator if you are a volunteer/admin.', 'error');
                             } else if (error.code === 'auth/wrong-password') {
                                 showNotification('Incorrect password. Please try again.', 'error');
+                            } else if (error.code === 'auth/invalid-login-credentials' || error.code === 'auth/invalid-credential') {
+                                showNotification('Email not found or incorrect password. Please check your credentials.', 'error');
                             } else {
                                 handleLoginError(error);
                             }
@@ -1148,7 +1116,7 @@ function handleLoginError(error) {
     let errorMessage = 'Login failed. ';
     
     if (error.code === 'auth/user-not-found') {
-        errorMessage = 'No account found. Please register first.';
+        errorMessage = 'Email not found. Please register first.';
         // This is handled in the login flow, but keeping for other cases
     } else if (error.code === 'permission-denied' || error.message?.includes('Missing or insufficient permissions')) {
         errorMessage = 'Permission denied. Please make sure Firestore security rules are properly deployed.';
@@ -1158,8 +1126,8 @@ function handleLoginError(error) {
         errorMessage += 'Invalid email address.';
     } else if (error.code === 'auth/user-disabled') {
         errorMessage += 'This account has been disabled.';
-    } else if (error.code === 'auth/invalid-credential') {
-        errorMessage += 'Invalid email or password. Please check your credentials.';
+    } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials') {
+        errorMessage = 'Email not found or incorrect password. Please check your credentials.';
     } else {
         errorMessage += error.message || 'Please try again.';
     }
@@ -1174,22 +1142,24 @@ function normalizePraveshikaId(praveshikaId) {
 }
 
 // Register Form Submission - Verification Step
+// NOTE: Registration now uses email + temporary password instead of Praveshika ID
+// Old Praveshika ID verification code has been replaced with email + temp password verification
 document.addEventListener('DOMContentLoaded', function() {
     const registerForm = document.querySelector('.register-form');
     if (registerForm) {
         registerForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            const uniqueId = document.getElementById('regUniqueId').value.trim(); // This is Praveshika ID
             const email = document.getElementById('regEmail').value.trim();
+            const tempPassword = document.getElementById('regTempPassword').value;
 
             // Validate both fields are provided
-            if (!uniqueId) {
-                showNotification('Please enter your Praveshika ID.', 'error');
+            if (!email) {
+                showNotification('Please enter your email address.', 'error');
                 return;
             }
 
-            if (!email) {
-                showNotification('Please enter your email address.', 'error');
+            if (!tempPassword) {
+                showNotification('Please enter your temporary password.', 'error');
                 return;
             }
 
@@ -1200,61 +1170,60 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Normalize the input Praveshika ID
-            const normalizedId = normalizePraveshikaId(uniqueId);
+            // Verify temporary password
+            const TEMP_PASSWORD = 'Vss@2025!';
+            if (tempPassword !== TEMP_PASSWORD) {
+                showNotification('Invalid temporary password. Please check and try again.', 'error');
+                return;
+            }
+
             const normalizedEmail = email.toLowerCase().trim();
 
-            // Verify with Firestore using normalized Praveshika ID
+            // Verify with Firestore using email
             if (window.firebase && firebase.firestore) {
                 const db = firebase.firestore();
                 
-                showNotification('Verifying your Praveshika ID and email...', 'info');
+                showNotification('Verifying your email...', 'info');
                 
-                // Strategy: Get all registrations and search for matching normalized ID
-                // This works even without indexes and handles both normalizedId field and document ID normalization
-                db.collection('registrations').get()
+                // Search for registration by email
+                db.collection('registrations').where('email', '==', email).limit(1).get()
                     .then(querySnapshot => {
                         let matchingDoc = null;
-                        let actualPraveshikaId = null;
                         
-                        // Search through all documents
-                        querySnapshot.forEach(doc => {
-                            const docData = doc.data();
-                            const docIdStr = String(doc.id); // Ensure it's a string
-                            const docIdNormalized = normalizePraveshikaId(docIdStr);
-                            const docFieldNormalized = docData.normalizedId ? normalizePraveshikaId(String(docData.normalizedId)) : '';
-                            const docFieldValue = docData.normalizedId ? String(docData.normalizedId) : '';
-                            
-                            // Match if either the normalized document ID or the normalizedId field matches
-                            // Check both the normalized version and direct field value
-                            if (docIdNormalized === normalizedId || 
-                                docFieldNormalized === normalizedId || 
-                                docFieldValue === normalizedId ||
-                                docData.normalizedId === normalizedId) {
-                                matchingDoc = doc;
-                                actualPraveshikaId = docIdStr;
-                                return; // Break out of forEach
-                            }
-                        });
+                        if (!querySnapshot.empty) {
+                            matchingDoc = querySnapshot.docs[0];
+                        } else {
+                            // Fallback: search through all documents if email field doesn't match exactly
+                            return db.collection('registrations').get()
+                                .then(allDocs => {
+                                    allDocs.forEach(doc => {
+                                        const docData = doc.data();
+                                        const docEmail = docData.email ? docData.email.toLowerCase().trim() : '';
+                                        if (docEmail === normalizedEmail) {
+                                            matchingDoc = doc;
+                                            return;
+                                        }
+                                    });
+                                    return matchingDoc;
+                                });
+                        }
                         
+                        return matchingDoc;
+                    })
+                    .then(matchingDoc => {
                         if (!matchingDoc) {
-                            showNotification('Verification failed. Praveshika ID not found.', 'error');
-                            return Promise.reject(new Error('Praveshika ID not found'));
+                            showNotification('Verification failed. Email not found in registrations.', 'error');
+                            return Promise.reject(new Error('Email not found'));
                         }
                         
                         const data = matchingDoc.data();
                         const storedEmail = data.email ? data.email.toLowerCase().trim() : '';
+                        const actualPraveshikaId = matchingDoc.id; // Get document ID from the matching document
                         
                         // Validate that the email exists in the registration
                         if (!storedEmail) {
-                            showNotification('Email not found in registration for this Praveshika ID.', 'error');
+                            showNotification('Email not found in registration.', 'error');
                             return Promise.reject(new Error('Email not found'));
-                        }
-                        
-                        // Validate that the email matches the one stored for this Praveshika ID
-                        if (storedEmail !== normalizedEmail) {
-                            showNotification('Email does not match the one associated with this Praveshika ID.', 'error');
-                            return Promise.reject(new Error('Email mismatch'));
                         }
                         
                         // Check if Firebase Auth account already exists for this email
@@ -1282,7 +1251,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // Verification successful - show password setup
                                 pendingRegistration = {
                                     name: data.name || '',
-                                    uniqueId: actualPraveshikaId, // Use actual document ID
+                                    uniqueId: actualPraveshikaId || '', // Use actual document ID if available
                                     email: data.email || email // Use stored email to preserve exact format
                                 };
                                 
@@ -1418,6 +1387,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             email: pendingRegistration.email,
                             name: pendingRegistration.name,
                             uniqueId: primaryUniqueId,
+                            role: 'shibirarthi',
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         }).then(() => {
                             // Always check emailToUids collection for associated uniqueIds
@@ -1603,6 +1573,21 @@ async function handleAuthStateChange(user) {
         authInitializing = false;
     }
     
+    // Update lastLoginAt timestamp when user logs in
+    if (user && window.firebase && firebase.firestore) {
+        const db = firebase.firestore();
+        try {
+            await db.collection('users').doc(user.uid).update({
+                lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch (error) {
+            // Silently fail if user document doesn't exist yet (will be created during registration)
+            if (error.code !== 'not-found') {
+                console.error('Error updating lastLoginAt:', error);
+            }
+        }
+    }
+    
     const loginBtn = document.querySelector('.header-actions .login-btn');
     const homeNavItem = document.getElementById('homeNavItem');
     const aboutNavItem = document.getElementById('aboutNavItem');
@@ -1777,16 +1762,17 @@ async function handleAuthStateChange(user) {
 }
 
 // Helper function to extract profile data from registration document
+// Prioritizes normalized field names, with fallbacks for backward compatibility
 function extractProfileData(data, userData = null, userEmail = '') {
     return {
         name: data.name || data['Full Name'] || userData?.name || '',
         email: data.email || data['Email address'] || userData?.email || userEmail || '',
         uniqueId: data.uniqueId || data['Praveshika ID'] || userData?.uniqueId || '',
-        country: data.Country || data.country || data['Country of Current Residence'] || '',
-        shreni: data.Shreni || data.shreni || data['Corrected Shreni'] || data['Default Shreni'] || data['Shreni for Sorting'] || '',
-        barcode: data.Barcode || data.barcode || data.BarCode || data.uniqueId || data['Praveshika ID'] || '',
+        country: data.country || data.Country || data['Country of Current Residence'] || '',
+        shreni: data.shreni || data.Shreni || data['Corrected Shreni'] || data['Default Shreni'] || data['Shreni for Sorting'] || '',
+        barcode: data.barcode || data.Barcode || data.BarCode || data.uniqueId || data['Praveshika ID'] || '',
         phone: data.phone || data.Phone || data['Phone number on which you can be contacted in Bharat (by call or WhatsApp)'] || '',
-        whatsapp: data['Whatsapp Number'] || data.whatsapp || '',
+        whatsapp: data.whatsapp || data['Whatsapp Number'] || '',
         address: data.address || data.Address || data['Current Address'] || '',
         city: data.city || data.City || data['City of Current Residence'] || '',
         state: data.state || data.State || data['State/Province'] || '',
@@ -1794,19 +1780,19 @@ function extractProfileData(data, userData = null, userEmail = '') {
         gender: data.gender || data.Gender || '',
         age: data.age || data.Age || '',
         occupation: data.occupation || data['Occupation (e.g. Engineer/Business/Homemaker/Student)'] || '',
-        educationalQual: data['Educational Qualification'] || data.educationalQualification || '',
-        zone: data.Zone || data['Zone/Shreni'] || '',
-        ganveshSize: data['Ganvesh Kurta Shoulder Size in cm (for swayamevaks and sevikas)'] || '',
-        sanghYears: data['Associated with sangh for how many years/months'] || '',
-        hssResponsibility: data['Do you have any responsibility in Hindu Swayamsevak Sangh?'] || '',
-        currentResponsibility: data['What is your current responsibility in HSS or other organisation?'] || '',
-        otherOrgResponsibility: data['Do you have any responsibility in any other organisation (e.g. VHP, Sewa International etc)?'] || '',
-        shikshaVarg: data['Which Sangh Shiksha Varg have you completed'] || '',
-        emergencyContactName: data['Emergency Contact Name'] || '',
-        emergencyContactNumber: data['Emergency Contact Number'] || '',
-        emergencyContactRelation: data['Relationship of Emergency Contact Person'] || '',
-        pickupNeeded: data['Do you need a pickup on arrival?'] || '',
-        dropoffNeeded: data['Do you need a drop off for departure?'] || ''
+        educationalQual: data.educationalQual || data['Educational Qualification'] || data.educationalQualification || '',
+        zone: data.zone || data.Zone || data['Zone/Shreni'] || '',
+        ganveshSize: data.ganveshSize || data['Ganvesh Kurta Shoulder Size in cm (for swayamevaks and sevikas)'] || '',
+        sanghYears: data.sanghYears || data['Associated with sangh for how many years/months'] || '',
+        hssResponsibility: data.hssResponsibility || data['Do you have any responsibility in Hindu Swayamsevak Sangh?'] || '',
+        currentResponsibility: data.currentResponsibility || data['What is your current responsibility in HSS or other organisation?'] || '',
+        otherOrgResponsibility: data.otherOrgResponsibility || data['Do you have any responsibility in any other organisation (e.g. VHP, Sewa International etc)?'] || '',
+        shikshaVarg: data.shikshaVarg || data['Which Sangh Shiksha Varg have you completed'] || '',
+        emergencyContactName: data.emergencyContactName || data['Emergency Contact Name'] || '',
+        emergencyContactNumber: data.emergencyContactNumber || data['Emergency Contact Number'] || '',
+        emergencyContactRelation: data.emergencyContactRelation || data['Relationship of Emergency Contact Person'] || '',
+        pickupNeeded: data.pickupNeeded || data['Do you need a pickup on arrival?'] || '',
+        dropoffNeeded: data.dropoffNeeded || data['Do you need a drop off for departure?'] || ''
     };
 }
 
@@ -2001,31 +1987,43 @@ function createProfileTabHTML(profileData, index, isActive = false) {
     `;
 }
 
-// Function to switch profile tabs
-function switchProfileTab(index) {
-    // Remove active class from all tab buttons first
-    const tabButtons = document.querySelectorAll('.profile-tab-btn');
+// Generic tab switching utility
+function switchTab(index, options = {}) {
+    const {
+        tabButtonSelector = '.profile-tab-btn',
+        tabPaneSelector = '.profile-tab-pane',
+        tabPaneIdPrefix = 'profileTab',
+        containerSelector = null,
+        clearStyles = true
+    } = options;
+    
+    const container = containerSelector ? document.querySelector(containerSelector) : document;
+    const scope = containerSelector ? container : document;
+    
+    // Remove active class from all tab buttons
+    const tabButtons = scope.querySelectorAll(tabButtonSelector);
     tabButtons.forEach(btn => btn.classList.remove('active'));
     
-    // Hide all tab panes immediately
-    const tabPanes = document.querySelectorAll('.profile-tab-pane');
+    // Hide all tab panes
+    const tabPanes = scope.querySelectorAll(tabPaneSelector);
     tabPanes.forEach(pane => {
         pane.classList.remove('active');
         pane.style.display = 'none';
-        // Ensure no residual styling
-        pane.style.height = '';
-        pane.style.overflow = '';
+        if (clearStyles) {
+            pane.style.height = '';
+            pane.style.overflow = '';
+        }
     });
     
     // Show selected tab pane
-    const selectedPane = document.getElementById(`profileTab${index}`);
+    const selectedPane = document.getElementById(`${tabPaneIdPrefix}${index}`);
     if (selectedPane) {
         selectedPane.classList.add('active');
         selectedPane.style.display = 'block';
     }
     
     // Activate selected tab button
-    const selectedButton = document.querySelector(`.profile-tab-btn[data-tab-index="${index}"]`);
+    const selectedButton = scope.querySelector(`${tabButtonSelector}[data-tab-index="${index}"]`);
     if (selectedButton) {
         selectedButton.classList.add('active');
     }
@@ -2034,6 +2032,15 @@ function switchProfileTab(index) {
     if (selectedPane) {
         selectedPane.offsetHeight;
     }
+}
+
+// Function to switch profile tabs
+function switchProfileTab(index) {
+    switchTab(index, {
+        tabButtonSelector: '.profile-tab-btn',
+        tabPaneSelector: '.profile-tab-pane',
+        tabPaneIdPrefix: 'profileTab'
+    });
 }
 
 // Load user profile information
@@ -2394,37 +2401,12 @@ function switchTransportationTab(index) {
     const transportationInfo = document.getElementById('transportationInfo');
     if (!transportationInfo) return;
     
-    // Remove active class from all tab buttons within transportation section
-    const tabButtons = transportationInfo.querySelectorAll('.profile-tab-btn');
-    tabButtons.forEach(btn => btn.classList.remove('active'));
-    
-    // Hide all transportation tab panes immediately
-    const tabPanes = transportationInfo.querySelectorAll('.transportation-tab-pane');
-    tabPanes.forEach(pane => {
-        pane.classList.remove('active');
-        pane.style.display = 'none';
-        // Ensure no residual styling
-        pane.style.height = '';
-        pane.style.overflow = '';
+    switchTab(index, {
+        tabButtonSelector: '.profile-tab-btn',
+        tabPaneSelector: '.transportation-tab-pane',
+        tabPaneIdPrefix: 'transportationTab',
+        containerSelector: '#transportationInfo'
     });
-    
-    // Show selected tab pane
-    const selectedPane = document.getElementById(`transportationTab${index}`);
-    if (selectedPane) {
-        selectedPane.classList.add('active');
-        selectedPane.style.display = 'block';
-    }
-    
-    // Activate selected tab button
-    const selectedButton = transportationInfo.querySelector(`.profile-tab-btn[data-tab-index="${index}"]`);
-    if (selectedButton) {
-        selectedButton.classList.add('active');
-    }
-    
-    // Force a reflow to ensure layout updates immediately
-    if (selectedPane) {
-        selectedPane.offsetHeight;
-    }
 }
 
 // Helper function to create transportation card HTML for a single person (as tab pane - no collapse)
@@ -2673,16 +2655,16 @@ function loadTransportationInfo(user) {
                                 // Try to get name from registration, then from associatedRegistrations, then use uniqueId as fallback
                                 const name = regData.name || regData['Full Name'] || nameLookup[uid] || `User ${uid}`;
                                 
-                                // Map Excel field names to display names (prioritize form response field names)
-                                const pickupLocation = regData['Place of Arrival'] || regData.pickupLocation || regData['Pickup Location'] || regData['PickupLocation'] || '';
-                                const arrivalDate = regData['Date of Arrival'] || regData.arrivalDate || regData['Arrival Date'] || regData['ArrivalDate'] || '';
-                                const arrivalTime = regData['Time of Arrival'] || regData.arrivalTime || regData['Arrival Time'] || regData['ArrivalTime'] || '';
-                                const flightTrainNumber = regData['Arrival Flight/Train Number'] || regData.flightTrainNumber || regData['Flight/Train Number'] || regData['FlightTrainNumber'] || regData['Flight Number'] || '';
-                                const returnDate = regData['Date of Departure Train/Flight'] || regData.returnDate || regData['Return Date'] || regData['ReturnDate'] || '';
-                                const returnTime = regData['Time of Departure Train/Flight'] || regData.returnTime || regData['Return Time'] || regData['ReturnTime'] || '';
-                                const returnFlightTrainNumber = regData['Departure Flight/Train Number'] || regData.returnFlightTrainNumber || regData['Return Flight/Train Number'] || regData['ReturnFlightTrainNumber'] || '';
-                                const pickupNeeded = regData['Do you need a pickup on arrival?'] || regData.pickupNeeded || '';
-                                const dropoffNeeded = regData['Do you need a drop off for departure?'] || regData.dropoffNeeded || '';
+                                // Map normalized field names (with fallbacks for backward compatibility)
+                                const pickupLocation = regData.arrivalPlace || regData['Place of Arrival'] || regData.pickupLocation || regData['Pickup Location'] || regData['PickupLocation'] || '';
+                                const arrivalDate = regData.arrivalDate || regData['Date of Arrival'] || regData['Arrival Date'] || regData['ArrivalDate'] || '';
+                                const arrivalTime = regData.arrivalTime || regData['Time of Arrival'] || regData['Arrival Time'] || regData['ArrivalTime'] || '';
+                                const flightTrainNumber = regData.arrivalFlightTrain || regData['Arrival Flight/Train Number'] || regData.flightTrainNumber || regData['Flight/Train Number'] || regData['FlightTrainNumber'] || regData['Flight Number'] || '';
+                                const returnDate = regData.departureDate || regData['Date of Departure Train/Flight'] || regData.returnDate || regData['Return Date'] || regData['ReturnDate'] || '';
+                                const returnTime = regData.departureTime || regData['Time of Departure Train/Flight'] || regData.returnTime || regData['Return Time'] || regData['ReturnTime'] || '';
+                                const returnFlightTrainNumber = regData.departureFlightTrain || regData['Departure Flight/Train Number'] || regData.returnFlightTrainNumber || regData['Return Flight/Train Number'] || regData['ReturnFlightTrainNumber'] || '';
+                                const pickupNeeded = regData.pickupNeeded || regData['Do you need a pickup on arrival?'] || '';
+                                const dropoffNeeded = regData.dropoffNeeded || regData['Do you need a drop off for departure?'] || '';
                                 
                                 return {
                                     uniqueId: uid,
@@ -2797,16 +2779,16 @@ function editTransportationSection(uniqueId, section) {
             .then((regDoc) => {
                 const data = regDoc.exists ? regDoc.data() : {};
                 
-                // Prioritize form response field names: "Place of Arrival", "Date of Arrival", "Time of Arrival", "Arrival Flight/Train Number"
-                const pickupLocation = data['Place of Arrival'] || data.pickupLocation || data['Pickup Location'] || data['PickupLocation'] || '';
-                const arrivalDate = data['Date of Arrival'] || data.arrivalDate || data['Arrival Date'] || data['ArrivalDate'] || '';
-                const arrivalTime = data['Time of Arrival'] || data.arrivalTime || data['Arrival Time'] || data['ArrivalTime'] || '';
-                const flightTrainNumber = data['Arrival Flight/Train Number'] || data.flightTrainNumber || data['Flight/Train Number'] || data['FlightTrainNumber'] || data['Flight Number'] || '';
-                const returnDate = data['Date of Departure Train/Flight'] || data.returnDate || data['Return Date'] || data['ReturnDate'] || '';
-                const returnTime = data['Time of Departure Train/Flight'] || data.returnTime || data['Return Time'] || data['ReturnTime'] || '';
-                const returnFlightTrainNumber = data['Departure Flight/Train Number'] || data.returnFlightTrainNumber || data['Return Flight/Train Number'] || data['ReturnFlightTrainNumber'] || '';
-                const pickupNeeded = data['Do you need a pickup on arrival?'] || data.pickupNeeded || '';
-                const dropoffNeeded = data['Do you need a drop off for departure?'] || data.dropoffNeeded || '';
+                // Prioritize normalized field names (with fallbacks for backward compatibility)
+                const pickupLocation = data.arrivalPlace || data['Place of Arrival'] || data.pickupLocation || data['Pickup Location'] || data['PickupLocation'] || '';
+                const arrivalDate = data.arrivalDate || data['Date of Arrival'] || data['Arrival Date'] || data['ArrivalDate'] || '';
+                const arrivalTime = data.arrivalTime || data['Time of Arrival'] || data['Arrival Time'] || data['ArrivalTime'] || '';
+                const flightTrainNumber = data.arrivalFlightTrain || data['Arrival Flight/Train Number'] || data.flightTrainNumber || data['Flight/Train Number'] || data['FlightTrainNumber'] || data['Flight Number'] || '';
+                const returnDate = data.departureDate || data['Date of Departure Train/Flight'] || data.returnDate || data['Return Date'] || data['ReturnDate'] || '';
+                const returnTime = data.departureTime || data['Time of Departure Train/Flight'] || data.returnTime || data['Return Time'] || data['ReturnTime'] || '';
+                const returnFlightTrainNumber = data.departureFlightTrain || data['Departure Flight/Train Number'] || data.returnFlightTrainNumber || data['Return Flight/Train Number'] || data['ReturnFlightTrainNumber'] || '';
+                const pickupNeeded = data.pickupNeeded || data['Do you need a pickup on arrival?'] || '';
+                const dropoffNeeded = data.dropoffNeeded || data['Do you need a drop off for departure?'] || '';
 
                 if (section === 'arrival') {
                     // Determine if pickup is needed (default to 'Yes' if fields are filled, 'No' if empty)
@@ -3214,65 +3196,25 @@ function saveTransportationInfo(uniqueId) {
                         
                         const existingData = doc.data();
                         
-                        // Prepare update data - use set with merge to handle special characters in field names
-                        // Firestore update() doesn't allow '/' in field names, so we use set() with merge
+                        // Prepare update data with normalized field names
                         const updateData = {
                             ...existingData, // Preserve all existing fields
-                            pickupLocation: pickupLocation || '',
+                            arrivalPlace: pickupLocation || '',
                             arrivalDate: arrivalDate || '',
                             arrivalTime: arrivalTime || '',
-                            flightTrainNumber: flightTrainNumber || '',
-                            returnDate: returnDate || '',
-                            returnTime: returnTime || '',
-                            returnFlightTrainNumber: returnFlightTrainNumber || '',
+                            arrivalFlightTrain: flightTrainNumber || '',
+                            departureDate: returnDate || '',
+                            departureTime: returnTime || '',
+                            departurePlace: '', // Will be set if needed
+                            departureFlightTrain: returnFlightTrainNumber || '',
                             pickupNeeded: pickupNeeded || '',
                             dropoffNeeded: dropoffNeeded || '',
-                            transportationUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            travelupdateAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         };
                         
-                        // Update form response field names (prioritize these)
-                        updateData['Place of Arrival'] = pickupLocation || '';
-                        updateData['Date of Arrival'] = arrivalDate || '';
-                        updateData['Time of Arrival'] = arrivalTime || '';
-                        updateData['Arrival Flight/Train Number'] = flightTrainNumber || '';
-                        updateData['Do you need a pickup on arrival?'] = pickupNeeded || '';
-                        updateData['Date of Departure Train/Flight'] = returnDate || '';
-                        updateData['Time of Departure Train/Flight'] = returnTime || '';
-                        updateData['Departure Flight/Train Number'] = returnFlightTrainNumber || '';
-                        updateData['Do you need a drop off for departure?'] = dropoffNeeded || '';
-                        
-                        // Update Excel column names (with special characters) only if they exist (for backward compatibility)
-                        // Use set() with merge instead of update() to handle special characters
-                        const fieldsToUpdate = {};
-                        
-                        // Check which Excel fields exist and update them
-                        if (existingData.hasOwnProperty('Pickup Location')) {
-                            fieldsToUpdate['Pickup Location'] = pickupLocation || '';
-                        }
-                        if (existingData.hasOwnProperty('Arrival Date')) {
-                            fieldsToUpdate['Arrival Date'] = arrivalDate || '';
-                        }
-                        if (existingData.hasOwnProperty('Arrival Time')) {
-                            fieldsToUpdate['Arrival Time'] = arrivalTime || '';
-                        }
-                        if (existingData.hasOwnProperty('Flight/Train Number')) {
-                            fieldsToUpdate['Flight/Train Number'] = flightTrainNumber || '';
-                        }
-                        if (existingData.hasOwnProperty('Return Date')) {
-                            fieldsToUpdate['Return Date'] = returnDate || '';
-                        }
-                        if (existingData.hasOwnProperty('Return Time')) {
-                            fieldsToUpdate['Return Time'] = returnTime || '';
-                        }
-                        if (existingData.hasOwnProperty('Return Flight/Train Number')) {
-                            fieldsToUpdate['Return Flight/Train Number'] = returnFlightTrainNumber || '';
-                        }
-                        
-                        // Use set with merge: true to handle fields with special characters
-                        return db.collection('registrations').doc(uniqueId).set({
-                            ...updateData,
-                            ...fieldsToUpdate
-                        }, { merge: true });
+                        // Use set with merge: true
+                        return db.collection('registrations').doc(uniqueId).set(updateData, { merge: true });
                     });
             })
             .then(() => {
@@ -3435,64 +3377,27 @@ function saveTransportationSection(uniqueId, section) {
                         
                         const existingData = doc.data();
                         
-                        // Prepare update data - only update the section being edited
+                        // Prepare update data - only update the section being edited (normalized field names)
                         const updateData = {
                             ...existingData, // Preserve all existing fields
-                            transportationUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            travelupdateAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         };
                         
                         if (section === 'arrival') {
-                            updateData.pickupLocation = pickupLocation;
+                            updateData.arrivalPlace = pickupLocation;
                             updateData.arrivalDate = arrivalDate;
                             updateData.arrivalTime = arrivalTime;
-                            updateData.flightTrainNumber = flightTrainNumber;
+                            updateData.arrivalFlightTrain = flightTrainNumber;
                             updateData.pickupNeeded = pickupNeeded;
-                            
-                            // Update form response field names (prioritize these)
-                            updateData['Place of Arrival'] = pickupLocation;
-                            updateData['Date of Arrival'] = arrivalDate;
-                            updateData['Time of Arrival'] = arrivalTime;
-                            updateData['Arrival Flight/Train Number'] = flightTrainNumber;
-                            updateData['Do you need a pickup on arrival?'] = pickupNeeded;
-                            
-                            // Update Excel column names if they exist (for backward compatibility)
-                            if (existingData.hasOwnProperty('Pickup Location')) {
-                                updateData['Pickup Location'] = pickupLocation;
-                            }
-                            if (existingData.hasOwnProperty('Arrival Date')) {
-                                updateData['Arrival Date'] = arrivalDate;
-                            }
-                            if (existingData.hasOwnProperty('Arrival Time')) {
-                                updateData['Arrival Time'] = arrivalTime;
-                            }
-                            if (existingData.hasOwnProperty('Flight/Train Number')) {
-                                updateData['Flight/Train Number'] = flightTrainNumber;
-                            }
                         } else if (section === 'return') {
-                            updateData.returnDate = returnDate;
-                            updateData.returnTime = returnTime;
-                            updateData.returnFlightTrainNumber = returnFlightTrainNumber;
+                            updateData.departureDate = returnDate;
+                            updateData.departureTime = returnTime;
+                            updateData.departureFlightTrain = returnFlightTrainNumber;
                             updateData.dropoffNeeded = dropoffNeeded;
-                            
-                            // Update form response field names (prioritize these)
-                            updateData['Date of Departure Train/Flight'] = returnDate;
-                            updateData['Time of Departure Train/Flight'] = returnTime;
-                            updateData['Departure Flight/Train Number'] = returnFlightTrainNumber;
-                            updateData['Do you need a drop off for departure?'] = dropoffNeeded;
-                            
-                            // Update Excel column names if they exist (for backward compatibility)
-                            if (existingData.hasOwnProperty('Return Date')) {
-                                updateData['Return Date'] = returnDate;
-                            }
-                            if (existingData.hasOwnProperty('Return Time')) {
-                                updateData['Return Time'] = returnTime;
-                            }
-                            if (existingData.hasOwnProperty('Return Flight/Train Number')) {
-                                updateData['Return Flight/Train Number'] = returnFlightTrainNumber;
-                            }
                         }
                         
-                        // Use set with merge: true to handle fields with special characters
+                        // Use set with merge: true
                         return db.collection('registrations').doc(uniqueId).set(updateData, { merge: true });
                     });
             })
@@ -3751,29 +3656,13 @@ function switchToursTab(index) {
     const toursInfo = document.getElementById('toursInfo');
     if (!toursInfo) return;
     
-    // Remove active class from all tab buttons within tours section
-    const tabButtons = toursInfo.querySelectorAll('.profile-tab-btn');
-    tabButtons.forEach(btn => btn.classList.remove('active'));
-    
-    // Hide all tours tab panes
-    const tabPanes = toursInfo.querySelectorAll('.tours-tab-pane');
-    tabPanes.forEach(pane => {
-        pane.classList.remove('active');
-        pane.style.display = 'none';
+    switchTab(index, {
+        tabButtonSelector: '.profile-tab-btn',
+        tabPaneSelector: '.tours-tab-pane',
+        tabPaneIdPrefix: 'toursTab',
+        containerSelector: '#toursInfo',
+        clearStyles: false
     });
-    
-    // Show selected tab pane
-    const selectedPane = document.getElementById(`toursTab${index}`);
-    if (selectedPane) {
-        selectedPane.classList.add('active');
-        selectedPane.style.display = 'block';
-    }
-    
-    // Activate selected tab button
-    const selectedButton = toursInfo.querySelector(`.profile-tab-btn[data-tab-index="${index}"]`);
-    if (selectedButton) {
-        selectedButton.classList.add('active');
-    }
 }
 
 // Helper function to create tours card HTML for a single person
@@ -4022,12 +3911,6 @@ function loadToursInfo(user) {
     }
 }
 
-// Legacy function - kept for compatibility
-function loadProfileTours(user) {
-    // Tours are now in a separate tab, redirect to that functionality
-    loadToursInfo(user);
-}
-
 // Switch tour tab
 function switchTourTab(tabName) {
     // Hide all tab panes
@@ -4225,14 +4108,12 @@ function saveToursInfo(uniqueId) {
                         
                         const existingData = doc.data();
                         
-                        // Prepare update data - update both camelCase and original field names
+                        // Prepare update data with normalized field names
                         const updateData = {
                             ...existingData,
                             postShibirTour: postShibirTour,
-                            'Post Shibir Tour': postShibirTour,
-                            'Post Shibir Tours': postShibirTour,
-                            'Please select a post shibir tour option': postShibirTour,
-                            toursUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            tourupdateAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         };
                         
                         // Use set with merge: true to update postShibirTour field
@@ -4634,17 +4515,6 @@ function displayUserManagementUI(users) {
     userListContainer.innerHTML = html;
 }
 
-// Helper function to escape HTML
-function escapeHtml(text) {
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return String(text).replace(/[&<>"']/g, m => map[m]);
-}
 
 // Handle user creation form submission
 async function handleUserCreationSubmit(event) {
@@ -6279,19 +6149,27 @@ async function selectParticipantFromSearch(uniqueId) {
 
 // Batch check-in from email search results
 async function batchCheckinFromEmail(uniqueIds) {
-    if (!uniqueIds || uniqueIds.length === 0) {
+    if (!uniqueIds || !Array.isArray(uniqueIds) || uniqueIds.length === 0) {
         showNotification('No participants selected for batch check-in', 'error');
         return;
     }
     
-    // Confirm batch check-in
-    const confirmMessage = `Are you sure you want to check in ${uniqueIds.length} participant(s)?`;
+    // Validate all IDs are strings
+    const validIds = uniqueIds.filter(id => id && typeof id === 'string' && id.trim() !== '');
+    if (validIds.length === 0) {
+        showNotification('No valid Praveshika IDs provided for batch check-in', 'error');
+        return;
+    }
+    
+    // Confirm batch check-in with explicit list of IDs
+    const idsList = validIds.slice(0, 5).join(', ') + (validIds.length > 5 ? ` and ${validIds.length - 5} more` : '');
+    const confirmMessage = `Are you sure you want to check in ${validIds.length} participant(s) with these Praveshika IDs?\n\n${idsList}\n\nThis will check in ONLY these specific IDs, not all users with the same email.`;
     if (!confirm(confirmMessage)) {
         return;
     }
     
-    // Use existing batch check-in function
-    await executeBatchCheckin(uniqueIds);
+    // Use existing batch check-in function with validated IDs
+    await executeBatchCheckin(validIds);
     
     // Clear participant info display
     clearParticipantInfo();
@@ -6314,8 +6192,12 @@ function displayParticipantInfo(regData, uniqueId) {
     
     participantDetails.innerHTML = `
         <div class="participant-details">
+            <div style="background: #e8f4f8; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #007bff;">
+                <p style="margin: 0; font-weight: bold; color: #007bff;">Ready to Check In</p>
+                <p style="margin: 0.5rem 0 0 0; font-size: 0.9em;">Praveshika ID: <strong>${escapeHtml(uniqueId)}</strong></p>
+            </div>
             <p><strong>Name:</strong> ${escapeHtml(name)}</p>
-            <p><strong>Praveshika ID:</strong> ${escapeHtml(uniqueId)}</p>
+            <p><strong>Praveshika ID:</strong> <strong style="color: #007bff;">${escapeHtml(uniqueId)}</strong></p>
             <p><strong>Email:</strong> ${escapeHtml(email)}</p>
             <p><strong>Country:</strong> ${escapeHtml(country)}</p>
             <p><strong>Shreni:</strong> ${escapeHtml(shreni)}</p>
@@ -6324,6 +6206,29 @@ function displayParticipantInfo(regData, uniqueId) {
     
     participantInfo.style.display = 'block';
     checkinForm.style.display = 'block';
+    
+    // Display the Praveshika ID in the check-in form for clarity
+    const checkinTypeDisplay = document.getElementById('checkinTypeDisplay');
+    if (checkinTypeDisplay) {
+        const typeLabel = CHECKIN_TYPE_LABELS[currentCheckinType] || currentCheckinType;
+        checkinTypeDisplay.textContent = typeLabel;
+    }
+    
+    // Add a clear indicator of which Praveshika ID will be checked in
+    const formHeader = checkinForm.querySelector('h3');
+    if (formHeader && !formHeader.dataset.praveshikaIdDisplayed) {
+        const idDisplay = document.createElement('div');
+        idDisplay.style.cssText = 'background: #fff3cd; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; border-left: 4px solid #ffc107;';
+        idDisplay.innerHTML = `<strong>Checking in:</strong> <span style="color: #007bff; font-weight: bold;">${escapeHtml(uniqueId)}</span>`;
+        checkinForm.insertBefore(idDisplay, checkinForm.querySelector('form'));
+        formHeader.dataset.praveshikaIdDisplayed = 'true';
+    } else if (formHeader && formHeader.dataset.praveshikaIdDisplayed) {
+        // Update the ID display if it already exists
+        const existingDisplay = checkinForm.querySelector('div[style*="background: #fff3cd"]');
+        if (existingDisplay) {
+            existingDisplay.innerHTML = `<strong>Checking in:</strong> <span style="color: #007bff; font-weight: bold;">${escapeHtml(uniqueId)}</span>`;
+        }
+    }
     
     // Check if already checked in
     checkCheckinStatus(uniqueId);
@@ -6336,7 +6241,18 @@ function clearParticipantInfo() {
     const checkinForm = document.getElementById('checkinForm');
     
     if (participantInfo) participantInfo.style.display = 'none';
-    if (checkinForm) checkinForm.style.display = 'none';
+    if (checkinForm) {
+        checkinForm.style.display = 'none';
+        // Remove the Praveshika ID display indicator
+        const idDisplay = checkinForm.querySelector('div[style*="background: #fff3cd"]');
+        if (idDisplay) {
+            idDisplay.remove();
+        }
+        const formHeader = checkinForm.querySelector('h3');
+        if (formHeader) {
+            formHeader.dataset.praveshikaIdDisplayed = 'false';
+        }
+    }
     
     // Clear inputs
     const barcodeInput = document.getElementById('barcodeInput');
@@ -6366,10 +6282,14 @@ function setupCheckinForm() {
 
 // Perform checkin
 async function performCheckin() {
-    if (!currentParticipantUniqueId) {
+    // Validate that we have a specific Praveshika ID selected
+    if (!currentParticipantUniqueId || typeof currentParticipantUniqueId !== 'string' || currentParticipantUniqueId.trim() === '') {
         showNotification('Please search for a participant first', 'error');
         return;
     }
+    
+    // Ensure we're only checking in a single, specific Praveshika ID
+    const uniqueIdToCheckIn = currentParticipantUniqueId.trim();
     
     if (!window.firebase || !firebase.auth || !firebase.firestore) {
         showNotification('Firebase not initialized', 'error');
@@ -6392,18 +6312,39 @@ async function performCheckin() {
     try {
         const db = firebase.firestore();
         
+        // Verify the registration exists for this specific Praveshika ID
+        const regDoc = await db.collection('registrations').doc(uniqueIdToCheckIn).get();
+        if (!regDoc.exists) {
+            showNotification(`Participant with Praveshika ID "${uniqueIdToCheckIn}" not found`, 'error');
+            return;
+        }
+        
+        const regData = regDoc.data();
+        
+        // Check if already checked in for this check-in type
+        const existingCheckinQuery = await db.collection('checkins')
+            .where('uniqueId', '==', uniqueIdToCheckIn)
+            .where('checkinType', '==', currentCheckinType)
+            .limit(1)
+            .get();
+        
+        if (!existingCheckinQuery.empty) {
+            const existingCheckin = existingCheckinQuery.docs[0].data();
+            const timestamp = existingCheckin.timestamp?.toDate();
+            const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+            const typeLabel = CHECKIN_TYPE_LABELS[currentCheckinType] || currentCheckinType;
+            showNotification(`Already checked in for ${typeLabel} at ${timeStr}. Duplicate check-ins are not allowed.`, 'error');
+            return;
+        }
+        
         // Get user data for checkedInByName
         const userDoc = await db.collection('users').doc(user.uid).get();
         const userData = userDoc.exists ? userDoc.data() : {};
         const checkedInByName = userData.volunteerName || userData.name || user.email || 'Unknown';
         
-        // Get participant data
-        const regDoc = await db.collection('registrations').doc(currentParticipantUniqueId).get();
-        const regData = regDoc.exists ? regDoc.data() : {};
-        
-        // Build checkin data - store only Praveshika ID
+        // Build checkin data - store only Praveshika ID (ensuring it's the specific one selected)
         const checkinData = {
-            uniqueId: currentParticipantUniqueId,
+            uniqueId: uniqueIdToCheckIn, // Explicitly use the validated uniqueId
             checkinType: currentCheckinType,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             checkedInBy: user.uid,
@@ -6429,11 +6370,12 @@ async function performCheckin() {
             if (lockerId) checkinData.lockerId = lockerId;
         }
         
-        // Create checkin document
-        const checkinId = `${currentParticipantUniqueId}_${currentCheckinType}_${Date.now()}`;
+        // Create checkin document with explicit uniqueId in the document ID
+        const checkinId = `${uniqueIdToCheckIn}_${currentCheckinType}_${Date.now()}`;
         await db.collection('checkins').doc(checkinId).set(checkinData);
         
-        showNotification('Checkin successful!', 'success');
+        const participantName = regData.name || regData['Full Name'] || uniqueIdToCheckIn;
+        showNotification(`Checkin successful for ${participantName} (${uniqueIdToCheckIn})!`, 'success');
         
         // Clear form
         clearCheckinForm();
@@ -6478,12 +6420,64 @@ async function checkCheckinStatus(uniqueId) {
             .limit(1)
             .get();
         
+        const checkinForm = document.getElementById('checkinForm');
+        const checkinFormElement = document.getElementById('checkinFormElement');
+        const submitButton = checkinFormElement?.querySelector('button[type="submit"]');
+        
         if (!checkinsQuery.empty) {
             const checkinData = checkinsQuery.docs[0].data();
             const timestamp = checkinData.timestamp?.toDate();
             const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+            const typeLabel = CHECKIN_TYPE_LABELS[currentCheckinType] || currentCheckinType;
             
-            showNotification(`Already checked in at ${timeStr}`, 'info');
+            // Show status in the form
+            const participantDetails = document.getElementById('participantDetails');
+            if (participantDetails) {
+                const statusDiv = document.createElement('div');
+                statusDiv.id = 'checkinStatusDiv';
+                statusDiv.style.cssText = 'background: #f8d7da; padding: 0.75rem; border-radius: 4px; margin-top: 1rem; border-left: 4px solid #dc3545;';
+                statusDiv.innerHTML = `
+                    <p style="margin: 0; color: #721c24; font-weight: bold;">⚠️ Already Checked In</p>
+                    <p style="margin: 0.5rem 0 0 0; color: #721c24; font-size: 0.9em;">
+                        This participant is already checked in for <strong>${escapeHtml(typeLabel)}</strong> at ${escapeHtml(timeStr)}.
+                    </p>
+                    <p style="margin: 0.5rem 0 0 0; color: #721c24; font-size: 0.85em;">
+                        Duplicate check-ins are not allowed for the same check-in type.
+                    </p>
+                `;
+                
+                // Remove existing status if any
+                const existingStatus = participantDetails.querySelector('#checkinStatusDiv');
+                if (existingStatus) {
+                    existingStatus.remove();
+                }
+                participantDetails.appendChild(statusDiv);
+            }
+            
+            // Disable the submit button
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.style.opacity = '0.6';
+                submitButton.style.cursor = 'not-allowed';
+                submitButton.textContent = 'Already Checked In';
+            }
+        } else {
+            // Remove status message if exists
+            const participantDetails = document.getElementById('participantDetails');
+            if (participantDetails) {
+                const existingStatus = participantDetails.querySelector('#checkinStatusDiv');
+                if (existingStatus) {
+                    existingStatus.remove();
+                }
+            }
+            
+            // Enable the submit button
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.style.opacity = '1';
+                submitButton.style.cursor = 'pointer';
+                submitButton.textContent = 'Check In';
+            }
         }
     } catch (error) {
         console.error('Error checking checkin status:', error);
@@ -6656,19 +6650,44 @@ async function executeBatchCheckin(ids) {
     
     for (const uniqueId of ids) {
         try {
-            // Get participant data
-            const regDoc = await db.collection('registrations').doc(uniqueId).get();
+            // Validate the uniqueId is a non-empty string
+            if (!uniqueId || typeof uniqueId !== 'string' || uniqueId.trim() === '') {
+                results.push({ uniqueId: uniqueId || 'Invalid', status: 'failed', error: 'Invalid Praveshika ID format' });
+                failCount++;
+                continue;
+            }
+            
+            const validatedUniqueId = uniqueId.trim();
+            
+            // Get participant data - verify this specific Praveshika ID exists
+            const regDoc = await db.collection('registrations').doc(validatedUniqueId).get();
             if (!regDoc.exists) {
-                results.push({ uniqueId, status: 'failed', error: 'Participant not found' });
+                results.push({ uniqueId: validatedUniqueId, status: 'failed', error: 'Participant not found' });
+                failCount++;
+                continue;
+            }
+            
+            // Check if already checked in for this check-in type
+            const existingCheckinQuery = await db.collection('checkins')
+                .where('uniqueId', '==', validatedUniqueId)
+                .where('checkinType', '==', currentCheckinType)
+                .limit(1)
+                .get();
+            
+            if (!existingCheckinQuery.empty) {
+                const existingCheckin = existingCheckinQuery.docs[0].data();
+                const timestamp = existingCheckin.timestamp?.toDate();
+                const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+                results.push({ uniqueId: validatedUniqueId, status: 'skipped', error: `Already checked in at ${timeStr}` });
                 failCount++;
                 continue;
             }
             
             const regData = regDoc.data();
             
-            // Build checkin data - store only Praveshika ID
+            // Build checkin data - store only Praveshika ID (explicitly use validated ID)
             const checkinData = {
-                uniqueId: uniqueId,
+                uniqueId: validatedUniqueId, // Explicitly use the validated and trimmed ID
                 checkinType: currentCheckinType,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 checkedInBy: user.uid,
@@ -6681,11 +6700,11 @@ async function executeBatchCheckin(ids) {
                 checkinData.pickupLocation = regData.pickupLocation || regData['Pickup Location'] || null;
             }
             
-            // Create checkin document
-            const checkinId = `${uniqueId}_${currentCheckinType}_${Date.now()}`;
+            // Create checkin document with explicit uniqueId in document ID
+            const checkinId = `${validatedUniqueId}_${currentCheckinType}_${Date.now()}`;
             await db.collection('checkins').doc(checkinId).set(checkinData);
             
-            results.push({ uniqueId, status: 'success' });
+            results.push({ uniqueId: validatedUniqueId, status: 'success' });
             successCount++;
         } catch (error) {
             console.error(`Error checking in ${uniqueId}:`, error);
@@ -6696,19 +6715,30 @@ async function executeBatchCheckin(ids) {
     
     // Show results
     if (batchPreview) {
+        const skippedCount = results.filter(r => r.status === 'skipped').length;
+        const actualFailCount = results.filter(r => r.status === 'failed').length;
         let html = `
             <div class="batch-results">
                 <h4>Batch Checkin Results</h4>
-                <p><strong>Total:</strong> ${ids.length} | <strong>Success:</strong> ${successCount} | <strong>Failed:</strong> ${failCount}</p>
+                <p><strong>Total:</strong> ${ids.length} | <strong>Success:</strong> ${successCount} | <strong>Skipped (Already Checked In):</strong> ${skippedCount} | <strong>Failed:</strong> ${actualFailCount}</p>
                 <div class="batch-results-list">
         `;
         
         results.forEach(result => {
-            const statusClass = result.status === 'success' ? 'success' : 'error';
+            let statusClass = 'error';
+            let statusText = 'Failed';
+            if (result.status === 'success') {
+                statusClass = 'success';
+                statusText = 'Success';
+            } else if (result.status === 'skipped') {
+                statusClass = 'warning';
+                statusText = 'Skipped (Already Checked In)';
+            }
             html += `
                 <div class="batch-result-item ${statusClass}">
                     <span>${escapeHtml(result.uniqueId)}</span>
-                    <span>${result.status === 'success' ? '✓' : '✗'} ${result.error || ''}</span>
+                    <span>${statusText}</span>
+                    ${result.error ? `<span>${escapeHtml(result.error)}</span>` : ''}
                 </div>
             `;
         });

@@ -119,19 +119,11 @@ service cloud.firestore {
                         isUniqueIdAssociatedWithEmail(uniqueId) ||
                         // Check if uniqueId is in user's associated registrations
                         isUniqueIdInAssociatedRegistrations(uniqueId)) &&
-                       // Allow updating transportation-related fields and tour selection
+                       // Allow updating transportation-related fields and tour selection (normalized field names)
                        request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['pickupLocation', 'Pickup Location', 'Place of Arrival',
-                                  'arrivalDate', 'Arrival Date', 'Date of Arrival',
-                                  'arrivalTime', 'Arrival Time', 'Time of Arrival',
-                                  'flightTrainNumber', 'Flight/Train Number', 'Arrival Flight/Train Number',
-                                  'returnDate', 'Return Date', 'Date of Departure Train/Flight',
-                                  'returnTime', 'Return Time', 'Time of Departure Train/Flight',
-                                  'returnFlightTrainNumber', 'Return Flight/Train Number', 'Departure Flight/Train Number',
-                                  'pickupNeeded', 'Do you need a pickup on arrival?',
-                                  'dropoffNeeded', 'Do you need a drop off for departure?',
-                                  'transportationUpdatedAt', 'postShibirTour', 'Post Shibir Tour', 'Post Shibir Tours', 
-                                  'Please select a post shibir tour option', 'toursUpdatedAt']) &&
+                         .hasOnly(['arrivalDate', 'arrivalTime', 'arrivalPlace', 'arrivalFlightTrain', 'pickupNeeded',
+                                  'departureDate', 'departureTime', 'departurePlace', 'departureFlightTrain', 'dropoffNeeded',
+                                  'postShibirTour', 'travelupdateAt', 'tourupdateAt', 'updatedAt']) &&
                        // Ensure critical fields are not modified
                        request.resource.data.uniqueId == resource.data.uniqueId &&
                        request.resource.data.normalizedId == resource.data.normalizedId &&

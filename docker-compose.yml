@@ -5,10 +5,14 @@ services:
     volumes:
       # Mount the service account key from your local machine
       - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
-      # Optionally mount a different Excel file
-      - ./TestData.xlsx:/app/TestData.xlsx:ro
+      # Mount the Registrations.xlsx file
+      - ./dataprocessing/Registrations.xlsx:/app/Registrations.xlsx:ro
+      # Optionally mount a different Excel file and override EXCEL_FILE_PATH
     environment:
       - NODE_ENV=production
-    # Uncomment to override the Excel file path
-    # command: node import-excel-to-firebase.js
+      # Default Excel file path (can be overridden)
+      - EXCEL_FILE_PATH=/app/Registrations.xlsx
+      # Service account path (defaults to /app/secrets/serviceAccountKey.json)
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+    # The script will upload Registrations.xlsx to Firestore with normalized structure
 
