@@ -1,5 +1,4 @@
 // Global variables
-let pendingRegistration = null;
 let firebaseInitialized = false;
 
 // Helper function to wait for Firebase initialization
@@ -44,8 +43,8 @@ function isProtectedTab(tabName) {
 // Generic helper to fetch user data from Firestore
 // 
 // TO SETUP INITIAL SUPERADMIN:
-// 1. User must first register an account through the normal registration flow
-// 2. Once registered, go to Firebase Console > Firestore Database
+// 1. User logs in with their registered email and default password
+// 2. Once logged in, go to Firebase Console > Firestore Database
 // 3. Navigate to the 'users' collection
 // 4. Find the user document by their UID (you can find this in Firebase Authentication)
 // 5. Edit the document and add a field: role = "superadmin" (type: string)
@@ -377,61 +376,11 @@ function closeLogin() {
     });
 }
 
-// Reset register form (defined early so it can be called elsewhere)
-function resetRegisterForm() {
-    pendingRegistration = null;
-    const verifyForm = document.getElementById('registerVerifyForm');
-    const passwordForm = document.getElementById('registerPasswordForm');
-    if (verifyForm) verifyForm.style.display = 'block';
-    if (passwordForm) passwordForm.style.display = 'none';
-    const registerForm = document.querySelector('.register-form');
-    if (registerForm) {
-        registerForm.reset();
-    }
-    const pwdForm = document.querySelector('.password-setup-form');
-    if (pwdForm) {
-        pwdForm.reset();
-    }
-    // Clear error message
-    const registerError = document.getElementById('registerError');
-    if (registerError) {
-        registerError.style.display = 'none';
-        registerError.textContent = '';
-    }
-}
-
-// Display error in register modal
-function showRegisterError(message) {
-    const registerError = document.getElementById('registerError');
-    if (registerError) {
-        registerError.textContent = message;
-        registerError.style.display = 'block';
-    }
-}
-
-// Register Modal Functionality
-function openRegister() {
-    openModal('registerModal', {
-        closeOtherModals: ['loginModal'],
-        onOpen: () => resetRegisterForm()
-    });
-}
-
-function closeRegister() {
-    closeModal('registerModal', {
-        onClose: () => resetRegisterForm()
-    });
-}
-
 // Close modal when clicking outside of it
 window.addEventListener('click', function(event) {
     const modal = document.getElementById('loginModal');
-    const regModal = document.getElementById('registerModal');
     if (event.target === modal) {
         closeLogin();
-    }
-    if (event.target === regModal) {
-        closeRegister();
     }
 });
 
@@ -499,7 +448,6 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         closeLogin();
-        closeRegister();
     }
 });
 
@@ -847,19 +795,178 @@ document.addEventListener('DOMContentLoaded', function() {
                 const isEmail = isValidEmail(identifier);
                 
                 if (isEmail) {
-                    // Direct email login
+                    // Direct email login with default password support
+                    const DEFAULT_PASSWORD = 'Vss@2025!';
+                    const db = firebase.firestore();
+                    
+                    // Try to login first
                     firebase.auth().signInWithEmailAndPassword(identifier, password)
                         .then((userCredential) => {
-                            handleLoginSuccess(loginForm);
+                            // Check if password reset is required (first login)
+                            checkAndPromptPasswordReset(userCredential.user, loginForm);
                         })
                         .catch((error) => {
-                            // Check if user doesn't exist or invalid credentials
-                            if (error.code === 'auth/user-not-found') {
-                                showNotification('Email not found. Please register first or contact your administrator.', 'error');
-                            } else if (error.code === 'auth/wrong-password') {
-                                showNotification('Incorrect password. Please try again.', 'error');
-                            } else if (error.code === 'auth/invalid-login-credentials' || error.code === 'auth/invalid-credential') {
-                                showNotification('Email not found or incorrect password. Please check your credentials.', 'error');
+                            // If user not found and password is default, try to auto-create account
+                            if (error.code === 'auth/user-not-found' && password === DEFAULT_PASSWORD) {
+                                // Check if email exists in registrations collection
+                                showNotification('Checking registration...', 'info');
+                                db.collection('registrations').where('email', '==', identifier).limit(1).get()
+                                    .then(querySnapshot => {
+                                        let matchingDoc = null;
+                                        
+                                        if (!querySnapshot.empty) {
+                                            matchingDoc = querySnapshot.docs[0];
+                                        } else {
+                                            // Fallback: search through all documents
+                                            return db.collection('registrations').get()
+                                                .then(allDocs => {
+                                                    const normalizedEmail = identifier.toLowerCase().trim();
+                                                    for (const doc of allDocs.docs) {
+                                                        const docData = doc.data();
+                                                        const docEmail = docData.email ? docData.email.toLowerCase().trim() : '';
+                                                        if (docEmail === normalizedEmail) {
+                                                            matchingDoc = doc;
+                                                            break;
+                                                        }
+                                                    }
+                                                    return matchingDoc;
+                                                });
+                                        }
+                                        
+                                        return matchingDoc;
+                                    })
+                                    .then(matchingDoc => {
+                                        if (!matchingDoc) {
+                                            showNotification('Email not found in registrations. Please contact your administrator.', 'error');
+                                            return;
+                                        }
+                                        
+                                        const data = matchingDoc.data();
+                                        const actualPraveshikaId = matchingDoc.id;
+                                        
+                                        // Auto-create account with default password
+                                        showNotification('Creating your account...', 'info');
+                                        return firebase.auth().createUserWithEmailAndPassword(identifier, DEFAULT_PASSWORD)
+                                            .then((userCredential) => {
+                                                const user = userCredential.user;
+                                                const normalizedEmail = identifier.toLowerCase().trim();
+                                                
+                                                // Create user document in Firestore
+                                                return db.collection('users').doc(user.uid).set({
+                                                    email: identifier,
+                                                    name: data.name || data['Full Name'] || '',
+                                                    uniqueId: actualPraveshikaId || '',
+                                                    role: 'shibirarthi',
+                                                    passwordResetRequired: true, // Mark for password reset on first login
+                                                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                                                }).then(() => {
+                                                    // Process associated registrations similar to old registration flow
+                                                    return db.collection('emailToUids').doc(normalizedEmail).get()
+                                                        .then((emailToUidsDoc) => {
+                                                            let allUniqueIds = [];
+                                                            
+                                                            if (emailToUidsDoc.exists) {
+                                                                const emailToUidsData = emailToUidsDoc.data();
+                                                                const uids = emailToUidsData.uids || [];
+                                                                allUniqueIds = [...uids];
+                                                            }
+                                                            
+                                                            if (actualPraveshikaId && !allUniqueIds.includes(actualPraveshikaId)) {
+                                                                allUniqueIds.push(actualPraveshikaId);
+                                                            }
+                                                            
+                                                            if (allUniqueIds.length === 0 && actualPraveshikaId) {
+                                                                allUniqueIds = [actualPraveshikaId];
+                                                            }
+                                                            
+                                                            if (allUniqueIds.length === 0) {
+                                                                return db.collection('users').doc(user.uid).update({
+                                                                    emailProcessed: true,
+                                                                    emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                                                });
+                                                            }
+                                                            
+                                                            const registrationPromises = allUniqueIds.map(uid => 
+                                                                db.collection('registrations').doc(uid).get()
+                                                                    .then((regDoc) => {
+                                                                        if (regDoc.exists) {
+                                                                            const regData = regDoc.data();
+                                                                            return {
+                                                                                uniqueId: regData.uniqueId || uid,
+                                                                                name: regData.name || regData['Full Name'] || '',
+                                                                                email: regData.email || regData['Email address'] || identifier
+                                                                            };
+                                                                        } else {
+                                                                            return {
+                                                                                uniqueId: uid,
+                                                                                name: data.name || '',
+                                                                                email: identifier
+                                                                            };
+                                                                        }
+                                                                    })
+                                                                    .catch(() => ({
+                                                                        uniqueId: uid,
+                                                                        name: data.name || '',
+                                                                        email: identifier
+                                                                    }))
+                                                            );
+                                                            
+                                                            return Promise.all(registrationPromises)
+                                                                .then((associatedRegistrations) => {
+                                                                    const validRegistrations = associatedRegistrations
+                                                                        .filter(reg => reg !== null && reg.uniqueId)
+                                                                        .filter((reg, index, self) => 
+                                                                            index === self.findIndex(r => r.uniqueId === reg.uniqueId)
+                                                                        );
+                                                                    
+                                                                    return db.collection('users').doc(user.uid).update({
+                                                                        associatedRegistrations: validRegistrations,
+                                                                        emailProcessed: true,
+                                                                        emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                                                    });
+                                                                })
+                                                                .catch(() => null);
+                                                        })
+                                                        .catch(() => {
+                                                            return db.collection('users').doc(user.uid).update({
+                                                                associatedRegistrations: [{
+                                                                    uniqueId: actualPraveshikaId,
+                                                                    name: data.name || '',
+                                                                    email: identifier
+                                                                }],
+                                                                emailProcessed: true,
+                                                                emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                                            });
+                                                        });
+                                                }).then(() => {
+                                                    // Account created, now check for password reset
+                                                    checkAndPromptPasswordReset(userCredential.user, loginForm);
+                                                });
+                                            })
+                                            .catch((createError) => {
+                                                console.error('Account creation error:', createError);
+                                                if (createError.code === 'auth/email-already-in-use') {
+                                                    // Account was created between check and creation, try login again
+                                                    firebase.auth().signInWithEmailAndPassword(identifier, DEFAULT_PASSWORD)
+                                                        .then((userCredential) => {
+                                                            checkAndPromptPasswordReset(userCredential.user, loginForm);
+                                                        })
+                                                        .catch((loginError) => {
+                                                            handleLoginError(loginError);
+                                                        });
+                                                } else {
+                                                    handleLoginError(createError);
+                                                }
+                                            });
+                                    })
+                                    .catch((dbError) => {
+                                        console.error('Database error:', dbError);
+                                        showNotification('Error checking registration. Please try again.', 'error');
+                                    });
+                            } else if (error.code === 'auth/user-not-found') {
+                                showNotification('Email not found. Please contact your administrator.', 'error');
+                            } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-login-credentials' || error.code === 'auth/invalid-credential') {
+                                showNotification('Incorrect password. Please check your credentials.', 'error');
                             } else {
                                 handleLoginError(error);
                             }
@@ -939,19 +1046,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     findEmailByPraveshikaId(normalizedId)
                         .then((email) => {
                             if (!email) {
-                                showNotification('ID not found. Volunteers/Admins: Contact your administrator. Shibirarthi: Register first.', 'error');
+                                showNotification('ID not found. Volunteers/Admins: Contact your administrator.', 'error');
                                 throw { code: 'auth/user-not-found', message: 'No email found for this ID.' };
                             }
                             // Login with the found email
                             return firebase.auth().signInWithEmailAndPassword(email, password);
                         })
                         .then((userCredential) => {
-                            handleLoginSuccess(loginForm);
+                            checkAndPromptPasswordReset(userCredential.user, loginForm);
                         })
                         .catch((error) => {
                             // Check if user doesn't exist or wrong password
                             if (error.code === 'auth/user-not-found') {
-                                // Don't redirect to register - could be volunteer/admin
                                 showNotification('ID not found. Contact your administrator if you are a volunteer/admin.', 'error');
                             } else if (error.code === 'auth/wrong-password') {
                                 showNotification('Incorrect password. Please try again.', 'error');
@@ -1083,6 +1189,61 @@ function refreshAssociatedRegistrations(user) {
         });
 }
 
+// Check if password reset is required and prompt user
+function checkAndPromptPasswordReset(user, loginForm) {
+    if (!window.firebase || !firebase.firestore) {
+        handleLoginSuccess(loginForm);
+        return;
+    }
+    
+    const db = firebase.firestore();
+    
+    // Check user document for passwordResetRequired flag
+    db.collection('users').doc(user.uid).get()
+        .then((userDoc) => {
+            const passwordResetRequired = userDoc.exists && userDoc.data().passwordResetRequired === true;
+            
+            if (passwordResetRequired) {
+                // Show password reset prompt
+                showNotification('Please reset your password for security. Sending reset email...', 'info');
+                
+                // Send password reset email
+                firebase.auth().sendPasswordResetEmail(user.email)
+                    .then(() => {
+                        showNotification('Password reset email sent! Please check your inbox and reset your password. You will be logged in after resetting.', 'success');
+                        // Update flag to false after sending reset email
+                        db.collection('users').doc(user.uid).update({
+                            passwordResetRequired: false
+                        }).catch(() => {
+                            // Ignore update errors
+                        });
+                        
+                        // Close login modal and sign out (user needs to reset password)
+                        setTimeout(() => {
+                            closeLogin();
+                            firebase.auth().signOut().then(() => {
+                                showNotification('Please check your email and reset your password, then login again.', 'info');
+                            });
+                        }, 3000);
+                    })
+                    .catch((error) => {
+                        console.error('Error sending password reset email:', error);
+                        showNotification('Error sending password reset email. You can reset it later from the login page.', 'error');
+                        // Still proceed with login
+                        handleLoginSuccess(loginForm);
+                    });
+            } else {
+                // No password reset required, proceed with normal login
+                handleLoginSuccess(loginForm);
+            }
+        })
+        .catch((error) => {
+            console.error('Error checking password reset requirement:', error);
+            // If check fails, proceed with normal login
+            handleLoginSuccess(loginForm);
+        });
+}
+
 // Helper function for successful login
 function handleLoginSuccess(loginForm) {
     showNotification('Logged in successfully!', 'success');
@@ -1116,7 +1277,7 @@ function handleLoginError(error) {
     let errorMessage = 'Login failed. ';
     
     if (error.code === 'auth/user-not-found') {
-        errorMessage = 'Email not found. Please register first.';
+        errorMessage = 'Email not found. Please contact your administrator.';
         // This is handled in the login flow, but keeping for other cases
     } else if (error.code === 'permission-denied' || error.message?.includes('Missing or insufficient permissions')) {
         errorMessage = 'Permission denied. Please make sure Firestore security rules are properly deployed.';
@@ -1140,411 +1301,6 @@ function normalizePraveshikaId(praveshikaId) {
     if (!praveshikaId) return '';
     return praveshikaId.toString().toLowerCase().replace(/[/-]/g, '');
 }
-
-// Register Form Submission - Verification Step
-// NOTE: Registration now uses email + temporary password instead of Praveshika ID
-// Old Praveshika ID verification code has been replaced with email + temp password verification
-document.addEventListener('DOMContentLoaded', function() {
-    const registerForm = document.querySelector('.register-form');
-    if (registerForm) {
-        registerForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const email = document.getElementById('regEmail').value.trim();
-            const tempPassword = document.getElementById('regTempPassword').value;
-
-            // Validate both fields are provided
-            if (!email) {
-                showNotification('Please enter your email address.', 'error');
-                return;
-            }
-
-            if (!tempPassword) {
-                showNotification('Please enter your temporary password.', 'error');
-                return;
-            }
-
-            // Basic email format validation
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                showNotification('Please enter a valid email address.', 'error');
-                return;
-            }
-
-            // Verify temporary password
-            const TEMP_PASSWORD = 'Vss@2025!';
-            if (tempPassword !== TEMP_PASSWORD) {
-                showNotification('Invalid temporary password. Please check and try again.', 'error');
-                return;
-            }
-
-            const normalizedEmail = email.toLowerCase().trim();
-
-            // Verify with Firestore using email
-            if (window.firebase && firebase.firestore) {
-                const db = firebase.firestore();
-                
-                showNotification('Verifying your email...', 'info');
-                
-                // Search for registration by email
-                db.collection('registrations').where('email', '==', email).limit(1).get()
-                    .then(querySnapshot => {
-                        let matchingDoc = null;
-                        
-                        if (!querySnapshot.empty) {
-                            matchingDoc = querySnapshot.docs[0];
-                        } else {
-                            // Fallback: search through all documents if email field doesn't match exactly
-                            return db.collection('registrations').get()
-                                .then(allDocs => {
-                                    allDocs.forEach(doc => {
-                                        const docData = doc.data();
-                                        const docEmail = docData.email ? docData.email.toLowerCase().trim() : '';
-                                        if (docEmail === normalizedEmail) {
-                                            matchingDoc = doc;
-                                            return;
-                                        }
-                                    });
-                                    return matchingDoc;
-                                });
-                        }
-                        
-                        return matchingDoc;
-                    })
-                    .then(matchingDoc => {
-                        if (!matchingDoc) {
-                            showNotification('Verification failed. Email not found in registrations.', 'error');
-                            return Promise.reject(new Error('Email not found'));
-                        }
-                        
-                        const data = matchingDoc.data();
-                        const storedEmail = data.email ? data.email.toLowerCase().trim() : '';
-                        const actualPraveshikaId = matchingDoc.id; // Get document ID from the matching document
-                        
-                        // Validate that the email exists in the registration
-                        if (!storedEmail) {
-                            showNotification('Email not found in registration.', 'error');
-                            return Promise.reject(new Error('Email not found'));
-                        }
-                        
-                        // Check if Firebase Auth account already exists for this email
-                        // This is the critical check - if account exists, DO NOT proceed to password setup
-                        return firebase.auth().fetchSignInMethodsForEmail(data.email || email)
-                            .then((signInMethods) => {
-                                // If signInMethods array has any methods, account exists
-                                if (signInMethods && signInMethods.length > 0) {
-                                    // Account already exists - DO NOT proceed to password setup
-                                    showNotification('An account with this email already exists. Please login instead.', 'error');
-                                    // Close register modal and open login modal
-                                    closeRegister();
-                                    setTimeout(() => {
-                                        // Pre-fill the login form with the email
-                                        const loginIdentifier = document.getElementById('loginIdentifier');
-                                        if (loginIdentifier) {
-                                            loginIdentifier.value = data.email || email;
-                                        }
-                                        openLogin();
-                                    }, 300);
-                                    return Promise.reject(new Error('Account already exists'));
-                                }
-                                
-                                // No sign-in methods found - account doesn't exist, proceed with registration
-                                // Verification successful - show password setup
-                                pendingRegistration = {
-                                    name: data.name || '',
-                                    uniqueId: actualPraveshikaId || '', // Use actual document ID if available
-                                    email: data.email || email // Use stored email to preserve exact format
-                                };
-                                
-                                // Switch to password setup form
-                                document.getElementById('registerVerifyForm').style.display = 'none';
-                                document.getElementById('registerPasswordForm').style.display = 'block';
-                                showNotification('Verification successful! Please set a password.', 'success');
-                                return Promise.resolve();
-                            })
-                            .catch((fetchError) => {
-                                // Handle errors from fetchSignInMethodsForEmail
-                                console.error('Error checking email existence:', fetchError);
-                                
-                                // If the error indicates email is already in use, handle it
-                                if (fetchError.code === 'auth/email-already-in-use' || 
-                                    fetchError.message && fetchError.message.includes('already in use')) {
-                                    showNotification('An account with this email already exists. Please login instead.', 'error');
-                                    closeRegister();
-                                    setTimeout(() => {
-                                        const loginIdentifier = document.getElementById('loginIdentifier');
-                                        if (loginIdentifier) {
-                                            loginIdentifier.value = data.email || email;
-                                        }
-                                        openLogin();
-                                    }, 300);
-                                    return Promise.reject(fetchError);
-                                }
-                                
-                                // For other errors (like network issues), still show error but don't proceed
-                                let errorMsg = 'Unable to verify email. Please try again.';
-                                if (fetchError.code === 'auth/invalid-email') {
-                                    errorMsg = 'Invalid email address.';
-                                } else if (fetchError.message) {
-                                    errorMsg = fetchError.message;
-                                }
-                                showNotification(errorMsg, 'error');
-                                return Promise.reject(fetchError);
-                            });
-                    })
-                    .catch(err => {
-                        console.error('Verification error:', err);
-                        let errorMsg = 'Verification error. Please try again.';
-                        if (err.code === 'permission-denied') {
-                            errorMsg = 'Permission denied. Please check Firestore security rules.';
-                        } else if (err.code === 'auth/invalid-email') {
-                            errorMsg = 'Invalid email address.';
-                        } else if (err.code === 'auth/too-many-requests') {
-                            errorMsg = 'Too many requests. Please try again later.';
-                        } else if (err.message) {
-                            errorMsg = err.message;
-                        }
-                        showNotification(errorMsg, 'error');
-                    });
-            } else {
-                showNotification('Firebase not initialized. Please check your configuration.', 'error');
-            }
-        });
-    }
-
-    // Password Setup Form Submission
-    const passwordForm = document.querySelector('.password-setup-form');
-    if (passwordForm) {
-        passwordForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const password = document.getElementById('regPassword').value;
-            const passwordConfirm = document.getElementById('regPasswordConfirm').value;
-
-            if (!password || !passwordConfirm) {
-                showNotification('Please fill in all fields.', 'error');
-                return;
-            }
-
-            if (password.length < 6) {
-                showNotification('Password must be at least 6 characters long.', 'error');
-                return;
-            }
-
-            if (password !== passwordConfirm) {
-                showNotification('Passwords do not match.', 'error');
-                return;
-            }
-
-            if (!pendingRegistration) {
-                showNotification('Session expired. Please start registration again.', 'error');
-                closeRegister();
-                return;
-            }
-
-            // Final check before creating account - verify email is still not in use
-            // This catches any edge cases where email was registered between verify and password setup
-            if (window.firebase && firebase.auth) {
-                showNotification('Verifying email availability...', 'info');
-                
-                firebase.auth().fetchSignInMethodsForEmail(pendingRegistration.email)
-                    .then((signInMethods) => {
-                        if (signInMethods && signInMethods.length > 0) {
-                            // Account was created between verify and password setup - show error
-                            showNotification('An account with this email already exists. Please login instead.', 'error');
-                            // Save email before clearing pendingRegistration
-                            const emailToUse = pendingRegistration ? pendingRegistration.email : '';
-                            // Reset registration form back to verify step
-                            document.getElementById('registerVerifyForm').style.display = 'block';
-                            document.getElementById('registerPasswordForm').style.display = 'none';
-                            pendingRegistration = null;
-                            // Close register modal and open login modal
-                            setTimeout(() => {
-                                closeRegister();
-                                setTimeout(() => {
-                                    const loginIdentifier = document.getElementById('loginIdentifier');
-                                    if (loginIdentifier && emailToUse) {
-                                        loginIdentifier.value = emailToUse;
-                                    }
-                                    openLogin();
-                                }, 300);
-                            }, 2000);
-                            return Promise.reject(new Error('Account already exists'));
-                        }
-                        
-                        // Email is still available - proceed with account creation
-                        showNotification('Creating your account...', 'info');
-                        
-                        return firebase.auth().createUserWithEmailAndPassword(pendingRegistration.email, password);
-                    })
-                    .then((userCredential) => {
-                        const user = userCredential.user;
-                        
-                        // Save additional user data to Firestore
-                        const db = firebase.firestore();
-                        const normalizedEmail = pendingRegistration.email.toLowerCase().trim();
-                        const primaryUniqueId = pendingRegistration.uniqueId;
-                        
-                        return db.collection('users').doc(user.uid).set({
-                            email: pendingRegistration.email,
-                            name: pendingRegistration.name,
-                            uniqueId: primaryUniqueId,
-                            role: 'shibirarthi',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        }).then(() => {
-                            // Always check emailToUids collection for associated uniqueIds
-                            // This ensures we pick up all uniqueIds associated with this email
-                                    return db.collection('emailToUids').doc(normalizedEmail).get()
-                                        .then((emailToUidsDoc) => {
-                                    // Collect all uniqueIds to process
-                                    let allUniqueIds = [];
-                                    
-                                    if (emailToUidsDoc.exists) {
-                                            const emailToUidsData = emailToUidsDoc.data();
-                                            const uids = emailToUidsData.uids || [];
-                                        allUniqueIds = [...uids];
-                                    }
-                                    
-                                    // Always include the primary uniqueId if not already in the list
-                                    if (primaryUniqueId && !allUniqueIds.includes(primaryUniqueId)) {
-                                        allUniqueIds.push(primaryUniqueId);
-                                    }
-                                    
-                                    // If no uniqueIds found, create a minimal associatedRegistrations with just the primary one
-                                    if (allUniqueIds.length === 0 && primaryUniqueId) {
-                                        allUniqueIds = [primaryUniqueId];
-                                    }
-                                    
-                                    if (allUniqueIds.length === 0) {
-                                        // No uniqueIds to process, mark as processed
-                                        return db.collection('users').doc(user.uid).update({
-                                            emailProcessed: true,
-                                            emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                        });
-                                            }
-
-                                            // Fetch registration documents for all uids
-                                    const registrationPromises = allUniqueIds.map(uid => 
-                                                db.collection('registrations').doc(uid).get()
-                                                    .then((regDoc) => {
-                                                        if (regDoc.exists) {
-                                                            const regData = regDoc.data();
-                                                            return {
-                                                                uniqueId: regData.uniqueId || uid,
-                                                        name: regData.name || regData['Full Name'] || '',
-                                                        email: regData.email || regData['Email address'] || pendingRegistration.email
-                                                    };
-                                                } else {
-                                                    // If registration doesn't exist, still create a basic entry from user data
-                                                    return {
-                                                        uniqueId: uid,
-                                                        name: pendingRegistration.name || '',
-                                                        email: pendingRegistration.email
-                                                    };
-                                                }
-                                                    })
-                                                    .catch((error) => {
-                                                        console.error(`Error fetching registration for uid ${uid}:`, error);
-                                                // Return basic entry even if fetch fails
-                                                return {
-                                                    uniqueId: uid,
-                                                    name: pendingRegistration.name || '',
-                                                    email: pendingRegistration.email
-                                                };
-                                                    })
-                                            );
-
-                                            return Promise.all(registrationPromises)
-                                                .then((associatedRegistrations) => {
-                                            // Filter out null values and ensure we have valid data
-                                            const validRegistrations = associatedRegistrations
-                                                .filter(reg => reg !== null && reg.uniqueId)
-                                                // Remove duplicates based on uniqueId
-                                                .filter((reg, index, self) => 
-                                                    index === self.findIndex(r => r.uniqueId === reg.uniqueId)
-                                                );
-                                                    
-                                                    // Update user document with associated registrations
-                                                    return db.collection('users').doc(user.uid).update({
-                                                        associatedRegistrations: validRegistrations,
-                                                        emailProcessed: true,
-                                                        emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                                    });
-                                                })
-                                                .catch((error) => {
-                                                    console.error('Error processing associated registrations:', error);
-                                                    // Don't throw - user creation should still succeed
-                                                    return null;
-                                                });
-                                        })
-                                        .catch((error) => {
-                                            console.error('Error checking emailToUids collection:', error);
-                                    // Even if emailToUids check fails, ensure we have at least the primary uniqueId
-                                    return db.collection('users').doc(user.uid).update({
-                                        associatedRegistrations: [{
-                                            uniqueId: primaryUniqueId,
-                                            name: pendingRegistration.name || '',
-                                            email: pendingRegistration.email
-                                        }],
-                                        emailProcessed: true,
-                                        emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                        });
-                                });
-                        });
-                    })
-                    .then(() => {
-                        showNotification('Account created successfully! You are now logged in.', 'success');
-                        closeRegister();
-                        resetRegisterForm();
-                        updateAuthUI();
-                        // Redirect to Shibirarthi Info tab after registration
-                        setTimeout(() => {
-                            activateTab('shibirarthi');
-                        }, 100);
-                    })
-                    .catch((error) => {
-                        console.error('Registration error:', error);
-                        let errorMessage = 'Registration failed. ';
-                        
-                        if (error.code === 'auth/email-already-in-use' || error.message === 'Account already exists') {
-                            // This should rarely happen now since we check at verify step and before creation
-                            // But handle it gracefully if it does
-                            errorMessage = 'This email is already registered. Please login instead.';
-                            // Save email before clearing pendingRegistration
-                            const emailToUse = pendingRegistration ? pendingRegistration.email : '';
-                            // Reset registration form back to verify step
-                            document.getElementById('registerVerifyForm').style.display = 'block';
-                            document.getElementById('registerPasswordForm').style.display = 'none';
-                            pendingRegistration = null;
-                            // Display error in modal
-                            showRegisterError(errorMessage);
-                            // Close register modal and open login modal after a short delay
-                            setTimeout(() => {
-                                closeRegister();
-                                setTimeout(() => {
-                                    const loginIdentifier = document.getElementById('loginIdentifier');
-                                    if (loginIdentifier && emailToUse) {
-                                        loginIdentifier.value = emailToUse;
-                                    }
-                                    openLogin();
-                                    showNotification(errorMessage, 'error');
-                                }, 300);
-                            }, 2000); // Give user time to read the error
-                        } else if (error.code === 'auth/invalid-email') {
-                            errorMessage += 'Invalid email address.';
-                            showRegisterError(errorMessage);
-                        } else if (error.code === 'auth/weak-password') {
-                            errorMessage += 'Password is too weak.';
-                            showRegisterError(errorMessage);
-                        } else {
-                            errorMessage += error.message;
-                            showRegisterError(errorMessage);
-                        }
-                    });
-            } else {
-                showNotification('Firebase not initialized. Please check your configuration.', 'error');
-            }
-        });
-    }
-});
 
 // Update UI based on auth state
 function updateAuthUI() {
@@ -4370,7 +4126,7 @@ async function createNewUser(name, email, uniqueId, role) {
         
         // Handle specific error cases
         if (error.code === 'auth/email-already-in-use') {
-            throw new Error('This email is already registered');
+            throw new Error('This email is already in use');
         } else if (error.code === 'auth/invalid-email') {
             throw new Error('Invalid email address');
         } else if (error.code === 'auth/weak-password') {

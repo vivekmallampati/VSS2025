@@ -70,10 +70,9 @@
                         </div>
                         <div class="login-cta">
                             <h3>Shibirarthi Login</h3>
-                            <p>Please use your Praveshika ID provided in the email to register.
-                            <br> Please login to access your registration</p>
+                            <p>Please use your registered email ID to login.
+                            <br>Default password: Vss@2025!</p>
                             <button class="btn btn-primary" onclick="openLogin()">Login</button>
-                            <button class="btn btn-secondary" onclick="openRegister()" style="margin-left: 0.5rem;">Register</button>
                         </div>
                     </div>
                 </div>
@@ -1373,23 +1372,22 @@
             <span class="close" onclick="closeLogin()">&times;</span>
             <h2>Login</h2>
             <p class="login-note" style="color: #666; font-size: 0.9rem; margin-bottom: 1rem; font-weight: 500;">
-                If logging in for first time, please <a href="#" onclick="closeLogin(); openRegister(); return false;" style="color: #007bff; text-decoration: underline; font-weight: 600;">REGISTER</a>. 
+                Use your registered email ID and default password: <strong>Vss@2025!</strong>
+                <br>On your first login, you will be prompted to reset your password for security.
             </p>
             <div id="loginFormContainer">
                 <form class="login-form" id="loginForm">
                     <div class="form-group">
-                        <input type="text" id="loginIdentifier" placeholder="Email or Praveshika ID" required>
+                        <input type="email" id="loginIdentifier" placeholder="Registered Email" required>
                     </div>
                     <div class="form-group">
-                        <input type="password" id="loginPassword" placeholder="Password" required>
+                        <input type="password" id="loginPassword" placeholder="Password (Default: Vss@2025!)" required>
                     </div>
                     <button type="submit" class="btn btn-primary">Login</button>
                 </form>
-                <p class="login-note">Login with your Praveshika ID or registered Email.</p>
+                <p class="login-note">Login with your registered email ID.</p>
                 <p class="login-note">
                     <a href="#" onclick="showForgotPassword(); return false;">Forgot Password?</a>
-                    <span style="margin: 0 0.5rem;">|</span>
-                    <a href="#" onclick="closeLogin(); openRegister(); return false;">Register</a>
                 </p>
             </div>
             <div id="forgotPasswordFormContainer" style="display: none;">
@@ -1405,39 +1403,6 @@
                 <p class="login-note">
                     <a href="#" onclick="showLoginForm(); return false;">Back to Login</a>
                 </p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Register Modal -->
-    <div id="registerModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeRegister()">&times;</span>
-            <h2>Register</h2>
-            <div id="registerVerifyForm">
-                <form class="register-form">
-                    <div class="form-group">
-                        <input type="email" id="regEmail" placeholder="Email address" required>
-                    </div>
-                    <div class="form-group">
-                        <input type="password" id="regTempPassword" placeholder="Temporary Password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Verify & Continue</button>
-                </form>
-                <p class="login-note">Enter your email and the temporary password sent in the email to verify your registration. If you need assistance, <a href="#" onclick="closeRegister(); activateTab('contact'); return false;" style="color: #007bff; text-decoration: underline;">use the contact form</a>.</p>
-            </div>
-            <div id="registerPasswordForm" style="display:none;">
-                <form class="password-setup-form">
-                    <div class="form-group">
-                        <input type="password" id="regPassword" placeholder="Password (min 6 characters)" required minlength="6">
-                    </div>
-                    <div class="form-group">
-                        <input type="password" id="regPasswordConfirm" placeholder="Confirm Password" required minlength="6">
-                    </div>
-                    <button type="submit" class="btn btn-primary">Create Account</button>
-                </form>
-                <div id="registerError" class="register-error" style="display: none;"></div>
-                <p class="login-note">Please set a secure password for your account.</p>
             </div>
         </div>
     </div>
