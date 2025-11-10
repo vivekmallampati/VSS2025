@@ -1330,7 +1330,6 @@ body {
 .image-grid img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 4px 16px var(--shadow); border: 2px solid var(--light-cream); }
 
 .login-note {
-    margin-top: 1rem;
     font-size: 0.9rem;
     color: var(--secondary-brown);
     text-align: center;

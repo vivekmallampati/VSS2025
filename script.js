@@ -378,9 +378,14 @@ function closeLogin() {
 
 // Close modal when clicking outside of it
 window.addEventListener('click', function(event) {
-    const modal = document.getElementById('loginModal');
-    if (event.target === modal) {
+    const loginModal = document.getElementById('loginModal');
+    if (event.target === loginModal) {
         closeLogin();
+    }
+    
+    const passwordResetModal = document.getElementById('passwordResetModal');
+    if (event.target === passwordResetModal) {
+        closePasswordResetModal();
     }
 });
 
@@ -806,8 +811,13 @@ document.addEventListener('DOMContentLoaded', function() {
                             checkAndPromptPasswordReset(userCredential.user, loginForm);
                         })
                         .catch((error) => {
-                            // If user not found and password is default, try to auto-create account
-                            if (error.code === 'auth/user-not-found' && password === DEFAULT_PASSWORD) {
+                            // If user not found or invalid credentials and password is default, try to auto-create account
+                            // Firebase may return different error codes: 'auth/user-not-found', 'auth/invalid-credential', or 'auth/invalid-login-credentials'
+                            const isUserNotFound = error.code === 'auth/user-not-found' || 
+                                                  error.code === 'auth/invalid-credential' || 
+                                                  error.code === 'auth/invalid-login-credentials';
+                            
+                            if (isUserNotFound && password === DEFAULT_PASSWORD) {
                                 // Check if email exists in registrations collection
                                 showNotification('Checking registration...', 'info');
                                 db.collection('registrations').where('email', '==', identifier).limit(1).get()
@@ -844,115 +854,41 @@ document.addEventListener('DOMContentLoaded', function() {
                                         const data = matchingDoc.data();
                                         const actualPraveshikaId = matchingDoc.id;
                                         
-                                        // Auto-create account with default password
+                                        // Auto-create Firebase Auth account with default password
+                                        // DO NOT create user document in Firestore yet - will be created after password reset
                                         showNotification('Creating your account...', 'info');
                                         return firebase.auth().createUserWithEmailAndPassword(identifier, DEFAULT_PASSWORD)
                                             .then((userCredential) => {
                                                 const user = userCredential.user;
-                                                const normalizedEmail = identifier.toLowerCase().trim();
                                                 
-                                                // Create user document in Firestore
-                                                return db.collection('users').doc(user.uid).set({
+                                                // Store registration data temporarily for later use
+                                                // We'll create the user document after password is changed
+                                                // For now, just prompt password reset
+                                                checkAndPromptPasswordReset(user, loginForm, {
                                                     email: identifier,
                                                     name: data.name || data['Full Name'] || '',
                                                     uniqueId: actualPraveshikaId || '',
-                                                    role: 'shibirarthi',
-                                                    passwordResetRequired: true, // Mark for password reset on first login
-                                                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                                                }).then(() => {
-                                                    // Process associated registrations similar to old registration flow
-                                                    return db.collection('emailToUids').doc(normalizedEmail).get()
-                                                        .then((emailToUidsDoc) => {
-                                                            let allUniqueIds = [];
-                                                            
-                                                            if (emailToUidsDoc.exists) {
-                                                                const emailToUidsData = emailToUidsDoc.data();
-                                                                const uids = emailToUidsData.uids || [];
-                                                                allUniqueIds = [...uids];
-                                                            }
-                                                            
-                                                            if (actualPraveshikaId && !allUniqueIds.includes(actualPraveshikaId)) {
-                                                                allUniqueIds.push(actualPraveshikaId);
-                                                            }
-                                                            
-                                                            if (allUniqueIds.length === 0 && actualPraveshikaId) {
-                                                                allUniqueIds = [actualPraveshikaId];
-                                                            }
-                                                            
-                                                            if (allUniqueIds.length === 0) {
-                                                                return db.collection('users').doc(user.uid).update({
-                                                                    emailProcessed: true,
-                                                                    emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                                                });
-                                                            }
-                                                            
-                                                            const registrationPromises = allUniqueIds.map(uid => 
-                                                                db.collection('registrations').doc(uid).get()
-                                                                    .then((regDoc) => {
-                                                                        if (regDoc.exists) {
-                                                                            const regData = regDoc.data();
-                                                                            return {
-                                                                                uniqueId: regData.uniqueId || uid,
-                                                                                name: regData.name || regData['Full Name'] || '',
-                                                                                email: regData.email || regData['Email address'] || identifier
-                                                                            };
-                                                                        } else {
-                                                                            return {
-                                                                                uniqueId: uid,
-                                                                                name: data.name || '',
-                                                                                email: identifier
-                                                                            };
-                                                                        }
-                                                                    })
-                                                                    .catch(() => ({
-                                                                        uniqueId: uid,
-                                                                        name: data.name || '',
-                                                                        email: identifier
-                                                                    }))
-                                                            );
-                                                            
-                                                            return Promise.all(registrationPromises)
-                                                                .then((associatedRegistrations) => {
-                                                                    const validRegistrations = associatedRegistrations
-                                                                        .filter(reg => reg !== null && reg.uniqueId)
-                                                                        .filter((reg, index, self) => 
-                                                                            index === self.findIndex(r => r.uniqueId === reg.uniqueId)
-                                                                        );
-                                                                    
-                                                                    return db.collection('users').doc(user.uid).update({
-                                                                        associatedRegistrations: validRegistrations,
-                                                                        emailProcessed: true,
-                                                                        emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                                                    });
-                                                                })
-                                                                .catch(() => null);
-                                                        })
-                                                        .catch(() => {
-                                                            return db.collection('users').doc(user.uid).update({
-                                                                associatedRegistrations: [{
-                                                                    uniqueId: actualPraveshikaId,
-                                                                    name: data.name || '',
-                                                                    email: identifier
-                                                                }],
-                                                                emailProcessed: true,
-                                                                emailProcessedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                                            });
-                                                        });
-                                                }).then(() => {
-                                                    // Account created, now check for password reset
-                                                    checkAndPromptPasswordReset(userCredential.user, loginForm);
+                                                    registrationData: data
                                                 });
                                             })
                                             .catch((createError) => {
                                                 console.error('Account creation error:', createError);
                                                 if (createError.code === 'auth/email-already-in-use') {
-                                                    // Account was created between check and creation, try login again
+                                                    // Account already exists - this means user has a different password
+                                                    // Try to login again with default password
                                                     firebase.auth().signInWithEmailAndPassword(identifier, DEFAULT_PASSWORD)
                                                         .then((userCredential) => {
                                                             checkAndPromptPasswordReset(userCredential.user, loginForm);
                                                         })
                                                         .catch((loginError) => {
-                                                            handleLoginError(loginError);
+                                                            // If login still fails, the password was changed
+                                                            if (loginError.code === 'auth/wrong-password' || 
+                                                                loginError.code === 'auth/invalid-credential' || 
+                                                                loginError.code === 'auth/invalid-login-credentials') {
+                                                                showNotification('The default password has been changed. Please use your current password or use "Forgot Password" to reset it.', 'error');
+                                                            } else {
+                                                                handleLoginError(loginError);
+                                                            }
                                                         });
                                                 } else {
                                                     handleLoginError(createError);
@@ -1189,8 +1125,203 @@ function refreshAssociatedRegistrations(user) {
         });
 }
 
+// Password Reset Modal Functions
+function openPasswordResetModal(user, loginForm, registrationInfo = null) {
+    const modal = document.getElementById('passwordResetModal');
+    if (modal) {
+        // Store user info for password reset
+        modal.dataset.userUid = user.uid;
+        modal.dataset.userEmail = user.email;
+        if (registrationInfo) {
+            modal.dataset.registrationInfo = JSON.stringify(registrationInfo);
+        }
+        modal.dataset.loginFormId = loginForm ? loginForm.id : '';
+        
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        
+        // Focus on first input
+        setTimeout(() => {
+            const firstInput = document.getElementById('resetPasswordNew');
+            if (firstInput) firstInput.focus();
+        }, 100);
+    }
+}
+
+function closePasswordResetModal() {
+    const modal = document.getElementById('passwordResetModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        
+        // Reset form
+        const form = document.getElementById('passwordResetForm');
+        if (form) form.reset();
+        
+        // Reset password visibility toggles
+        const newPasswordInput = document.getElementById('resetPasswordNew');
+        const confirmPasswordInput = document.getElementById('resetPasswordConfirm');
+        const toggleNew = document.getElementById('toggleNewPassword');
+        const toggleConfirm = document.getElementById('toggleConfirmPassword');
+        
+        if (newPasswordInput) newPasswordInput.type = 'password';
+        if (confirmPasswordInput) confirmPasswordInput.type = 'password';
+        if (toggleNew) toggleNew.textContent = '👁️';
+        if (toggleConfirm) toggleConfirm.textContent = '👁️';
+        
+        // Clear stored data
+        delete modal.dataset.userUid;
+        delete modal.dataset.userEmail;
+        delete modal.dataset.registrationInfo;
+        delete modal.dataset.loginFormId;
+    }
+}
+
+// Toggle password visibility
+function togglePasswordVisibility(inputId, toggleId) {
+    const input = document.getElementById(inputId);
+    const toggle = document.getElementById(toggleId);
+    
+    if (input && toggle) {
+        if (input.type === 'password') {
+            input.type = 'text';
+            toggle.textContent = '🙈';
+        } else {
+            input.type = 'password';
+            toggle.textContent = '👁️';
+        }
+    }
+}
+
+// Password Reset Form Submission (for first-time login)
+document.addEventListener('DOMContentLoaded', function() {
+    const passwordResetForm = document.getElementById('passwordResetForm');
+    if (passwordResetForm) {
+        passwordResetForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const modal = document.getElementById('passwordResetModal');
+            if (!modal) return;
+            
+            const userUid = modal.dataset.userUid;
+            const registrationInfo = modal.dataset.registrationInfo ? JSON.parse(modal.dataset.registrationInfo) : null;
+            const loginFormId = modal.dataset.loginFormId;
+            const loginForm = loginFormId ? document.getElementById(loginFormId) : null;
+            
+            if (!userUid) {
+                showNotification('Session expired. Please login again.', 'error');
+                closePasswordResetModal();
+                return;
+            }
+            
+            const newPassword = document.getElementById('resetPasswordNew').value;
+            const confirmPassword = document.getElementById('resetPasswordConfirm').value;
+            
+            if (!newPassword) {
+                showNotification('Please enter a new password.', 'error');
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                showNotification('New password must be at least 6 characters long.', 'error');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                showNotification('New password and confirm password do not match.', 'error');
+                return;
+            }
+            
+            // Get current user
+            const currentUser = firebase.auth().currentUser;
+            if (!currentUser || currentUser.uid !== userUid) {
+                showNotification('Session expired. Please login again.', 'error');
+                closePasswordResetModal();
+                return;
+            }
+            
+            // Update password
+            showNotification('Resetting password...', 'info');
+            
+            currentUser.updatePassword(newPassword)
+                .then(() => {
+                    showNotification('Password reset successfully!', 'success');
+                    
+                    // Create user document (required for first-time login)
+                    if (window.firebase && firebase.firestore) {
+                        const db = firebase.firestore();
+                        let userData;
+                        
+                        // If registrationInfo exists (account creation), use it to populate user data
+                        if (registrationInfo) {
+                            userData = {
+                                email: currentUser.email,
+                                name: registrationInfo.name || '',
+                                uniqueId: registrationInfo.uniqueId || '',
+                                role: registrationInfo.role || 'participant',
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                associatedRegistrations: registrationInfo.uniqueId ? [{
+                                    uniqueId: registrationInfo.uniqueId,
+                                    name: registrationInfo.name || '',
+                                    email: currentUser.email
+                                }] : []
+                            };
+                        } else {
+                            // First-time login without registrationInfo - create basic user document
+                            userData = {
+                                email: currentUser.email,
+                                name: '',
+                                uniqueId: '',
+                                role: 'participant',
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                associatedRegistrations: []
+                            };
+                        }
+                        
+                        return db.collection('users').doc(currentUser.uid).set(userData, { merge: true })
+                            .then(() => {
+                                // Clear pending user creation if exists
+                                localStorage.removeItem('pendingUserCreation_' + currentUser.uid);
+                            });
+                    }
+                })
+                .then(() => {
+                    // Close modal and proceed with login
+                    closePasswordResetModal();
+                    closeLogin();
+                    
+                    if (loginForm) {
+                        handleLoginSuccess(loginForm);
+                    } else {
+                        updateAuthUI();
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error resetting password:', error);
+                    let errorMessage = 'Error resetting password. ';
+                    
+                    if (error.code === 'auth/weak-password') {
+                        errorMessage = 'New password is too weak. Please choose a stronger password.';
+                    } else if (error.code === 'auth/requires-recent-login') {
+                        errorMessage = 'For security, please login again and then reset your password.';
+                        // Sign out and close modal
+                        firebase.auth().signOut().then(() => {
+                            closePasswordResetModal();
+                            closeLogin();
+                        });
+                    } else {
+                        errorMessage += error.message || 'Please try again.';
+                    }
+                    
+                    showNotification(errorMessage, 'error');
+                });
+        });
+    }
+});
+
 // Check if password reset is required and prompt user
-function checkAndPromptPasswordReset(user, loginForm) {
+// Shows password reset modal when user document doesn't exist (first-time login or account creation)
+function checkAndPromptPasswordReset(user, loginForm, registrationInfo = null) {
     if (!window.firebase || !firebase.firestore) {
         handleLoginSuccess(loginForm);
         return;
@@ -1198,47 +1329,27 @@ function checkAndPromptPasswordReset(user, loginForm) {
     
     const db = firebase.firestore();
     
-    // Check user document for passwordResetRequired flag
+    // Check if user document exists in Firestore
     db.collection('users').doc(user.uid).get()
         .then((userDoc) => {
-            const passwordResetRequired = userDoc.exists && userDoc.data().passwordResetRequired === true;
+            const userExists = userDoc.exists;
             
-            if (passwordResetRequired) {
-                // Show password reset prompt
-                showNotification('Please reset your password for security. Sending reset email...', 'info');
-                
-                // Send password reset email
-                firebase.auth().sendPasswordResetEmail(user.email)
-                    .then(() => {
-                        showNotification('Password reset email sent! Please check your inbox and reset your password. You will be logged in after resetting.', 'success');
-                        // Update flag to false after sending reset email
-                        db.collection('users').doc(user.uid).update({
-                            passwordResetRequired: false
-                        }).catch(() => {
-                            // Ignore update errors
-                        });
-                        
-                        // Close login modal and sign out (user needs to reset password)
-                        setTimeout(() => {
-                            closeLogin();
-                            firebase.auth().signOut().then(() => {
-                                showNotification('Please check your email and reset your password, then login again.', 'info');
-                            });
-                        }, 3000);
-                    })
-                    .catch((error) => {
-                        console.error('Error sending password reset email:', error);
-                        showNotification('Error sending password reset email. You can reset it later from the login page.', 'error');
-                        // Still proceed with login
-                        handleLoginSuccess(loginForm);
-                    });
-            } else {
-                // No password reset required, proceed with normal login
+            // FIRST-TIME LOGIN OR ACCOUNT CREATION: If user document doesn't exist, show password reset modal
+            // This applies whether it's a first-time login or a newly created account
+            if (!userExists) {
+                // User successfully authenticated but no document in Firestore
+                // Close login modal and show password reset modal
+                // Pass registrationInfo so user document can be created after password reset
+                closeLogin();
+                openPasswordResetModal(user, loginForm, registrationInfo);
+            } 
+            // REGULAR LOGIN: User document exists, proceed with normal login
+            else {
                 handleLoginSuccess(loginForm);
             }
         })
         .catch((error) => {
-            console.error('Error checking password reset requirement:', error);
+            console.error('Error checking user document:', error);
             // If check fails, proceed with normal login
             handleLoginSuccess(loginForm);
         });

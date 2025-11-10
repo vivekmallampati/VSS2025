@@ -1370,21 +1370,24 @@
         <div class="modal-content">
             <span class="close" onclick="closeLogin()">&times;</span>
             <h2>Login</h2>
-            <p class="login-note" style="color: #666; font-size: 0.9rem; margin-bottom: 1rem; font-weight: 500;">
-                Use your registered email ID.
-                <br>On your first login, you will be prompted to reset your password for security.
-            </p>
             <div id="loginFormContainer">
+                <p class="login-note" style="color: #ff9544; font-size: 0.8rem; font-weight: 500;">
+                    <br>On your first login, you will be prompted to reset your password for security.
+                </p>
                 <form class="login-form" id="loginForm">
                     <div class="form-group">
                         <input type="email" id="loginIdentifier" placeholder="Registered Email" required>
                     </div>
-                    <div class="form-group">
-                        <input type="password" id="loginPassword" placeholder="Password (Default: Vss@2025!)" required>
+                    <div class="form-group" style="position: relative;">
+                        <input type="password" id="loginPassword" placeholder="Password" required style="padding-right: 40px;">
+                        <span class="password-toggle" onclick="togglePasswordVisibility('loginPassword', 'toggleLoginPassword')" id="toggleLoginPassword" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666; font-size: 1.2rem; user-select: none;">👁️</span>
                     </div>
-                    <button type="submit" class="btn btn-primary">Login</button>
+                    <div style="display: flex; justify-content: center;">
+                        <button type="submit" class="btn btn-primary">Login</button>
+                    </div>
                 </form>
-                <p class="login-note">Login with your registered email ID.</p>
+                <!-- <p class="login-note">Please login with your registered email ID.</p> -->
+                <br
                 <p class="login-note">
                     <a href="#" onclick="showForgotPassword(); return false;">Forgot Password?</a>
                 </p>
@@ -1403,6 +1406,28 @@
                     <a href="#" onclick="showLoginForm(); return false;">Back to Login</a>
                 </p>
             </div>
+        </div>
+    </div>
+
+    <!-- Password Reset Modal (for first-time login) -->
+    <div id="passwordResetModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closePasswordResetModal()">&times;</span>
+            <h2>Reset Your Password</h2>
+            <p class="login-note" style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">
+                For security, please set a new password for your account.
+            </p>
+            <form class="login-form" id="passwordResetForm">
+                <div class="form-group" style="position: relative;">
+                    <input type="password" id="resetPasswordNew" placeholder="New Password" required style="padding-right: 40px;">
+                    <span class="password-toggle" onclick="togglePasswordVisibility('resetPasswordNew', 'toggleNewPassword')" id="toggleNewPassword" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666; font-size: 1.2rem; user-select: none;">👁️</span>
+                </div>
+                <div class="form-group" style="position: relative;">
+                    <input type="password" id="resetPasswordConfirm" placeholder="Confirm New Password" required style="padding-right: 40px;">
+                    <span class="password-toggle" onclick="togglePasswordVisibility('resetPasswordConfirm', 'toggleConfirmPassword')" id="toggleConfirmPassword" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666; font-size: 1.2rem; user-select: none;">👁️</span>
+                </div>
+                <button type="submit" class="btn btn-primary">Reset Password</button>
+            </form>
         </div>
     </div>
 
