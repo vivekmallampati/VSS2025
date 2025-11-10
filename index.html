@@ -1372,6 +1372,9 @@
         <div class="modal-content">
             <span class="close" onclick="closeLogin()">&times;</span>
             <h2>Login</h2>
+            <p class="login-note" style="color: #666; font-size: 0.9rem; margin-bottom: 1rem; font-weight: 500;">
+                If logging in for first time, please <a href="#" onclick="closeLogin(); openRegister(); return false;" style="color: #007bff; text-decoration: underline; font-weight: 600;">REGISTER</a>. Use the temporary password sent in the email.
+            </p>
             <div id="loginFormContainer">
                 <form class="login-form" id="loginForm">
                     <div class="form-group">
@@ -1421,7 +1424,7 @@
                     </div>
                     <button type="submit" class="btn btn-primary">Verify & Continue</button>
                 </form>
-                <p class="login-note">Enter your email and temporary password to verify your registration.</p>
+                <p class="login-note">Enter your email and the temporary password sent in the email to verify your registration. If you need assistance, <a href="#" onclick="closeRegister(); activateTab('contact'); return false;" style="color: #007bff; text-decoration: underline;">use the contact form</a>.</p>
             </div>
             <div id="registerPasswordForm" style="display:none;">
                 <form class="password-setup-form">
