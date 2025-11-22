@@ -4437,7 +4437,29 @@ function calculateStatistics(registrations, users) {
         tourBreakdown: {},
         pickupBreakdown: {},
         dropoffBreakdown: {},
-        genderBreakdown: {}
+        genderBreakdown: {},
+        countryOverallBreakdown: {},
+        zoneShreniBreakdown: {},
+        ageBreakdown: {},
+        shikshaVargBreakdown: {},
+        shikshaVargShreniBreakdown: {},
+        arrivalDateBreakdown: {},
+        arrivalTimeBucketsBreakdown: {},
+        pickupNeededBreakdown: {},
+        dropoffNeededBreakdown: {},
+        placeOfArrivalBreakdown: {},
+        placeArrivalDateBreakdown: {},
+        placeArrivalDateTimeBreakdown: {},
+        placeOfDepartureBreakdown: {},
+        placeDepartureDateBreakdown: {},
+        ganaveshSizeBreakdown: {},
+        medicalConditionsBreakdown: {},
+        dietaryRestrictionsBreakdown: {},
+        travelUpdateStats: {
+            totalUpdated: 0,
+            totalNotUpdated: 0,
+            updatePercentage: 0
+        }
     };
     
     // Count unique email addresses
@@ -4487,7 +4509,120 @@ function calculateStatistics(registrations, users) {
         // Gender breakdown
         const gender = reg.gender || reg.Gender || 'Not Specified';
         stats.genderBreakdown[gender] = (stats.genderBreakdown[gender] || 0) + 1;
+        
+        // Country overall breakdown (same as countryBreakdown but separate for clarity)
+        stats.countryOverallBreakdown[country] = (stats.countryOverallBreakdown[country] || 0) + 1;
+        
+        // Zone by Shreni breakdown
+        const zoneShreniKey = `${zone} | ${shreni}`;
+        stats.zoneShreniBreakdown[zoneShreniKey] = (stats.zoneShreniBreakdown[zoneShreniKey] || 0) + 1;
+        
+        // Age breakdown (dynamic buckets based on data)
+        const age = parseInt(reg.age || reg.Age || 0);
+        if (age > 0) {
+            let ageBucket = '';
+            if (age <= 20) ageBucket = '0-20';
+            else if (age <= 30) ageBucket = '21-30';
+            else if (age <= 35) ageBucket = '31-35';
+            else if (age <= 40) ageBucket = '36-40';
+            else if (age <= 50) ageBucket = '41-50';
+            else if (age <= 60) ageBucket = '51-60';
+            else ageBucket = '60+';
+            stats.ageBreakdown[ageBucket] = (stats.ageBreakdown[ageBucket] || 0) + 1;
+        }
+        
+        // Shiksha Varg breakdown
+        const shikshaVarg = reg.shikshaVarg || reg['Which Sangh Shiksha Varg have you completed'] || reg['Shiksha Varg'] || 'Not specified';
+        stats.shikshaVargBreakdown[shikshaVarg] = (stats.shikshaVargBreakdown[shikshaVarg] || 0) + 1;
+        
+        // Shiksha Varg by Shreni
+        const shikshaVargShreniKey = `${shreni} | ${shikshaVarg}`;
+        stats.shikshaVargShreniBreakdown[shikshaVargShreniKey] = (stats.shikshaVargShreniBreakdown[shikshaVargShreniKey] || 0) + 1;
+        
+        // Date of Arrival breakdown
+        const arrivalDate = reg.arrivalDate || reg['Date of Arrival'] || '';
+        if (arrivalDate) {
+            stats.arrivalDateBreakdown[arrivalDate] = (stats.arrivalDateBreakdown[arrivalDate] || 0) + 1;
+        }
+        
+        // Arrival Time Buckets (2/4 hour sections)
+        const arrivalTime = reg.arrivalTime || reg['Time of Arrival'] || '';
+        if (arrivalTime) {
+            const timeBucket = getTimeBucket(arrivalTime);
+            stats.arrivalTimeBucketsBreakdown[timeBucket] = (stats.arrivalTimeBucketsBreakdown[timeBucket] || 0) + 1;
+        }
+        
+        // Pickup Needed breakdown
+        const pickupNeeded = reg.pickupNeeded || reg['Do you need a pickup on arrival?'] || 'Not specified';
+        stats.pickupNeededBreakdown[pickupNeeded] = (stats.pickupNeededBreakdown[pickupNeeded] || 0) + 1;
+        
+        // Dropoff Needed breakdown
+        const dropoffNeeded = reg.dropoffNeeded || reg['Do you need a drop off for departure?'] || 'Not specified';
+        stats.dropoffNeededBreakdown[dropoffNeeded] = (stats.dropoffNeededBreakdown[dropoffNeeded] || 0) + 1;
+        
+        // Place of Arrival breakdown
+        const placeOfArrival = reg.arrivalPlace || reg['Place of Arrival'] || reg.pickupLocation || '';
+        if (placeOfArrival) {
+            stats.placeOfArrivalBreakdown[placeOfArrival] = (stats.placeOfArrivalBreakdown[placeOfArrival] || 0) + 1;
+            
+            // Place of Arrival by Date
+            if (arrivalDate) {
+                const placeDateKey = `${placeOfArrival} | ${arrivalDate}`;
+                stats.placeArrivalDateBreakdown[placeDateKey] = (stats.placeArrivalDateBreakdown[placeDateKey] || 0) + 1;
+                
+                // Place of Arrival by Date and Time Bucket
+                if (arrivalTime) {
+                    const timeBucket = getTimeBucket(arrivalTime);
+                    const placeDateTimeKey = `${placeOfArrival} | ${arrivalDate} | ${timeBucket}`;
+                    stats.placeArrivalDateTimeBreakdown[placeDateTimeKey] = (stats.placeArrivalDateTimeBreakdown[placeDateTimeKey] || 0) + 1;
+                }
+            }
+        }
+        
+        // Place of Departure breakdown
+        const placeOfDeparture = reg.departurePlace || reg['Place of Departure'] || '';
+        if (placeOfDeparture) {
+            stats.placeOfDepartureBreakdown[placeOfDeparture] = (stats.placeOfDepartureBreakdown[placeOfDeparture] || 0) + 1;
+            
+            // Place of Departure by Date
+            const departureDate = reg.departureDate || reg['Date of Departure'] || reg['Date of Departure Train/Flight'] || '';
+            if (departureDate) {
+                const placeDepDateKey = `${placeOfDeparture} | ${departureDate}`;
+                stats.placeDepartureDateBreakdown[placeDepDateKey] = (stats.placeDepartureDateBreakdown[placeDepDateKey] || 0) + 1;
+            }
+        }
+        
+        // Ganavesh Size breakdown
+        const ganaveshSize = reg.ganveshSize || reg['Ganvesh Kurta Shoulder Size in cm (for swayamevaks and sevikas)'] || '';
+        if (ganaveshSize) {
+            stats.ganaveshSizeBreakdown[ganaveshSize] = (stats.ganaveshSizeBreakdown[ganaveshSize] || 0) + 1;
+        }
+        
+        // Medical Conditions breakdown
+        const medicalCondition = reg.medicalCondition || reg['Medical Condition'] || reg['Do you have any medical condition?'] || '';
+        if (medicalCondition && medicalCondition.toLowerCase() !== 'no' && medicalCondition.toLowerCase() !== 'none') {
+            stats.medicalConditionsBreakdown[medicalCondition] = (stats.medicalConditionsBreakdown[medicalCondition] || 0) + 1;
+        }
+        
+        // Dietary Restrictions breakdown
+        const dietaryRestriction = reg.dietaryRestriction || reg['Dietary Restriction'] || reg['Dietary Restrictions'] || reg['Diet'] || '';
+        if (dietaryRestriction) {
+            stats.dietaryRestrictionsBreakdown[dietaryRestriction] = (stats.dietaryRestrictionsBreakdown[dietaryRestriction] || 0) + 1;
+        }
+        
+        // Track travel updates (check if travelupdateAt field exists)
+        if (reg.travelupdateAt) {
+            stats.travelUpdateStats.totalUpdated++;
+        } else {
+            stats.travelUpdateStats.totalNotUpdated++;
+        }
     });
+    
+    // Calculate travel update percentage
+    const totalRegistrations = registrations.length;
+    stats.travelUpdateStats.updatePercentage = totalRegistrations > 0 
+        ? ((stats.travelUpdateStats.totalUpdated / totalRegistrations) * 100).toFixed(1) 
+        : '0.0';
     
     // Calculate totals for percentages
     stats.totalCountries = Object.keys(stats.countryBreakdown).length;
@@ -4548,6 +4683,180 @@ function displayAdminStatistics(stats, registrations) {
     
     // Display gender breakdown
     displayBreakdownTable('genderTableBody', stats.genderBreakdown, stats.totalRegistrations);
+    
+    // Display country overall breakdown
+    displayBreakdownTable('countryOverallTableBody', stats.countryOverallBreakdown, stats.totalRegistrations);
+    
+    // Display zone by shreni breakdown (multi-column)
+    displayMultiColumnBreakdownTable('zoneShreniTableBody', stats.zoneShreniBreakdown, stats.totalRegistrations, ' | ');
+    
+    // Display age breakdown
+    displayBreakdownTable('ageTableBody', stats.ageBreakdown, stats.totalRegistrations);
+    
+    // Display shiksha varg breakdown
+    displayBreakdownTable('shikshaVargTableBody', stats.shikshaVargBreakdown, stats.totalRegistrations);
+    
+    // Display shiksha varg by shreni breakdown (multi-column)
+    displayMultiColumnBreakdownTable('shikshaVargShreniTableBody', stats.shikshaVargShreniBreakdown, stats.totalRegistrations, ' | ');
+    
+    // Display arrival date breakdown
+    displayBreakdownTable('arrivalDateTableBody', stats.arrivalDateBreakdown, stats.totalRegistrations);
+    
+    // Display arrival time buckets breakdown
+    displayBreakdownTable('arrivalTimeBucketsTableBody', stats.arrivalTimeBucketsBreakdown, stats.totalRegistrations);
+    
+    // Display pickup needed breakdown
+    displayBreakdownTable('pickupNeededTableBody', stats.pickupNeededBreakdown, stats.totalRegistrations);
+    
+    // Display dropoff needed breakdown
+    displayBreakdownTable('dropoffNeededTableBody', stats.dropoffNeededBreakdown, stats.totalRegistrations);
+    
+    // Display place of arrival breakdown
+    displayBreakdownTable('placeOfArrivalTableBody', stats.placeOfArrivalBreakdown, stats.totalRegistrations);
+    
+    // Display place of arrival by date breakdown (multi-column)
+    displayMultiColumnBreakdownTable('placeArrivalDateTableBody', stats.placeArrivalDateBreakdown, stats.totalRegistrations, ' | ');
+    
+    // Display place of arrival by date and time bucket breakdown (multi-column)
+    displayMultiColumnBreakdownTable('placeArrivalDateTimeTableBody', stats.placeArrivalDateTimeBreakdown, stats.totalRegistrations, ' | ');
+    
+    // Display place of departure breakdown
+    displayBreakdownTable('placeOfDepartureTableBody', stats.placeOfDepartureBreakdown, stats.totalRegistrations);
+    
+    // Display place of departure by date breakdown (multi-column)
+    displayMultiColumnBreakdownTable('placeDepartureDateTableBody', stats.placeDepartureDateBreakdown, stats.totalRegistrations, ' | ');
+    
+    // Display ganavesh size breakdown
+    displayBreakdownTable('ganaveshSizeTableBody', stats.ganaveshSizeBreakdown, stats.totalRegistrations);
+    
+    // Display medical conditions breakdown
+    displayBreakdownTable('medicalConditionsTableBody', stats.medicalConditionsBreakdown, stats.totalRegistrations);
+    
+    // Display dietary restrictions breakdown
+    displayBreakdownTable('dietaryRestrictionsTableBody', stats.dietaryRestrictionsBreakdown, stats.totalRegistrations);
+    
+    // Display travel update statistics
+    const totalTravelUpdatesEl = document.getElementById('totalTravelUpdates');
+    if (totalTravelUpdatesEl) {
+        totalTravelUpdatesEl.textContent = stats.travelUpdateStats.totalUpdated;
+    }
+    
+    const totalNotUpdatedTravelEl = document.getElementById('totalNotUpdatedTravel');
+    if (totalNotUpdatedTravelEl) {
+        totalNotUpdatedTravelEl.textContent = stats.travelUpdateStats.totalNotUpdated;
+    }
+    
+    const travelUpdatePercentageEl = document.getElementById('travelUpdatePercentage');
+    if (travelUpdatePercentageEl) {
+        travelUpdatePercentageEl.textContent = stats.travelUpdateStats.updatePercentage + '%';
+    }
+}
+
+// Export registration data with transportation to CSV
+function exportRegistrationDataWithTransport() {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    const db = firebase.firestore();
+    showNotification('Preparing export...', 'info');
+    
+    // Fetch all registrations
+    db.collection('registrations').get()
+        .then((snapshot) => {
+            const registrations = [];
+            snapshot.forEach((doc) => {
+                registrations.push(doc.data());
+            });
+            
+            // Prepare CSV data
+            const csvRows = [];
+            
+            // CSV Header
+            csvRows.push([
+                'Name',
+                'Praveshika ID',
+                'Email ID',
+                'Phone Number',
+                'Pickup Needed',
+                'Place of Arrival',
+                'Date of Arrival',
+                'Time of Arrival',
+                'Arrival Flight/Train Number',
+                'Dropoff Needed',
+                'Date of Departure',
+                'Time of Departure',
+                'Departure Flight/Train Number',
+                'Place of Departure'
+            ].join(','));
+            
+            // CSV Data Rows
+            registrations.forEach((reg) => {
+                const name = escapeCsvField(reg.name || reg['Full Name'] || '');
+                const praveshikaId = escapeCsvField(reg.uniqueId || reg['Praveshika ID'] || '');
+                const email = escapeCsvField(reg.email || reg['Email address'] || reg['Email'] || '');
+                const phone = escapeCsvField(reg.phone || reg.Phone || reg['Phone number on which you can be contacted in Bharat (by call or WhatsApp)'] || '');
+                const pickupNeeded = escapeCsvField(reg.pickupNeeded || reg['Do you need a pickup on arrival?'] || '');
+                const placeOfArrival = escapeCsvField(reg.arrivalPlace || reg['Place of Arrival'] || reg.pickupLocation || '');
+                const arrivalDate = escapeCsvField(reg.arrivalDate || reg['Date of Arrival'] || '');
+                const arrivalTime = escapeCsvField(reg.arrivalTime || reg['Time of Arrival'] || '');
+                const arrivalFlightTrain = escapeCsvField(reg.arrivalFlightTrain || reg['Arrival Flight/Train Number'] || reg.flightTrainNumber || '');
+                const dropoffNeeded = escapeCsvField(reg.dropoffNeeded || reg['Do you need a drop off for departure?'] || '');
+                const departureDate = escapeCsvField(reg.departureDate || reg['Date of Departure'] || reg['Date of Departure Train/Flight'] || '');
+                const departureTime = escapeCsvField(reg.departureTime || reg['Time of Departure'] || reg['Time of Departure Train/Flight'] || '');
+                const departureFlightTrain = escapeCsvField(reg.departureFlightTrain || reg['Departure Flight/Train Number'] || reg.returnFlightTrainNumber || '');
+                const placeOfDeparture = escapeCsvField(reg.departurePlace || reg['Place of Departure'] || '');
+                
+                csvRows.push([
+                    name,
+                    praveshikaId,
+                    email,
+                    phone,
+                    pickupNeeded,
+                    placeOfArrival,
+                    arrivalDate,
+                    arrivalTime,
+                    arrivalFlightTrain,
+                    dropoffNeeded,
+                    departureDate,
+                    departureTime,
+                    departureFlightTrain,
+                    placeOfDeparture
+                ].join(','));
+            });
+            
+            // Create CSV content
+            const csvContent = csvRows.join('\n');
+            
+            // Create download link
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `VSS2025_Registration_Transport_Data_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showNotification('CSV file downloaded successfully!', 'success');
+        })
+        .catch((error) => {
+            console.error('Error exporting data:', error);
+            showNotification('Error exporting data: ' + error.message, 'error');
+        });
+}
+
+// Helper function to escape CSV fields
+function escapeCsvField(field) {
+    if (field === null || field === undefined) return '';
+    const str = String(field);
+    // If field contains comma, quote, or newline, wrap in quotes and escape quotes
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
 }
 
 function displayBreakdownTable(tableBodyId, breakdown, total) {
@@ -4562,7 +4871,7 @@ function displayBreakdownTable(tableBodyId, breakdown, total) {
         const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
         html += `
             <tr>
-                <td>${escapeHtml(key)}</td>
+                <td>${escapeHtml(key || 'Not specified')}</td>
                 <td>${count}</td>
                 <td>${percentage}%</td>
             </tr>
@@ -4574,6 +4883,59 @@ function displayBreakdownTable(tableBodyId, breakdown, total) {
     }
     
     tbody.innerHTML = html;
+}
+
+// Display multi-column breakdown table (for zone|shreni, place|date, etc.)
+function displayMultiColumnBreakdownTable(tableBodyId, breakdown, total, separator) {
+    const tbody = document.getElementById(tableBodyId);
+    if (!tbody) return;
+    
+    // Sort by count descending
+    const sortedEntries = Object.entries(breakdown).sort((a, b) => b[1] - a[1]);
+    
+    let html = '';
+    sortedEntries.forEach(([key, count]) => {
+        const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+        const parts = key.split(separator);
+        
+        // Determine number of columns based on separator count
+        let rowHtml = '<tr>';
+        parts.forEach(part => {
+            rowHtml += `<td>${escapeHtml(part || 'Not specified')}</td>`;
+        });
+        rowHtml += `<td>${count}</td>`;
+        rowHtml += `<td>${percentage}%</td>`;
+        rowHtml += '</tr>';
+        html += rowHtml;
+    });
+    
+    if (sortedEntries.length === 0) {
+        html = '<tr><td colspan="5" style="text-align: center;">No data available</td></tr>';
+    }
+    
+    tbody.innerHTML = html;
+}
+
+// Helper function to get time bucket from time string (2/4 hour sections)
+function getTimeBucket(timeStr) {
+    if (!timeStr) return 'Unknown';
+    
+    // Try to parse time string (could be HH:MM or HH:MM:SS format)
+    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
+    if (!timeMatch) return 'Unknown';
+    
+    const hours = parseInt(timeMatch[1]);
+    const minutes = parseInt(timeMatch[2]);
+    
+    // Create 4-hour buckets: 00-04, 04-08, 08-12, 12-16, 16-20, 20-24
+    if (hours >= 0 && hours < 4) return '00:00-04:00';
+    if (hours >= 4 && hours < 8) return '04:00-08:00';
+    if (hours >= 8 && hours < 12) return '08:00-12:00';
+    if (hours >= 12 && hours < 16) return '12:00-16:00';
+    if (hours >= 16 && hours < 20) return '16:00-20:00';
+    if (hours >= 20 && hours < 24) return '20:00-24:00';
+    
+    return 'Unknown';
 }
 
 // Zone breakdown table with clickable rows
