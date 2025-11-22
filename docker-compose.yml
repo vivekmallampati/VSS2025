@@ -5,14 +5,61 @@ services:
     volumes:
       # Mount the service account key from your local machine
       - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
-      # Mount the Registrations.xlsx file
-      - ./dataprocessing/Registrations.xlsx:/app/Registrations.xlsx:ro
-      # Optionally mount a different Excel file and override EXCEL_FILE_PATH
+      # Mount the latest Registrations_21_11.xlsx file
+      - ./dataprocessing/Registrations_21_11.xlsx:/app/Registrations_21_11.xlsx:ro
     environment:
       - NODE_ENV=production
       # Default Excel file path (can be overridden)
-      - EXCEL_FILE_PATH=/app/Registrations.xlsx
+      - EXCEL_FILE_PATH=/app/Registrations_21_11.xlsx
       # Service account path (defaults to /app/secrets/serviceAccountKey.json)
       - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
-    # The script will upload Registrations.xlsx to Firestore with normalized structure
+    # The script will upload Registrations_21_11.xlsx to Firestore with normalized structure
+
+  approve-registrations:
+    build: .
+    container_name: vss2025-approve-registrations
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+    command: node approve_registrations.js
+    # Approves newly approved Praveshika IDs by updating status field
+
+  cancel-registrations:
+    build: .
+    container_name: vss2025-cancel-registrations
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+    command: node cancel_registrations.js
+    # Cancels registrations by updating status field to 'Cancelled'
+
+  sync-email-to-uids:
+    build: .
+    container_name: vss2025-sync-email-to-uids
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+    command: node sync_email_to_uids.js
+    # Syncs emailToUids collection with all registrations to ensure perfect sync
+
+  sync-user-associated-registrations:
+    build: .
+    container_name: vss2025-sync-user-associated-registrations
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+    command: node sync_user_associated_registrations.js
+    # Syncs associatedRegistrations field in users collection based on emailToUids
 

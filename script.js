@@ -1503,79 +1503,48 @@ async function handleAuthStateChange(user) {
             mediaNavItem.style.display = 'none';
         }
         
-        // If user is admin (but not superadmin), show only checkin and myprofile tabs
-        if (isAdminUser && !isSuperadminUser) {
-            // Hide all tabs except checkin and myprofile for admins
-            if (shibirarthiNavItem) {
-                shibirarthiNavItem.style.display = 'none';
+        // Show appropriate tabs based on user role
+        // Show protected tabs for all authenticated users
+        if (shibirarthiNavItem) {
+            shibirarthiNavItem.style.display = '';
+        }
+        if (myProfileNavItem) {
+            myProfileNavItem.style.display = '';
+            loadUserProfile(user);
+        }
+        if (myTransportationNavItem) {
+            myTransportationNavItem.style.display = '';
+            loadTransportationInfo(user);
+        }
+        if (myToursNavItem) {
+            myToursNavItem.style.display = '';
+            loadToursInfo(user);
+        }
+        
+        // Show checkin tab for superadmin, admin, or volunteers
+        if (checkinNavItem) {
+            if (canPerformCheckinUser) {
+                checkinNavItem.style.display = '';
+            } else {
+                checkinNavItem.style.display = 'none';
             }
-            if (myProfileNavItem) {
-                myProfileNavItem.style.display = '';
-                loadUserProfile(user);
-            }
-            if (myTransportationNavItem) {
-                myTransportationNavItem.style.display = 'none';
-            }
-            if (myToursNavItem) {
-                myToursNavItem.style.display = 'none';
-            }
-            if (checkinNavItem) {
-                if (canPerformCheckinUser) {
-                    checkinNavItem.style.display = '';
-                } else {
-                    checkinNavItem.style.display = 'none';
-                }
-            }
-            if (adminDashboardNavItem) {
+        }
+        
+        // Show admin dashboard for both superadmins and admins
+        if (adminDashboardNavItem) {
+            if (isAdminUser) {
+                adminDashboardNavItem.style.display = '';
+            } else {
                 adminDashboardNavItem.style.display = 'none';
             }
-            if (userManagementNavItem) {
+        }
+        
+        // Show user management only for superadmins
+        if (userManagementNavItem) {
+            if (isSuperadminUser) {
+                userManagementNavItem.style.display = '';
+            } else {
                 userManagementNavItem.style.display = 'none';
-            }
-        } else {
-            // For superadmins and regular users, show all appropriate tabs
-            // Show protected tabs
-            if (shibirarthiNavItem) {
-                shibirarthiNavItem.style.display = '';
-            }
-            if (myProfileNavItem) {
-                myProfileNavItem.style.display = '';
-                loadUserProfile(user);
-            }
-            if (myTransportationNavItem) {
-                myTransportationNavItem.style.display = '';
-                loadTransportationInfo(user);
-            }
-            if (myToursNavItem) {
-                myToursNavItem.style.display = '';
-                loadToursInfo(user);
-            }
-            
-            // Show checkin tab for superadmin, admin, or volunteers
-            if (checkinNavItem) {
-                if (canPerformCheckinUser) {
-                    checkinNavItem.style.display = '';
-                } else {
-                    checkinNavItem.style.display = 'none';
-                }
-            }
-            
-            // Show admin dashboard only for superadmins
-            if (adminDashboardNavItem) {
-                if (isSuperadminUser) {
-                    adminDashboardNavItem.style.display = '';
-                } else {
-                    adminDashboardNavItem.style.display = 'none';
-                }
-            }
-            
-            // Show user management only for superadmins
-            if (userManagementNavItem) {
-                if (isSuperadminUser) {
-                    userManagementNavItem.style.display = '';
-                } else {
-                    userManagementNavItem.style.display = 'none';
-                }
             }
         }
     } else {

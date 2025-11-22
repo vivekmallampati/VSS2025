@@ -37,7 +37,7 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // Read Excel file - support custom path via environment variable
-const excelFilePath = process.env.EXCEL_FILE_PATH || 'TestData.xlsx';
+const excelFilePath = process.env.EXCEL_FILE_PATH || 'Registrations_21_11.xlsx';
 let workbook;
 try {
     workbook = XLSX.readFile(excelFilePath);
