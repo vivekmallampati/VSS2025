@@ -1302,7 +1302,20 @@
                                     <button class="btn btn-primary" onclick="loadTransportationChanges('all')">Anytime</button>
                                 </div>
                                 <div class="change-stats" style="margin-bottom: 1.5rem;">
-                                    <p><strong>Total Changes:</strong> <span id="totalTransportationChanges">0</span></p>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                                        <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px;">
+                                            <p style="margin: 0; font-size: 0.9rem; color: #666;">Last Day</p>
+                                            <p style="margin: 0.5rem 0 0 0; font-size: 1.5rem; font-weight: bold;" id="transportationChangesDay">0</p>
+                                        </div>
+                                        <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px;">
+                                            <p style="margin: 0; font-size: 0.9rem; color: #666;">Last Week</p>
+                                            <p style="margin: 0.5rem 0 0 0; font-size: 1.5rem; font-weight: bold;" id="transportationChangesWeek">0</p>
+                                        </div>
+                                        <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px;">
+                                            <p style="margin: 0; font-size: 0.9rem; color: #666;">Total Changes</p>
+                                            <p style="margin: 0.5rem 0 0 0; font-size: 1.5rem; font-weight: bold;" id="totalTransportationChanges">0</p>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div id="transportationChangesList" class="data-table-container">
                                     <table class="data-table">

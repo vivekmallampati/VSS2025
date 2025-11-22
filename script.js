@@ -4053,6 +4053,7 @@ async function loadAdminDashboard(user) {
         loadTransportationAnalytics(registrations);
         
         // Load transportation changes (default to "all")
+        // This will also load the summary counts
         loadTransportationChanges('all');
         
         // Load checkin analytics
@@ -4863,6 +4864,12 @@ function displayBreakdownTable(tableBodyId, breakdown, total) {
     const tbody = document.getElementById(tableBodyId);
     if (!tbody) return;
     
+    // Handle null or undefined breakdown
+    if (!breakdown || typeof breakdown !== 'object') {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center;">No data available</td></tr>';
+        return;
+    }
+    
     // Sort by count descending
     const sortedEntries = Object.entries(breakdown).sort((a, b) => b[1] - a[1]);
     
@@ -4889,6 +4896,12 @@ function displayBreakdownTable(tableBodyId, breakdown, total) {
 function displayMultiColumnBreakdownTable(tableBodyId, breakdown, total, separator) {
     const tbody = document.getElementById(tableBodyId);
     if (!tbody) return;
+    
+    // Handle null or undefined breakdown
+    if (!breakdown || typeof breakdown !== 'object') {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No data available</td></tr>';
+        return;
+    }
     
     // Sort by count descending
     const sortedEntries = Object.entries(breakdown).sort((a, b) => b[1] - a[1]);
@@ -4920,8 +4933,12 @@ function displayMultiColumnBreakdownTable(tableBodyId, breakdown, total, separat
 function getTimeBucket(timeStr) {
     if (!timeStr) return 'Unknown';
     
+    // Convert to string if it's not already
+    const timeString = String(timeStr).trim();
+    if (!timeString) return 'Unknown';
+    
     // Try to parse time string (could be HH:MM or HH:MM:SS format)
-    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
+    const timeMatch = timeString.match(/(\d{1,2}):(\d{2})/);
     if (!timeMatch) return 'Unknown';
     
     const hours = parseInt(timeMatch[1]);
@@ -5354,13 +5371,16 @@ async function loadTransportationChanges(period) {
     }
     
     try {
+        // First, load summary counts for all periods
+        await loadTransportationChangeSummary();
+        
         // For "anytime" period, use optimized query limited to 1000 most recent changes
         if (!startTime) {
             // Use query with orderBy and limit instead of loading all documents
             // This shows the last 1000 transportation changes, not all historical changes
             // Note: orderBy only returns documents where the field exists
             let query = db.collection('registrations')
-                .orderBy('transportationUpdatedAt', 'desc')
+                .orderBy('travelupdateAt', 'desc')
                 .limit(1000);
             
             const snapshot = await query.get();
@@ -5368,15 +5388,15 @@ async function loadTransportationChanges(period) {
             
             snapshot.forEach(doc => {
                 const data = doc.data();
-                if (data.transportationUpdatedAt) {
+                if (data.travelupdateAt) {
                     changes.push({
                         name: data.name || data['Full Name'] || 'Unknown',
                         uniqueId: data.uniqueId || doc.id,
                         email: data.email || data['Email address'] || '',
-                        pickupLocation: data.pickupLocation || data['Pickup Location'] || 'Not Specified',
-                        arrivalDate: data.arrivalDate || data['Arrival Date'] || '',
-                        arrivalTime: data.arrivalTime || data['Arrival Time'] || '',
-                        transportationUpdatedAt: data.transportationUpdatedAt
+                        pickupLocation: data.arrivalPlace || data.pickupLocation || data['Pickup Location'] || data['Place of Arrival'] || 'Not Specified',
+                        arrivalDate: data.arrivalDate || data['Arrival Date'] || data['Date of Arrival'] || '',
+                        arrivalTime: data.arrivalTime || data['Arrival Time'] || data['Time of Arrival'] || '',
+                        travelupdateAt: data.travelupdateAt
                     });
                 }
             });
@@ -5387,23 +5407,23 @@ async function loadTransportationChanges(period) {
         
         // For day/week periods, use query
         let query = db.collection('registrations')
-            .where('transportationUpdatedAt', '>=', firebase.firestore.Timestamp.fromDate(startTime))
-            .orderBy('transportationUpdatedAt', 'desc');
+            .where('travelupdateAt', '>=', firebase.firestore.Timestamp.fromDate(startTime))
+            .orderBy('travelupdateAt', 'desc');
         
         const snapshot = await query.get();
         
         const changes = [];
         snapshot.forEach(doc => {
             const data = doc.data();
-            if (data.transportationUpdatedAt) {
+            if (data.travelupdateAt) {
                 changes.push({
                     name: data.name || data['Full Name'] || 'Unknown',
                     uniqueId: data.uniqueId || doc.id,
                     email: data.email || data['Email address'] || '',
-                    pickupLocation: data.pickupLocation || data['Pickup Location'] || 'Not Specified',
-                    arrivalDate: data.arrivalDate || data['Arrival Date'] || '',
-                    arrivalTime: data.arrivalTime || data['Arrival Time'] || '',
-                    transportationUpdatedAt: data.transportationUpdatedAt
+                    pickupLocation: data.arrivalPlace || data.pickupLocation || data['Pickup Location'] || data['Place of Arrival'] || 'Not Specified',
+                    arrivalDate: data.arrivalDate || data['Arrival Date'] || data['Date of Arrival'] || '',
+                    arrivalTime: data.arrivalTime || data['Arrival Time'] || data['Time of Arrival'] || '',
+                    travelupdateAt: data.travelupdateAt
                 });
             }
         });
@@ -5418,14 +5438,83 @@ async function loadTransportationChanges(period) {
     }
 }
 
-// Helper function to display transportation changes
-function displayTransportationChanges(changes) {
-    // Update total changes count
-    const totalChangesEl = document.getElementById('totalTransportationChanges');
-    if (totalChangesEl) {
-        totalChangesEl.textContent = changes.length;
+// Load summary counts for transportation changes
+async function loadTransportationChangeSummary() {
+    if (!window.firebase || !firebase.firestore) {
+        return;
     }
     
+    const db = firebase.firestore();
+    const now = new Date();
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    
+    try {
+        // Count changes in last day
+        const dayQuery = db.collection('registrations')
+            .where('travelupdateAt', '>=', firebase.firestore.Timestamp.fromDate(dayAgo));
+        const daySnapshot = await dayQuery.get();
+        const dayCount = daySnapshot.size;
+        
+        // Count changes in last week
+        const weekQuery = db.collection('registrations')
+            .where('travelupdateAt', '>=', firebase.firestore.Timestamp.fromDate(weekAgo));
+        const weekSnapshot = await weekQuery.get();
+        const weekCount = weekSnapshot.size;
+        
+        // Count total changes (all registrations with travelupdateAt)
+        const totalQuery = db.collection('registrations')
+            .where('travelupdateAt', '>', firebase.firestore.Timestamp.fromDate(new Date(0)));
+        const totalSnapshot = await totalQuery.get();
+        const totalCount = totalSnapshot.size;
+        
+        // Update UI
+        const dayEl = document.getElementById('transportationChangesDay');
+        if (dayEl) dayEl.textContent = dayCount;
+        
+        const weekEl = document.getElementById('transportationChangesWeek');
+        if (weekEl) weekEl.textContent = weekCount;
+        
+        const totalEl = document.getElementById('totalTransportationChanges');
+        if (totalEl) totalEl.textContent = totalCount;
+        
+    } catch (error) {
+        console.error('Error loading transportation change summary:', error);
+        // Fallback: try to get approximate counts
+        try {
+            const allSnapshot = await db.collection('registrations').get();
+            let dayCount = 0;
+            let weekCount = 0;
+            let totalCount = 0;
+            
+            allSnapshot.forEach(doc => {
+                const data = doc.data();
+                if (data.travelupdateAt) {
+                    totalCount++;
+                    const updateTime = data.travelupdateAt.toDate ? data.travelupdateAt.toDate() : null;
+                    if (updateTime) {
+                        if (updateTime >= dayAgo) dayCount++;
+                        if (updateTime >= weekAgo) weekCount++;
+                    }
+                }
+            });
+            
+            const dayEl = document.getElementById('transportationChangesDay');
+            if (dayEl) dayEl.textContent = dayCount;
+            
+            const weekEl = document.getElementById('transportationChangesWeek');
+            if (weekEl) weekEl.textContent = weekCount;
+            
+            const totalEl = document.getElementById('totalTransportationChanges');
+            if (totalEl) totalEl.textContent = totalCount;
+        } catch (fallbackError) {
+            console.error('Error in fallback summary calculation:', fallbackError);
+        }
+    }
+}
+
+// Helper function to display transportation changes
+function displayTransportationChanges(changes) {
     // Display changes
     const tbody = document.getElementById('transportationChangesTableBody');
     if (!tbody) return;
@@ -5435,14 +5524,18 @@ function displayTransportationChanges(changes) {
         html = '<tr><td colspan="7" style="text-align: center;">No changes found for the selected period.</td></tr>';
     } else {
         changes.forEach(change => {
-            const updateTime = change.transportationUpdatedAt.toDate ? 
-                change.transportationUpdatedAt.toDate().toLocaleString() : 
+            const updateTime = change.travelupdateAt ? 
+                (change.travelupdateAt.toDate ? change.travelupdateAt.toDate().toLocaleString() : 'Unknown') : 
                 'Unknown';
+            
+            // Add "Last changed" indicator to Praveshika ID
+            const praveshikaIdDisplay = escapeHtml(change.uniqueId) + 
+                ' <span style="color: #28a745; font-size: 0.85rem; font-weight: bold;">(Last changed)</span>';
             
             html += `
                 <tr>
                     <td>${escapeHtml(change.name)}</td>
-                    <td>${escapeHtml(change.uniqueId)}</td>
+                    <td>${praveshikaIdDisplay}</td>
                     <td>${escapeHtml(change.email)}</td>
                     <td>${escapeHtml(change.pickupLocation)}</td>
                     <td>${escapeHtml(change.arrivalDate)}</td>
