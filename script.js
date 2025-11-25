@@ -6470,7 +6470,7 @@ window.addEventListener('click', function(event) {
 
 // Global variables for checkin
 let currentCheckinType = 'pickup_location';
-let currentParticipantUniqueId = null;
+let currentCheckinParticipantUniqueId = null;
 let checkinHistoryListener = null;
 let currentHistoryPage = 1;
 let historyPageSize = 50;
@@ -6892,7 +6892,7 @@ function displayParticipantInfo(regData, uniqueId) {
     
     if (!participantInfo || !participantDetails || !checkinForm) return;
     
-    currentParticipantUniqueId = uniqueId;
+    currentCheckinParticipantUniqueId = uniqueId;
     
     const name = regData.name || regData['Full Name'] || 'Unknown';
     const email = regData.email || regData['Email address'] || 'N/A';
@@ -6945,7 +6945,7 @@ function displayParticipantInfo(regData, uniqueId) {
 
 // Clear participant info
 function clearParticipantInfo() {
-    currentParticipantUniqueId = null;
+    currentCheckinParticipantUniqueId = null;
     const participantInfo = document.getElementById('participantInfo');
     const checkinForm = document.getElementById('checkinForm');
     
@@ -6992,13 +6992,13 @@ function setupCheckinForm() {
 // Perform checkin
 async function performCheckin() {
     // Validate that we have a specific Praveshika ID selected
-    if (!currentParticipantUniqueId || typeof currentParticipantUniqueId !== 'string' || currentParticipantUniqueId.trim() === '') {
+    if (!currentCheckinParticipantUniqueId || typeof currentCheckinParticipantUniqueId !== 'string' || currentCheckinParticipantUniqueId.trim() === '') {
         showNotification('Please search for a participant first', 'error');
         return;
     }
     
     // Ensure we're only checking in a single, specific Praveshika ID
-    const uniqueIdToCheckIn = currentParticipantUniqueId.trim();
+    const uniqueIdToCheckIn = currentCheckinParticipantUniqueId.trim();
     
     if (!window.firebase || !firebase.auth || !firebase.firestore) {
         showNotification('Firebase not initialized', 'error');
