@@ -4649,6 +4649,9 @@ function displayParticipantLookupResults(regData, uniqueId) {
     const resultsDiv = document.getElementById('participantLookupResults');
     const detailsDiv = document.getElementById('participantLookupDetails');
     const fieldsDiv = document.getElementById('participantLookupFields');
+    const editBtn = document.getElementById('editParticipantBtn');
+    const saveBtn = document.getElementById('saveParticipantBtn');
+    const cancelBtn = document.getElementById('cancelEditBtn');
     
     if (!detailsDiv || !fieldsDiv) return;
     
@@ -4661,8 +4664,10 @@ function displayParticipantLookupResults(regData, uniqueId) {
     currentParticipantData = regData;
     currentParticipantUniqueId = uniqueId;
     
-    // Reset edit mode
-    cancelParticipantEditMode();
+    // Reset edit mode buttons to default state
+    if (editBtn) editBtn.style.display = 'inline-block';
+    if (saveBtn) saveBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = 'none';
     
     // Display all fields
     let html = '<div class="participant-fields-display">';
@@ -4749,20 +4754,8 @@ function enableParticipantEditMode() {
 
 // Cancel edit mode
 function cancelParticipantEditMode() {
-    const fieldsDiv = document.getElementById('participantLookupFields');
-    const editBtn = document.getElementById('editParticipantBtn');
-    const saveBtn = document.getElementById('saveParticipantBtn');
-    const cancelBtn = document.getElementById('cancelEditBtn');
-    
-    if (!fieldsDiv || !currentParticipantData) return;
-    
-    // Restore display mode
+    if (!currentParticipantData || !currentParticipantUniqueId) return;
     displayParticipantLookupResults(currentParticipantData, currentParticipantUniqueId);
-    
-    // Show/hide buttons
-    if (editBtn) editBtn.style.display = 'inline-block';
-    if (saveBtn) saveBtn.style.display = 'none';
-    if (cancelBtn) cancelBtn.style.display = 'none';
 }
 
 // Save participant edits
