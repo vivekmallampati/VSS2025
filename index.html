@@ -55,6 +55,7 @@
                 <li id="checkinNavItem" style="display: none;"><a href="#checkin" class="nav-link" data-tab="checkin">Checkin</a></li>
                 <li id="adminDashboardNavItem" style="display: none;"><a href="#admin-dashboard" class="nav-link" data-tab="admin-dashboard">Admin Dashboard</a></li>
                 <li id="userManagementNavItem" style="display: none;"><a href="#user-management" class="nav-link" data-tab="user-management">User Management</a></li>
+                <li id="participantLookupNavItem" style="display: none;"><a href="#participant-lookup" class="nav-link" data-tab="participant-lookup">Participant Lookup</a></li>
                 <!-- <li><a href="#documents" class="nav-link" data-tab="documents">Documents</a></li> -->
                 <li id="mediaNavItem"><a href="#media" class="nav-link" data-tab="media">Media</a></li>
                 <!-- <li><a href="#donate" class="nav-link" data-tab="donate">Donate</a></li> -->
@@ -1498,6 +1499,64 @@
                             <h3>Existing Users (Volunteers & Admins)</h3>
                             <div id="userManagementList" class="data-table-container">
                                 <p>Loading users...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Participant Lookup Tab -->
+        <section id="participant-lookup" class="tab-content">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Participant Lookup</h2>
+                    <p>Search and view full participant information from Registration collection</p>
+                </div>
+                <div class="participant-lookup-content">
+                    <div id="participantLookupLoading" style="text-align: center; padding: 2rem;">
+                        <p>Loading participant lookup...</p>
+                    </div>
+                    
+                    <div id="participantLookupData" style="display: none;">
+                        <!-- Search Section -->
+                        <div class="participant-lookup-search" style="background: #f5f5f5; padding: 2rem; border-radius: 8px; margin-bottom: 2rem;">
+                            <h3>Search Participant</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                <div class="form-group">
+                                    <label for="lookupUniqueId">Search by Unique ID (Praveshika ID):</label>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        <input type="text" id="lookupUniqueId" class="form-input" placeholder="Enter Praveshika ID" autocomplete="off">
+                                        <button class="btn btn-primary" onclick="searchParticipantByUniqueId()">Search</button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="lookupEmail">Search by Email:</label>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        <input type="email" id="lookupEmail" class="form-input" placeholder="Enter email address" autocomplete="off">
+                                        <button class="btn btn-primary" onclick="searchParticipantByEmail()">Search</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Search Results / Participant Selection -->
+                        <div id="participantLookupResults" style="display: none;">
+                            <!-- This will show selection list if email search returns multiple results -->
+                        </div>
+
+                        <!-- Participant Details Display -->
+                        <div id="participantLookupDetails" style="display: none;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h3>Participant Information</h3>
+                                <div>
+                                    <button id="editParticipantBtn" class="btn btn-primary" onclick="enableParticipantEditMode()" style="display: inline-block;">Edit</button>
+                                    <button id="saveParticipantBtn" class="btn btn-success" onclick="saveParticipantEdits()" style="display: none;">Save Changes</button>
+                                    <button id="cancelEditBtn" class="btn btn-secondary" onclick="cancelParticipantEditMode()" style="display: none;">Cancel</button>
+                                </div>
+                            </div>
+                            <div id="participantLookupFields" style="background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #ddd;">
+                                <!-- All Registration fields will be displayed here -->
                             </div>
                         </div>
                     </div>

@@ -33,7 +33,7 @@ function waitForFirebase(callback, maxRetries = 50) {
 }
 
 // Protected tabs that require authentication
-const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours', 'checkin', 'admin-dashboard', 'user-management'];
+const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours', 'checkin', 'admin-dashboard', 'user-management', 'participant-lookup'];
 
 // Helper function to check if a tab is protected
 function isProtectedTab(tabName) {
@@ -250,6 +250,9 @@ function activateTab(tabName, skipAuthCheck = false) {
                         break;
                     case 'user-management':
                         loadUserManagementPage(user);
+                        break;
+                    case 'participant-lookup':
+                        loadParticipantLookupPage(user);
                         break;
                 }
             }
@@ -1466,6 +1469,7 @@ async function handleAuthStateChange(user) {
     const checkinNavItem = document.getElementById('checkinNavItem');
     const adminDashboardNavItem = document.getElementById('adminDashboardNavItem');
     const userManagementNavItem = document.getElementById('userManagementNavItem');
+    const participantLookupNavItem = document.getElementById('participantLookupNavItem');
     
     if (user) {
         // Check user roles
@@ -1547,6 +1551,15 @@ async function handleAuthStateChange(user) {
                 userManagementNavItem.style.display = 'none';
             }
         }
+        
+        // Show participant lookup for both superadmins and admins
+        if (participantLookupNavItem) {
+            if (isAdminUser) {
+                participantLookupNavItem.style.display = '';
+            } else {
+                participantLookupNavItem.style.display = 'none';
+            }
+        }
     } else {
         // User is logged out
         if (loginBtn) {
@@ -1586,6 +1599,9 @@ async function handleAuthStateChange(user) {
         }
         if (userManagementNavItem) {
             userManagementNavItem.style.display = 'none';
+        }
+        if (participantLookupNavItem) {
+            participantLookupNavItem.style.display = 'none';
         }
         
         // If user is on protected tab, redirect to home
@@ -4423,6 +4439,408 @@ async function handleUserCreationSubmit(event) {
     } finally {
         if (submitButton) submitButton.disabled = false;
     }
+}
+
+// ============================================
+// PARTICIPANT LOOKUP FUNCTIONS
+// ============================================
+
+// Load participant lookup page
+async function loadParticipantLookupPage(user) {
+    // Verify user is admin (superadmin or admin)
+    const isAdminUser = await isAdmin(user);
+    if (!isAdminUser) {
+        const loadingDiv = document.getElementById('participantLookupLoading');
+        if (loadingDiv) {
+            loadingDiv.innerHTML = '<p style="color: red;">Access denied. You do not have permission to view this page.</p>';
+        }
+        return;
+    }
+    
+    const loadingDiv = document.getElementById('participantLookupLoading');
+    const dataDiv = document.getElementById('participantLookupData');
+    
+    if (!loadingDiv || !dataDiv) return;
+    
+    loadingDiv.style.display = 'block';
+    dataDiv.style.display = 'none';
+    
+    if (!window.firebase || !firebase.firestore) {
+        loadingDiv.innerHTML = '<p style="color: red;">Firebase not initialized.</p>';
+        return;
+    }
+    
+    try {
+        // Clear previous results
+        clearParticipantLookupResults();
+        
+        // Show data div, hide loading
+        loadingDiv.style.display = 'none';
+        dataDiv.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error loading participant lookup page:', error);
+        loadingDiv.innerHTML = '<p style="color: red;">Error loading participant lookup. Please try again.</p>';
+    }
+}
+
+// Search participant by Unique ID (exact match)
+async function searchParticipantByUniqueId() {
+    const uniqueIdInput = document.getElementById('lookupUniqueId');
+    if (!uniqueIdInput) return;
+    
+    const uniqueId = uniqueIdInput.value.trim();
+    if (!uniqueId) {
+        showNotification('Please enter a Praveshika ID', 'error');
+        return;
+    }
+    
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const normalizedId = normalizePraveshikaId(uniqueId);
+        
+        // Search in registrations collection
+        const registrationsQuery = await db.collection('registrations')
+            .where('normalizedId', '==', normalizedId)
+            .limit(1)
+            .get();
+        
+        if (registrationsQuery.empty) {
+            // Try direct document ID lookup
+            const regDoc = await db.collection('registrations').doc(uniqueId).get();
+            if (regDoc.exists) {
+                displayParticipantLookupResults(regDoc.data(), uniqueId);
+            } else {
+                showNotification('Participant not found', 'error');
+                clearParticipantLookupResults();
+            }
+        } else {
+            const regData = registrationsQuery.docs[0].data();
+            const foundUniqueId = regData.uniqueId || registrationsQuery.docs[0].id;
+            displayParticipantLookupResults(regData, foundUniqueId);
+        }
+    } catch (error) {
+        console.error('Error searching participant:', error);
+        showNotification('Error searching participant: ' + error.message, 'error');
+    }
+}
+
+// Search participant by Email (group match)
+async function searchParticipantByEmail() {
+    const emailInput = document.getElementById('lookupEmail');
+    if (!emailInput) return;
+    
+    const email = emailInput.value.trim();
+    if (!email) {
+        showNotification('Please enter an email address', 'error');
+        return;
+    }
+    
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const emailLower = email.toLowerCase();
+        
+        // Fetch all registrations and filter client-side for case-insensitive email match
+        const allRegistrations = await db.collection('registrations').limit(1000).get();
+        const results = [];
+        
+        allRegistrations.docs.forEach(doc => {
+            const data = doc.data();
+            const regEmail = (data.email || data['Email address'] || '').toLowerCase();
+            if (regEmail.includes(emailLower)) {
+                results.push(doc);
+            }
+        });
+        
+        if (results.length === 0) {
+            showNotification('No participants found with this email', 'info');
+            clearParticipantLookupResults();
+            return;
+        }
+        
+        if (results.length === 1) {
+            const regData = results[0].data();
+            const uniqueId = regData.uniqueId || results[0].id;
+            displayParticipantLookupResults(regData, uniqueId);
+        } else {
+            // Show selection list
+            displayParticipantSelectionList(results);
+        }
+    } catch (error) {
+        console.error('Error searching participant by email:', error);
+        showNotification('Error searching participant: ' + error.message, 'error');
+    }
+}
+
+// Display participant selection list (when email search returns multiple results)
+function displayParticipantSelectionList(docs) {
+    const resultsDiv = document.getElementById('participantLookupResults');
+    const detailsDiv = document.getElementById('participantLookupDetails');
+    
+    if (!resultsDiv) return;
+    
+    if (detailsDiv) {
+        detailsDiv.style.display = 'none';
+    }
+    
+    let html = `<div class="participant-search-results">
+        <h4>${docs.length} participant(s) found with this email. Please select:</h4>
+        <ul style="list-style: none; padding: 0;">`;
+    
+    docs.forEach(doc => {
+        const data = doc.data();
+        const name = data.name || data['Full Name'] || 'Unknown';
+        const uniqueId = data.uniqueId || doc.id;
+        const email = data.email || data['Email address'] || '';
+        
+        html += `
+            <li style="margin: 0.5rem 0; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <button class="btn btn-link" onclick="selectParticipantFromLookup('${escapeHtml(uniqueId)}')" style="text-align: left; width: 100%;">
+                    <strong>${escapeHtml(name)}</strong><br>
+                    <small>Praveshika ID: ${escapeHtml(uniqueId)}${email ? ' - ' + escapeHtml(email) : ''}</small>
+                </button>
+            </li>`;
+    });
+    
+    html += '</ul></div>';
+    
+    resultsDiv.innerHTML = html;
+    resultsDiv.style.display = 'block';
+}
+
+// Select participant from lookup results
+async function selectParticipantFromLookup(uniqueId) {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const regDoc = await db.collection('registrations').doc(uniqueId).get();
+        
+        if (regDoc.exists) {
+            displayParticipantLookupResults(regDoc.data(), uniqueId);
+        } else {
+            showNotification('Participant not found', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading participant:', error);
+        showNotification('Error loading participant: ' + error.message, 'error');
+    }
+}
+
+// Store current participant data for editing
+let currentParticipantData = null;
+let currentParticipantUniqueId = null;
+
+// Display participant lookup results with all fields
+function displayParticipantLookupResults(regData, uniqueId) {
+    const resultsDiv = document.getElementById('participantLookupResults');
+    const detailsDiv = document.getElementById('participantLookupDetails');
+    const fieldsDiv = document.getElementById('participantLookupFields');
+    
+    if (!detailsDiv || !fieldsDiv) return;
+    
+    // Hide results selection list
+    if (resultsDiv) {
+        resultsDiv.style.display = 'none';
+    }
+    
+    // Store current data
+    currentParticipantData = regData;
+    currentParticipantUniqueId = uniqueId;
+    
+    // Reset edit mode
+    cancelParticipantEditMode();
+    
+    // Display all fields
+    let html = '<div class="participant-fields-display">';
+    
+    // Get all fields from the registration document
+    const fieldNames = Object.keys(regData).sort();
+    
+    fieldNames.forEach(fieldName => {
+        const fieldValue = regData[fieldName];
+        // Handle Firestore timestamp fields
+        if (fieldName === 'importedAt' || fieldName === 'createdAt' || fieldName === 'updatedAt' || 
+            fieldName === 'travelupdateAt' || fieldName === 'tourupdateAt') {
+            // Format timestamp fields
+            let displayValue = '';
+            if (fieldValue && fieldValue.toDate) {
+                displayValue = new Date(fieldValue.toDate()).toLocaleString();
+            } else if (fieldValue) {
+                displayValue = String(fieldValue);
+            } else {
+                displayValue = 'N/A';
+            }
+            html += `
+                <div class="field-row" data-field="${escapeHtml(fieldName)}">
+                    <label><strong>${escapeHtml(fieldName)}:</strong></label>
+                    <div class="field-value">${escapeHtml(displayValue)}</div>
+                </div>`;
+        } else {
+            // Regular field - display as string
+            const displayValue = fieldValue !== null && fieldValue !== undefined ? String(fieldValue) : '';
+            html += `
+                <div class="field-row" data-field="${escapeHtml(fieldName)}">
+                    <label><strong>${escapeHtml(fieldName)}:</strong></label>
+                    <div class="field-value">${escapeHtml(displayValue)}</div>
+                </div>`;
+        }
+    });
+    
+    html += '</div>';
+    
+    fieldsDiv.innerHTML = html;
+    detailsDiv.style.display = 'block';
+}
+
+// Enable edit mode
+function enableParticipantEditMode() {
+    const fieldsDiv = document.getElementById('participantLookupFields');
+    const editBtn = document.getElementById('editParticipantBtn');
+    const saveBtn = document.getElementById('saveParticipantBtn');
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    
+    if (!fieldsDiv || !currentParticipantData) return;
+    
+    // Convert display fields to input fields
+    const fieldRows = fieldsDiv.querySelectorAll('.field-row');
+    fieldRows.forEach(row => {
+        const fieldName = row.getAttribute('data-field');
+        const fieldValueDiv = row.querySelector('.field-value');
+        
+        if (fieldValueDiv) {
+            const currentValue = fieldValueDiv.textContent.trim();
+            // Skip timestamp fields - they shouldn't be edited
+            if (fieldName === 'importedAt' || fieldName === 'createdAt' || fieldName === 'updatedAt' || 
+                fieldName === 'travelupdateAt' || fieldName === 'tourupdateAt') {
+                return; // Keep as display only
+            }
+            
+            // Replace with input field
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'form-input';
+            input.value = currentValue;
+            input.style.width = '100%';
+            input.setAttribute('data-field-name', fieldName);
+            
+            fieldValueDiv.replaceWith(input);
+        }
+    });
+    
+    // Show/hide buttons
+    if (editBtn) editBtn.style.display = 'none';
+    if (saveBtn) saveBtn.style.display = 'inline-block';
+    if (cancelBtn) cancelBtn.style.display = 'inline-block';
+}
+
+// Cancel edit mode
+function cancelParticipantEditMode() {
+    const fieldsDiv = document.getElementById('participantLookupFields');
+    const editBtn = document.getElementById('editParticipantBtn');
+    const saveBtn = document.getElementById('saveParticipantBtn');
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    
+    if (!fieldsDiv || !currentParticipantData) return;
+    
+    // Restore display mode
+    displayParticipantLookupResults(currentParticipantData, currentParticipantUniqueId);
+    
+    // Show/hide buttons
+    if (editBtn) editBtn.style.display = 'inline-block';
+    if (saveBtn) saveBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+}
+
+// Save participant edits
+async function saveParticipantEdits() {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    const fieldsDiv = document.getElementById('participantLookupFields');
+    if (!fieldsDiv || !currentParticipantUniqueId) return;
+    
+    // Collect all field values
+    const updatedData = {};
+    const inputs = fieldsDiv.querySelectorAll('input[data-field-name]');
+    
+    inputs.forEach(input => {
+        const fieldName = input.getAttribute('data-field-name');
+        updatedData[fieldName] = input.value.trim();
+    });
+    
+    // Preserve uniqueId and normalizedId
+    updatedData.uniqueId = currentParticipantUniqueId;
+    if (currentParticipantData.normalizedId) {
+        updatedData.normalizedId = currentParticipantData.normalizedId;
+    }
+    
+    // Add updatedAt timestamp
+    updatedData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+    
+    // Show confirmation dialog
+    const confirmMessage = `Are you sure you want to update the registration for Praveshika ID: ${currentParticipantUniqueId}?\n\nThis will modify the database.`;
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Update the document (only updates specified fields, preserves others)
+        await db.collection('registrations').doc(currentParticipantUniqueId).update(updatedData);
+        
+        showNotification('Participant information updated successfully', 'success');
+        
+        // Reload the data to show updated values
+        const regDoc = await db.collection('registrations').doc(currentParticipantUniqueId).get();
+        if (regDoc.exists) {
+            displayParticipantLookupResults(regDoc.data(), currentParticipantUniqueId);
+        }
+        
+    } catch (error) {
+        console.error('Error updating participant:', error);
+        let errorMsg = 'Error updating participant information. Please try again.';
+        if (error.code === 'permission-denied') {
+            errorMsg = 'Permission denied. You do not have permission to update this registration.';
+        } else if (error.message) {
+            errorMsg = error.message;
+        }
+        showNotification(errorMsg, 'error');
+    }
+}
+
+// Clear participant lookup results
+function clearParticipantLookupResults() {
+    const resultsDiv = document.getElementById('participantLookupResults');
+    const detailsDiv = document.getElementById('participantLookupDetails');
+    
+    if (resultsDiv) {
+        resultsDiv.innerHTML = '';
+        resultsDiv.style.display = 'none';
+    }
+    
+    if (detailsDiv) {
+        detailsDiv.style.display = 'none';
+    }
+    
+    currentParticipantData = null;
+    currentParticipantUniqueId = null;
 }
 
 function calculateStatistics(registrations, users) {

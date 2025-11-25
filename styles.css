@@ -3091,6 +3091,39 @@ body {
     margin: 0.5rem 0;
 }
 
+/* Participant Lookup Styles */
+.participant-fields-display {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.field-row {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem;
+    background: #f9f9f9;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+}
+
+.field-row label {
+    font-weight: 600;
+    color: var(--primary-brown);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.field-row .field-value {
+    color: var(--text-dark);
+    word-wrap: break-word;
+    line-height: 1.5;
+}
+
+.field-row input.form-input {
+    margin-top: 0.25rem;
+}
+
 /* Checkin Form */
 .checkin-form-card {
     background: var(--white);

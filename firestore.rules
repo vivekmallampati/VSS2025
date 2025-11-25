@@ -109,26 +109,34 @@ service cloud.firestore {
       allow delete: if false;
       
       // Allow authenticated users to update only their own transportation info
+      // OR allow admins to update any field
       allow update: if request.auth != null && 
-                       // Check if user's uniqueId matches (normalized comparison)
-                       (isOwnerOfRegistration(uniqueId) ||
-                        // Also check normalized comparison for flexible matching
-                        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                         normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(uniqueId)) ||
-                        // Check if uniqueId is associated with user's email via emailToUids
-                        isUniqueIdAssociatedWithEmail(uniqueId) ||
-                        // Check if uniqueId is in user's associated registrations
-                        isUniqueIdInAssociatedRegistrations(uniqueId)) &&
-                       // Allow updating transportation-related fields and tour selection (normalized field names)
-                       request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['arrivalDate', 'arrivalTime', 'arrivalPlace', 'arrivalFlightTrain', 'pickupNeeded',
-                                  'departureDate', 'departureTime', 'departurePlace', 'departureFlightTrain', 'dropoffNeeded',
-                                  'postShibirTour', 'travelupdateAt', 'tourupdateAt', 'updatedAt']) &&
-                       // Ensure critical fields are not modified
-                       request.resource.data.uniqueId == resource.data.uniqueId &&
-                       request.resource.data.normalizedId == resource.data.normalizedId &&
-                       request.resource.data.name == resource.data.name &&
-                       request.resource.data.email == resource.data.email;
+                       (
+                         // Admin can update any field (except uniqueId must be preserved)
+                         (isAdmin() && request.resource.data.uniqueId == resource.data.uniqueId) ||
+                         // Regular users can update only their own transportation info
+                         (
+                           // Check if user's uniqueId matches (normalized comparison)
+                           (isOwnerOfRegistration(uniqueId) ||
+                            // Also check normalized comparison for flexible matching
+                            (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                             normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(uniqueId)) ||
+                            // Check if uniqueId is associated with user's email via emailToUids
+                            isUniqueIdAssociatedWithEmail(uniqueId) ||
+                            // Check if uniqueId is in user's associated registrations
+                            isUniqueIdInAssociatedRegistrations(uniqueId)) &&
+                           // Allow updating transportation-related fields and tour selection (normalized field names)
+                           request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['arrivalDate', 'arrivalTime', 'arrivalPlace', 'arrivalFlightTrain', 'pickupNeeded',
+                                      'departureDate', 'departureTime', 'departurePlace', 'departureFlightTrain', 'dropoffNeeded',
+                                      'postShibirTour', 'travelupdateAt', 'tourupdateAt', 'updatedAt']) &&
+                           // Ensure critical fields are not modified
+                           request.resource.data.uniqueId == resource.data.uniqueId &&
+                           request.resource.data.normalizedId == resource.data.normalizedId &&
+                           request.resource.data.name == resource.data.name &&
+                           request.resource.data.email == resource.data.email
+                         )
+                       );
     }
     
     // Users collection
