@@ -4815,6 +4815,7 @@ function calculateStatistics(registrations, users) {
         ageBreakdown: {},
         shikshaVargBreakdown: {},
         shikshaVargShreniBreakdown: {},
+        shreniGenderBreakdown: {},
         arrivalDateBreakdown: {},
         arrivalTimeBucketsBreakdown: {},
         pickupNeededBreakdown: {},
@@ -4916,6 +4917,10 @@ function calculateStatistics(registrations, users) {
         // Shiksha Varg by Shreni
         const shikshaVargShreniKey = `${shreni} | ${shikshaVarg}`;
         stats.shikshaVargShreniBreakdown[shikshaVargShreniKey] = (stats.shikshaVargShreniBreakdown[shikshaVargShreniKey] || 0) + 1;
+        
+        // Shreni by Gender breakdown
+        const shreniGenderKey = `${shreni} | ${gender}`;
+        stats.shreniGenderBreakdown[shreniGenderKey] = (stats.shreniGenderBreakdown[shreniGenderKey] || 0) + 1;
         
         // Date of Arrival breakdown
         const arrivalDate = reg.arrivalDate || reg['Date of Arrival'] || '';
@@ -5032,12 +5037,6 @@ function calculateStatistics(registrations, users) {
         }
     });
     
-    // Debug logging
-    console.log('Total Praveshika IDs with Accounts calculation:');
-    console.log('Total users:', users.length);
-    console.log('Users with associatedRegistrations:', users.filter(u => u.associatedRegistrations).length);
-    console.log('Total count:', totalPraveshikaIdsWithAccounts);
-    
     stats.totalPraveshikaIdsWithAccounts = totalPraveshikaIdsWithAccounts;
     
     // Track email corrections and late/updated registrations
@@ -5141,6 +5140,9 @@ function displayAdminStatistics(stats, registrations) {
     
     // Display shiksha varg by shreni breakdown (multi-column)
     displayMultiColumnBreakdownTable('shikshaVargShreniTableBody', stats.shikshaVargShreniBreakdown, stats.totalRegistrations, ' | ');
+    
+    // Display shreni by gender breakdown (multi-column)
+    displayMultiColumnBreakdownTable('shreniGenderTableBody', stats.shreniGenderBreakdown, stats.totalRegistrations, ' | ');
     
     // Display arrival date breakdown
     displayBreakdownTable('arrivalDateTableBody', stats.arrivalDateBreakdown, stats.totalRegistrations);
