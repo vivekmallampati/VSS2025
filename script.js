@@ -5736,7 +5736,10 @@ function displayMultiColumnBreakdownTable(tableBodyId, breakdown, total, separat
     
     // Handle null or undefined breakdown
     if (!breakdown || typeof breakdown !== 'object') {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No data available</td></tr>';
+        // Calculate colspan based on table structure - for Shreni/Gender it's 4 columns
+        const table = tbody.closest('table');
+        const headerCols = table ? table.querySelectorAll('thead th').length : 4;
+        tbody.innerHTML = `<tr><td colspan="${headerCols}" style="text-align: center;">No data available</td></tr>`;
         return;
     }
     
@@ -5746,7 +5749,7 @@ function displayMultiColumnBreakdownTable(tableBodyId, breakdown, total, separat
     let html = '';
     sortedEntries.forEach(([key, count]) => {
         const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
-        const parts = key.split(separator);
+        const parts = key.split(separator).map(p => p.trim());
         
         // Determine number of columns based on separator count
         let rowHtml = '<tr>';
@@ -5760,10 +5763,46 @@ function displayMultiColumnBreakdownTable(tableBodyId, breakdown, total, separat
     });
     
     if (sortedEntries.length === 0) {
-        html = '<tr><td colspan="5" style="text-align: center;">No data available</td></tr>';
+        // Calculate colspan based on table structure
+        const table = tbody.closest('table');
+        const headerCols = table ? table.querySelectorAll('thead th').length : 4;
+        html = `<tr><td colspan="${headerCols}" style="text-align: center;">No data available</td></tr>`;
     }
     
     tbody.innerHTML = html;
+}
+
+/**
+ * Get Shreni and Gender breakdown data from registrations
+ * @param {Array} registrations - Array of registration objects
+ * @returns {Object} Object with shreniGenderBreakdown data and total count
+ */
+function getShreniGenderBreakdown(registrations) {
+    if (!registrations || !Array.isArray(registrations)) {
+        return {
+            breakdown: {},
+            total: 0
+        };
+    }
+    
+    const breakdown = {};
+    
+    registrations.forEach(reg => {
+        // Extract Shreni (with fallbacks for different field names)
+        const shreni = reg.Shreni || reg.shreni || reg['Corrected Shreni'] || reg['Default Shreni'] || 'Unknown';
+        
+        // Extract Gender (with fallbacks for different field names)
+        const gender = reg.gender || reg.Gender || 'Not Specified';
+        
+        // Create key in format "Shreni | Gender"
+        const key = `${shreni} | ${gender}`;
+        breakdown[key] = (breakdown[key] || 0) + 1;
+    });
+    
+    return {
+        breakdown: breakdown,
+        total: registrations.length
+    };
 }
 
 // Helper function to get time bucket from time string (2/4 hour sections)
