@@ -4484,50 +4484,10 @@ async function loadParticipantLookupPage(user) {
     }
 }
 
-// Search participant by Unique ID (exact match)
+// Search participant by Unique ID (exact match) - kept for backward compatibility
 async function searchParticipantByUniqueId() {
-    const uniqueIdInput = document.getElementById('lookupUniqueId');
-    if (!uniqueIdInput) return;
-    
-    const uniqueId = uniqueIdInput.value.trim();
-    if (!uniqueId) {
-        showNotification('Please enter a Praveshika ID', 'error');
-        return;
-    }
-    
-    if (!window.firebase || !firebase.firestore) {
-        showNotification('Firebase not initialized', 'error');
-        return;
-    }
-    
-    try {
-        const db = firebase.firestore();
-        const normalizedId = normalizePraveshikaId(uniqueId);
-        
-        // Search in registrations collection
-        const registrationsQuery = await db.collection('registrations')
-            .where('normalizedId', '==', normalizedId)
-            .limit(1)
-            .get();
-        
-        if (registrationsQuery.empty) {
-            // Try direct document ID lookup
-            const regDoc = await db.collection('registrations').doc(uniqueId).get();
-            if (regDoc.exists) {
-                displayParticipantLookupResults(regDoc.data(), uniqueId);
-            } else {
-                showNotification('Participant not found', 'error');
-                clearParticipantLookupResults();
-            }
-        } else {
-            const regData = registrationsQuery.docs[0].data();
-            const foundUniqueId = regData.uniqueId || registrationsQuery.docs[0].id;
-            displayParticipantLookupResults(regData, foundUniqueId);
-        }
-    } catch (error) {
-        console.error('Error searching participant:', error);
-        showNotification('Error searching participant: ' + error.message, 'error');
-    }
+    // Redirect to enhanced search function
+    await searchParticipantByLoginId();
 }
 
 // Search participant by Email (group match)
@@ -4871,6 +4831,12 @@ function calculateStatistics(registrations, users) {
             totalUpdated: 0,
             totalNotUpdated: 0,
             updatePercentage: 0
+        },
+        totalPraveshikaIdsWithAccounts: 0,
+        emailCorrections: {
+            lateRegistrations: [],
+            updatedRegistrations: [],
+            needsConfirmation: []
         }
     };
     
@@ -5040,6 +5006,71 @@ function calculateStatistics(registrations, users) {
     stats.totalCountries = Object.keys(stats.countryBreakdown).length;
     stats.totalShrenis = Object.keys(stats.shreniBreakdown).length;
     
+    // Calculate total Praveshika IDs associated with accounts created
+    // Go through users collection and sum the number of associatedRegistrations
+    let totalPraveshikaIdsWithAccounts = 0;
+    users.forEach(user => {
+        // Check for associatedRegistrations array
+        if (user.associatedRegistrations) {
+            if (Array.isArray(user.associatedRegistrations)) {
+                totalPraveshikaIdsWithAccounts += user.associatedRegistrations.length;
+            } else if (typeof user.associatedRegistrations === 'object') {
+                // If it's an object, try to get length from keys or values
+                const regs = Object.values(user.associatedRegistrations);
+                if (Array.isArray(regs)) {
+                    totalPraveshikaIdsWithAccounts += regs.length;
+                }
+            }
+        }
+        // Fallback: check emailToUids if associatedRegistrations doesn't exist
+        else if (user.emailToUids) {
+            if (user.emailToUids.uniqueIds && Array.isArray(user.emailToUids.uniqueIds)) {
+                totalPraveshikaIdsWithAccounts += user.emailToUids.uniqueIds.length;
+            } else if (Array.isArray(user.emailToUids)) {
+                totalPraveshikaIdsWithAccounts += user.emailToUids.length;
+            }
+        }
+    });
+    
+    // Debug logging
+    console.log('Total Praveshika IDs with Accounts calculation:');
+    console.log('Total users:', users.length);
+    console.log('Users with associatedRegistrations:', users.filter(u => u.associatedRegistrations).length);
+    console.log('Total count:', totalPraveshikaIdsWithAccounts);
+    
+    stats.totalPraveshikaIdsWithAccounts = totalPraveshikaIdsWithAccounts;
+    
+    // Track email corrections and late/updated registrations
+    registrations.forEach(reg => {
+        const email = reg.email || reg['Email address'] || '';
+        const createdAt = reg.createdAt || reg.timestamp;
+        const updatedAt = reg.updatedAt || reg.travelupdateAt;
+        const isLate = createdAt && (() => {
+            const regDate = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
+            // Consider late if registered after a certain date (adjust as needed)
+            const cutoffDate = new Date('2025-01-01'); // Adjust this date
+            return regDate > cutoffDate;
+        })();
+        
+        if (isLate) {
+            stats.emailCorrections.lateRegistrations.push({
+                uniqueId: reg.uniqueId || '',
+                email: email,
+                name: reg.name || reg['Full Name'] || '',
+                registrationDate: createdAt
+            });
+        }
+        
+        if (updatedAt) {
+            stats.emailCorrections.updatedRegistrations.push({
+                uniqueId: reg.uniqueId || '',
+                email: email,
+                name: reg.name || reg['Full Name'] || '',
+                updatedDate: updatedAt
+            });
+        }
+    });
+    
     return stats;
 }
 
@@ -5162,6 +5193,68 @@ function displayAdminStatistics(stats, registrations) {
     if (travelUpdatePercentageEl) {
         travelUpdatePercentageEl.textContent = stats.travelUpdateStats.updatePercentage + '%';
     }
+    
+    // Display total Praveshika IDs with accounts
+    const totalPraveshikaIdsWithAccountsEl = document.getElementById('totalPraveshikaIdsWithAccounts');
+    if (totalPraveshikaIdsWithAccountsEl) {
+        totalPraveshikaIdsWithAccountsEl.textContent = stats.totalPraveshikaIdsWithAccounts || 0;
+    }
+    
+    // Display email corrections
+    displayEmailCorrections(stats.emailCorrections);
+    
+    // Store stats globally for gender slicing
+    window.dashboardStats = stats;
+    window.dashboardRegistrations = registrations;
+}
+
+// Display email corrections for late and updated registrations
+function displayEmailCorrections(emailCorrections) {
+    // Display late registrations
+    const lateRegsTbody = document.getElementById('lateRegistrationsTableBody');
+    if (lateRegsTbody && emailCorrections.lateRegistrations) {
+        let html = '';
+        if (emailCorrections.lateRegistrations.length === 0) {
+            html = '<tr><td colspan="5" style="text-align: center;">No late registrations found</td></tr>';
+        } else {
+            emailCorrections.lateRegistrations.forEach(reg => {
+                const regDate = reg.registrationDate && reg.registrationDate.toDate 
+                    ? reg.registrationDate.toDate().toLocaleDateString() 
+                    : (reg.registrationDate ? new Date(reg.registrationDate).toLocaleDateString() : 'N/A');
+                html += `<tr>
+                    <td>${escapeHtml(reg.uniqueId)}</td>
+                    <td>${escapeHtml(reg.name)}</td>
+                    <td>${escapeHtml(reg.email)}</td>
+                    <td>${regDate}</td>
+                    <td><span style="color: #f57c00;">Late Registration</span></td>
+                </tr>`;
+            });
+        }
+        lateRegsTbody.innerHTML = html;
+    }
+    
+    // Display updated registrations
+    const updatedRegsTbody = document.getElementById('updatedRegistrationsTableBody');
+    if (updatedRegsTbody && emailCorrections.updatedRegistrations) {
+        let html = '';
+        if (emailCorrections.updatedRegistrations.length === 0) {
+            html = '<tr><td colspan="5" style="text-align: center;">No updated registrations found</td></tr>';
+        } else {
+            emailCorrections.updatedRegistrations.forEach(reg => {
+                const updateDate = reg.updatedDate && reg.updatedDate.toDate 
+                    ? reg.updatedDate.toDate().toLocaleDateString() 
+                    : (reg.updatedDate ? new Date(reg.updatedDate).toLocaleDateString() : 'N/A');
+                html += `<tr>
+                    <td>${escapeHtml(reg.uniqueId)}</td>
+                    <td>${escapeHtml(reg.name)}</td>
+                    <td>${escapeHtml(reg.email)}</td>
+                    <td>${updateDate}</td>
+                    <td><span style="color: #388e3c;">Updated</span></td>
+                </tr>`;
+            });
+        }
+        updatedRegsTbody.innerHTML = html;
+    }
 }
 
 // Export registration data with transportation to CSV
@@ -5269,6 +5362,337 @@ function escapeCsvField(field) {
         return '"' + str.replace(/"/g, '""') + '"';
     }
     return str;
+}
+
+// Gender slicing with range details
+function updateGenderSlicing() {
+    const startRange = parseInt(document.getElementById('genderRangeStart')?.value || 0);
+    const endRange = parseInt(document.getElementById('genderRangeEnd')?.value || 1000);
+    
+    if (!window.dashboardStats || !window.dashboardRegistrations) {
+        showNotification('Dashboard data not loaded. Please refresh the dashboard.', 'error');
+        return;
+    }
+    
+    const stats = window.dashboardStats;
+    const registrations = window.dashboardRegistrations;
+    
+    // Filter registrations by range (using index or ID number)
+    const filteredRegs = registrations.filter((reg, index) => {
+        const regIndex = index + 1; // 1-based index
+        return regIndex >= startRange && regIndex <= endRange;
+    });
+    
+    // Calculate gender breakdown for filtered range
+    const genderBreakdown = {};
+    filteredRegs.forEach(reg => {
+        const gender = reg.gender || reg.Gender || 'Not Specified';
+        genderBreakdown[gender] = (genderBreakdown[gender] || 0) + 1;
+    });
+    
+    // Display in table
+    const tbody = document.getElementById('genderSlicingTableBody');
+    if (!tbody) return;
+    
+    const total = filteredRegs.length;
+    const sortedEntries = Object.entries(genderBreakdown).sort((a, b) => b[1] - a[1]);
+    
+    let html = '';
+    sortedEntries.forEach(([gender, count]) => {
+        const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+        html += `<tr>
+            <td>${escapeHtml(gender)}</td>
+            <td>${count}</td>
+            <td>${percentage}%</td>
+            <td>Range ${startRange}-${endRange} (${total} total)</td>
+        </tr>`;
+    });
+    
+    if (sortedEntries.length === 0) {
+        html = '<tr><td colspan="4" style="text-align: center;">No data in this range</td></tr>';
+    }
+    
+    tbody.innerHTML = html;
+}
+
+// Enhanced search by login ID (Praveshika ID) to show all related IDs
+async function searchParticipantByLoginId() {
+    const loginIdInput = document.getElementById('lookupUniqueId');
+    if (!loginIdInput) return;
+    
+    const loginId = loginIdInput.value.trim();
+    if (!loginId) {
+        showNotification('Please enter a Praveshika ID', 'error');
+        return;
+    }
+    
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const normalizedId = normalizePraveshikaId(loginId);
+        
+        // First, find the registration with this ID
+        const regQuery = await db.collection('registrations')
+            .where('normalizedId', '==', normalizedId)
+            .limit(1)
+            .get();
+        
+        if (regQuery.empty) {
+            // Try direct document ID lookup
+            const regDoc = await db.collection('registrations').doc(loginId).get();
+            if (regDoc.exists) {
+                const regData = regDoc.data();
+                const email = regData.email || regData['Email address'] || '';
+                
+                // Find all registrations with the same email
+                if (email) {
+                    const allRegs = await db.collection('registrations').get();
+                    const relatedRegs = [];
+                    allRegs.docs.forEach(doc => {
+                        const data = doc.data();
+                        const regEmail = (data.email || data['Email address'] || '').toLowerCase();
+                        if (regEmail === email.toLowerCase()) {
+                            relatedRegs.push({
+                                doc: doc,
+                                data: data,
+                                uniqueId: data.uniqueId || doc.id
+                            });
+                        }
+                    });
+                    
+                    if (relatedRegs.length > 1) {
+                        displayRelatedIds(relatedRegs, loginId);
+                    } else {
+                        displayParticipantLookupResults(regData, loginId);
+                    }
+                } else {
+                    displayParticipantLookupResults(regData, loginId);
+                }
+            } else {
+                showNotification('Participant not found', 'error');
+                clearParticipantLookupResults();
+            }
+        } else {
+            const regData = regQuery.docs[0].data();
+            const foundUniqueId = regData.uniqueId || regQuery.docs[0].id;
+            const email = regData.email || regData['Email address'] || '';
+            
+            // Find all registrations with the same email
+            if (email) {
+                const allRegs = await db.collection('registrations').get();
+                const relatedRegs = [];
+                allRegs.docs.forEach(doc => {
+                    const data = doc.data();
+                    const regEmail = (data.email || data['Email address'] || '').toLowerCase();
+                    if (regEmail === email.toLowerCase()) {
+                        relatedRegs.push({
+                            doc: doc,
+                            data: data,
+                            uniqueId: data.uniqueId || doc.id
+                        });
+                    }
+                });
+                
+                if (relatedRegs.length > 1) {
+                    displayRelatedIds(relatedRegs, foundUniqueId);
+                } else {
+                    displayParticipantLookupResults(regData, foundUniqueId);
+                }
+            } else {
+                displayParticipantLookupResults(regData, foundUniqueId);
+            }
+        }
+    } catch (error) {
+        console.error('Error searching participant by login ID:', error);
+        showNotification('Error searching participant: ' + error.message, 'error');
+    }
+}
+
+// Display related IDs when searching by login ID
+function displayRelatedIds(relatedRegs, searchedId) {
+    const resultsDiv = document.getElementById('participantLookupResults');
+    const detailsDiv = document.getElementById('participantLookupDetails');
+    
+    if (!resultsDiv) return;
+    
+    if (detailsDiv) {
+        detailsDiv.style.display = 'none';
+    }
+    
+    let html = `<div class="participant-search-results">
+        <h4>Found ${relatedRegs.length} related registration(s) for this login ID. Please select:</h4>
+        <ul style="list-style: none; padding: 0;">`;
+    
+    relatedRegs.forEach(reg => {
+        const name = reg.data.name || reg.data['Full Name'] || 'Unknown';
+        const uniqueId = reg.uniqueId;
+        const email = reg.data.email || reg.data['Email address'] || '';
+        const isSearched = uniqueId === searchedId;
+        
+        html += `
+            <li style="margin: 0.5rem 0; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; ${isSearched ? 'background: #e3f2fd;' : ''}">
+                <button class="btn btn-link" onclick="selectParticipantFromLookup('${escapeHtml(uniqueId)}')" style="text-align: left; width: 100%;">
+                    <strong>${escapeHtml(name)}</strong> ${isSearched ? '<span style="color: #1976d2;">(Searched ID)</span>' : ''}<br>
+                    <small>Praveshika ID: ${escapeHtml(uniqueId)}${email ? ' - ' + escapeHtml(email) : ''}</small>
+                </button>
+            </li>`;
+    });
+    
+    html += '</ul></div>';
+    
+    resultsDiv.innerHTML = html;
+    resultsDiv.style.display = 'block';
+}
+
+// Export all data to Excel
+async function exportAllDataToExcel() {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    showNotification('Preparing Excel export...', 'info');
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Fetch all registrations
+        const registrationsSnapshot = await db.collection('registrations').get();
+        const registrations = [];
+        registrationsSnapshot.forEach(doc => {
+            const data = doc.data();
+            data._documentId = doc.id;
+            registrations.push(data);
+        });
+        
+        // Convert to CSV first (Excel can open CSV)
+        const csvRows = [];
+        
+        // Get all unique field names
+        const allFields = new Set();
+        registrations.forEach(reg => {
+            Object.keys(reg).forEach(key => {
+                if (key !== '_documentId') allFields.add(key);
+            });
+        });
+        
+        const fieldArray = Array.from(allFields).sort();
+        
+        // Add document ID as first column
+        csvRows.push(['Document ID', ...fieldArray].map(f => escapeCsvField(f)).join(','));
+        
+        // Add data rows
+        registrations.forEach(reg => {
+            const row = [reg._documentId || ''];
+            fieldArray.forEach(field => {
+                let value = reg[field];
+                if (value && typeof value === 'object') {
+                    if (value.toDate) {
+                        value = value.toDate().toISOString();
+                    } else {
+                        value = JSON.stringify(value);
+                    }
+                }
+                row.push(value || '');
+            });
+            csvRows.push(row.map(f => escapeCsvField(f)).join(','));
+        });
+        
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `VSS2025_All_Data_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showNotification('Excel file (CSV format) downloaded successfully!', 'success');
+    } catch (error) {
+        console.error('Error exporting to Excel:', error);
+        showNotification('Error exporting to Excel: ' + error.message, 'error');
+    }
+}
+
+// Export collection as comprehensive CSV with all fields
+async function exportCollectionAsCSV(collectionName) {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    showNotification(`Preparing ${collectionName} export...`, 'info');
+    
+    try {
+        const db = firebase.firestore();
+        const snapshot = await db.collection(collectionName).get();
+        
+        if (snapshot.empty) {
+            showNotification(`No data found in ${collectionName} collection`, 'info');
+            return;
+        }
+        
+        const docs = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            data._documentId = doc.id;
+            docs.push(data);
+        });
+        
+        // Get all unique field names
+        const allFields = new Set();
+        docs.forEach(doc => {
+            Object.keys(doc).forEach(key => {
+                if (key !== '_documentId') allFields.add(key);
+            });
+        });
+        
+        const fieldArray = Array.from(allFields).sort();
+        
+        // Create CSV
+        const csvRows = [];
+        csvRows.push(['Document ID', ...fieldArray].map(f => escapeCsvField(f)).join(','));
+        
+        docs.forEach(doc => {
+            const row = [doc._documentId || ''];
+            fieldArray.forEach(field => {
+                let value = doc[field];
+                if (value && typeof value === 'object') {
+                    if (value.toDate) {
+                        value = value.toDate().toISOString();
+                    } else if (value instanceof Date) {
+                        value = value.toISOString();
+                    } else {
+                        value = JSON.stringify(value);
+                    }
+                }
+                row.push(value || '');
+            });
+            csvRows.push(row.map(f => escapeCsvField(f)).join(','));
+        });
+        
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `VSS2025_${collectionName}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showNotification(`${collectionName} CSV file downloaded successfully!`, 'success');
+    } catch (error) {
+        console.error(`Error exporting ${collectionName}:`, error);
+        showNotification(`Error exporting ${collectionName}: ` + error.message, 'error');
+    }
 }
 
 function displayBreakdownTable(tableBodyId, breakdown, total) {

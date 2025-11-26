@@ -7,6 +7,46 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="docs/logo.png">
+    <style>
+        .analytics-section {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            background: #fff;
+        }
+        .analytics-section-header {
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f5f5f5;
+            border-bottom: 1px solid #e0e0e0;
+            user-select: none;
+        }
+        .analytics-section-header:hover {
+            background: #eeeeee;
+        }
+        .analytics-section-header h3 {
+            margin: 0;
+            flex: 1;
+        }
+        .analytics-section-toggle {
+            font-size: 1.2rem;
+            color: #666;
+            transition: transform 0.3s ease;
+        }
+        .analytics-section.expanded .analytics-section-toggle {
+            transform: rotate(180deg);
+        }
+        .analytics-section-content {
+            display: none;
+            padding: 1.5rem;
+        }
+        .analytics-section.expanded .analytics-section-content {
+            display: block;
+        }
+    </style>
     
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-FQ9MSQ4890"></script>
@@ -826,13 +866,22 @@
                                 <h3>Shreni Groups</h3>
                                 <p class="metric-value" id="totalShrenis">0</p>
                             </div>
+                            <div class="metric-card">
+                                <h3>Praveshika IDs with Accounts</h3>
+                                <p class="metric-value" id="totalPraveshikaIdsWithAccounts">0</p>
+                                <p class="metric-subtitle">IDs associated with user accounts</p>
+                            </div>
                         </div>
 
                         <!-- Zone Breakdown -->
                         <div class="analytics-section">
-                            <h3>Registrations by Zone</h3>
-                            <p class="section-description">Click on a zone to see country-wise breakdown</p>
-                            <div id="zoneBreakdown" class="data-table-container">
+                            <div class="analytics-section-header" onclick="toggleSection(this)">
+                                <h3>Registrations by Zone</h3>
+                                <span class="analytics-section-toggle">▼</span>
+                            </div>
+                            <div class="analytics-section-content">
+                                <p class="section-description">Click on a zone to see country-wise breakdown</p>
+                                <div id="zoneBreakdown" class="data-table-container">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
@@ -852,14 +901,19 @@
                                 <div id="zoneCountryTableBody" class="data-table-container">
                                 </div>
                             </div>
+                            </div>
                         </div>
 
                         
 
                         <!-- Shreni Breakdown -->
                         <div class="analytics-section">
-                            <h3>Registrations by Shreni</h3>
-                            <div id="shreniBreakdown" class="data-table-container">
+                            <div class="analytics-section-header" onclick="toggleSection(this)">
+                                <h3>Registrations by Shreni</h3>
+                                <span class="analytics-section-toggle">▼</span>
+                            </div>
+                            <div class="analytics-section-content">
+                                <div id="shreniBreakdown" class="data-table-container">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
@@ -872,12 +926,17 @@
                                     </tbody>
                                 </table>
                             </div>
+                            </div>
                         </div>
 
                         <!-- Tour Selections -->
                         <div class="analytics-section">
-                            <h3>Post-Shibir Tour Selections</h3>
-                            <div id="tourBreakdown" class="data-table-container">
+                            <div class="analytics-section-header" onclick="toggleSection(this)">
+                                <h3>Post-Shibir Tour Selections</h3>
+                                <span class="analytics-section-toggle">▼</span>
+                            </div>
+                            <div class="analytics-section-content">
+                                <div id="tourBreakdown" class="data-table-container">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
@@ -890,12 +949,17 @@
                                     </tbody>
                                 </table>
                             </div>
+                            </div>
                         </div>
 
                         <!-- Pickup Locations -->
                         <div class="analytics-section">
-                            <h3>Pickup Locations</h3>
-                            <div id="pickupBreakdown" class="data-table-container">
+                            <div class="analytics-section-header" onclick="toggleSection(this)">
+                                <h3>Pickup Locations</h3>
+                                <span class="analytics-section-toggle">▼</span>
+                            </div>
+                            <div class="analytics-section-content">
+                                <div id="pickupBreakdown" class="data-table-container">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
@@ -908,12 +972,17 @@
                                     </tbody>
                                 </table>
                             </div>
+                            </div>
                         </div>
 
                         <!-- Dropoff Locations -->
                         <div class="analytics-section">
-                            <h3>Dropoff Locations</h3>
-                            <div id="dropoffBreakdown" class="data-table-container">
+                            <div class="analytics-section-header" onclick="toggleSection(this)">
+                                <h3>Dropoff Locations</h3>
+                                <span class="analytics-section-toggle">▼</span>
+                            </div>
+                            <div class="analytics-section-content">
+                                <div id="dropoffBreakdown" class="data-table-container">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
@@ -926,12 +995,17 @@
                                     </tbody>
                                 </table>
                             </div>
+                            </div>
                         </div>
 
                         <!-- Gender Breakdown -->
                         <div class="analytics-section">
-                            <h3>Gender Distribution</h3>
-                            <div id="genderBreakdown" class="data-table-container">
+                            <div class="analytics-section-header" onclick="toggleSection(this)">
+                                <h3>Gender Distribution</h3>
+                                <span class="analytics-section-toggle">▼</span>
+                            </div>
+                            <div class="analytics-section-content">
+                                <div id="genderBreakdown" class="data-table-container">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
@@ -944,12 +1018,48 @@
                                     </tbody>
                                 </table>
                             </div>
+                            </div>
+                        </div>
+
+                        <!-- Gender Slicing with Range Details -->
+                        <div class="analytics-section">
+                            <div class="analytics-section-header" onclick="toggleSection(this)">
+                                <h3>Gender Slicing with Range Details</h3>
+                                <span class="analytics-section-toggle">▼</span>
+                            </div>
+                            <div class="analytics-section-content">
+                                <div class="gender-slicing-controls" style="margin-bottom: 1rem;">
+                                <label for="genderRangeStart">Start Range:</label>
+                                <input type="number" id="genderRangeStart" min="0" value="0" style="margin: 0 1rem; padding: 0.5rem; width: 100px;">
+                                <label for="genderRangeEnd">End Range:</label>
+                                <input type="number" id="genderRangeEnd" min="0" value="1000" style="margin: 0 1rem; padding: 0.5rem; width: 100px;">
+                                <button class="btn btn-primary" onclick="updateGenderSlicing()">Apply Range</button>
+                            </div>
+                            <div id="genderSlicingBreakdown" class="data-table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Gender</th>
+                                            <th>Count (Range)</th>
+                                            <th>Percentage</th>
+                                            <th>Range Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="genderSlicingTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                            </div>
                         </div>
 
                         <!-- Country Breakdown Overall -->
                         <div class="analytics-section">
-                            <h3>Registrations by Country (Overall)</h3>
-                            <div id="countryBreakdownOverall" class="data-table-container">
+                            <div class="analytics-section-header" onclick="toggleSection(this)">
+                                <h3>Registrations by Country (Overall)</h3>
+                                <span class="analytics-section-toggle">▼</span>
+                            </div>
+                            <div class="analytics-section-content">
+                                <div id="countryBreakdownOverall" class="data-table-container">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
@@ -1280,6 +1390,47 @@
                             </div>
                         </div>
 
+                        <!-- Email Correction Tracking Section -->
+                        <div class="analytics-section" style="border-top: 2px solid #e0e0e0; margin-top: 3rem; padding-top: 2rem;">
+                            <h2 style="margin-bottom: 1.5rem;">Email Correction Tracking</h2>
+                            <div style="margin-bottom: 1rem;">
+                                <h3>Late Registrations</h3>
+                                <div id="lateRegistrationsTable" class="data-table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Praveshika ID</th>
+                                                <th>Name</th>
+                                                <th>Email ID</th>
+                                                <th>Registration Date</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="lateRegistrationsTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 1rem;">
+                                <h3>Updated Registrations</h3>
+                                <div id="updatedRegistrationsTable" class="data-table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Praveshika ID</th>
+                                                <th>Name</th>
+                                                <th>Email ID</th>
+                                                <th>Updated Date</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="updatedRegistrationsTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Export Data Section -->
                         <div class="analytics-section" style="border-top: 2px solid #e0e0e0; margin-top: 3rem; padding-top: 2rem;">
                             <h2 style="margin-bottom: 1.5rem;">Export Data</h2>
@@ -1287,6 +1438,20 @@
                                 <h3>Export Registration Data with Transportation</h3>
                                 <p class="section-description">Download CSV file with Name, Praveshika ID, Email ID, Phone number, and Transport information</p>
                                 <button class="btn btn-primary" onclick="exportRegistrationDataWithTransport()">📥 Download Registration Data (CSV)</button>
+                            </div>
+                            <div style="margin-bottom: 1rem;">
+                                <h3>Export All Website Data (Excel)</h3>
+                                <p class="section-description">Download all website data including feedback period data in Excel format</p>
+                                <button class="btn btn-primary" onclick="exportAllDataToExcel()">📊 Download All Data (Excel)</button>
+                            </div>
+                            <div style="margin-bottom: 1rem;">
+                                <h3>Export Collections as CSV</h3>
+                                <p class="section-description">Download complete collections with all fields as columns</p>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <button class="btn btn-primary" onclick="exportCollectionAsCSV('registrations')">📥 Registrations (CSV)</button>
+                                    <button class="btn btn-primary" onclick="exportCollectionAsCSV('users')">📥 Users (CSV)</button>
+                                    <button class="btn btn-primary" onclick="exportCollectionAsCSV('checkins')">📥 Check-ins (CSV)</button>
+                                </div>
                             </div>
                         </div>
 
@@ -1524,11 +1689,12 @@
                             <h3>Search Participant</h3>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                                 <div class="form-group">
-                                    <label for="lookupUniqueId">Search by Unique ID (Praveshika ID):</label>
+                                    <label for="lookupUniqueId">Search by Login ID (Praveshika ID):</label>
                                     <div style="display: flex; gap: 0.5rem;">
                                         <input type="text" id="lookupUniqueId" class="form-input" placeholder="Enter Praveshika ID" autocomplete="off">
-                                        <button class="btn btn-primary" onclick="searchParticipantByUniqueId()">Search</button>
+                                        <button class="btn btn-primary" onclick="searchParticipantByLoginId()">Search</button>
                                     </div>
+                                    <p style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;">Searches by login ID and displays all related IDs</p>
                                 </div>
                                 <div class="form-group">
                                     <label for="lookupEmail">Search by Email:</label>
@@ -1960,6 +2126,66 @@ function openSubTab(tabName, event) {
       }
     });
   }
+}
+
+// Toggle collapsible section
+function toggleSection(header) {
+    const section = header.closest('.analytics-section');
+    if (section) {
+        section.classList.toggle('expanded');
+    }
+}
+
+// Initialize all analytics sections as collapsed
+function initializeCollapsibleSections() {
+    const sections = document.querySelectorAll('.analytics-section');
+    sections.forEach(section => {
+        // Check if this section already has the collapsible structure
+        if (!section.querySelector('.analytics-section-header')) {
+            // Try h2 first (for major sections), then h3
+            let header = section.querySelector('h2');
+            let headerTag = 'h2';
+            if (!header) {
+                header = section.querySelector('h3');
+                headerTag = 'h3';
+            }
+            
+            if (header && header.parentElement === section) {
+                const title = header.textContent;
+                const restOfContent = Array.from(section.children)
+                    .filter(child => child !== header)
+                    .map(child => child.outerHTML)
+                    .join('');
+                
+                // Create new structure
+                section.innerHTML = `
+                    <div class="analytics-section-header" onclick="toggleSection(this)">
+                        <${headerTag}>${title}</${headerTag}>
+                        <span class="analytics-section-toggle">▼</span>
+                    </div>
+                    <div class="analytics-section-content">
+                        ${restOfContent}
+                    </div>
+                `;
+            }
+        }
+        // Ensure all sections start collapsed
+        section.classList.remove('expanded');
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', initializeCollapsibleSections);
+
+// Also initialize when dashboard is loaded (for dynamically loaded content)
+if (typeof loadAdminDashboard !== 'undefined') {
+    const originalLoadAdminDashboard = loadAdminDashboard;
+    window.loadAdminDashboard = function(...args) {
+        const result = originalLoadAdminDashboard.apply(this, args);
+        // Wait a bit for DOM to update, then initialize collapsible sections
+        setTimeout(initializeCollapsibleSections, 100);
+        return result;
+    };
 }
 </script>
 </body>
