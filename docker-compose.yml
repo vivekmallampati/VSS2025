@@ -63,3 +63,15 @@ services:
     command: node sync_user_associated_registrations.js
     # Syncs associatedRegistrations field in users collection based on emailToUids
 
+  normalize-field-names:
+    build: .
+    container_name: vss2025-normalize-field-names
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+    command: node normalize-field-names.js
+    # Normalizes field names for 261 participant records from capitalized/multi-word format to camelCase
+

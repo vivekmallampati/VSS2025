@@ -1,5 +1,7 @@
-// Script to import Excel data to Firebase
-// Run with: node import-excel-to-firebase.js
+// Script to import Excel data to Firebase or export Firebase collections to Excel
+// Run with: 
+//   Import: node import-excel-to-firebase.js
+//   Export: node import-excel-to-firebase.js --export contactMessages emailToUids
 // Requires: npm install xlsx firebase-admin
 
 const XLSX = require('xlsx');

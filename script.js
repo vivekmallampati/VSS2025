@@ -4725,6 +4725,19 @@ async function saveParticipantEdits() {
         return;
     }
     
+    // Verify user is authenticated and is an admin
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        showNotification('You must be logged in to update participant information', 'error');
+        return;
+    }
+    
+    const isAdminUser = await isAdmin(user);
+    if (!isAdminUser) {
+        showNotification('Permission denied. Only administrators can update participant information.', 'error');
+        return;
+    }
+    
     const fieldsDiv = document.getElementById('participantLookupFields');
     if (!fieldsDiv || !currentParticipantUniqueId) return;
     
@@ -4737,11 +4750,17 @@ async function saveParticipantEdits() {
         updatedData[fieldName] = input.value.trim();
     });
     
-    // Preserve uniqueId and normalizedId
+    // Preserve critical fields as required by Firebase security rules
+    // uniqueId must be preserved and match the document ID (required for admin updates)
     updatedData.uniqueId = currentParticipantUniqueId;
+    
+    // Preserve normalizedId if it exists (should not be changed)
     if (currentParticipantData.normalizedId) {
         updatedData.normalizedId = currentParticipantData.normalizedId;
     }
+    
+    // Note: As an admin, we can update name and email if they're in the form inputs
+    // The Firebase rules allow admins to update any field except uniqueId must be preserved
     
     // Add updatedAt timestamp
     updatedData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
@@ -4770,7 +4789,7 @@ async function saveParticipantEdits() {
         console.error('Error updating participant:', error);
         let errorMsg = 'Error updating participant information. Please try again.';
         if (error.code === 'permission-denied') {
-            errorMsg = 'Permission denied. You do not have permission to update this registration.';
+            errorMsg = 'Permission denied. You do not have permission to update this registration. Please ensure you are logged in as an administrator.';
         } else if (error.message) {
             errorMsg = error.message;
         }
