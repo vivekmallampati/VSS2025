@@ -112,8 +112,9 @@ service cloud.firestore {
       // OR allow admins to update any field
       allow update: if request.auth != null && 
                        (
-                         // Admin can update any field (except uniqueId must be preserved)
-                         (isAdmin() && request.resource.data.uniqueId == resource.data.uniqueId) ||
+                         // Admin can update any field (uniqueId must match document ID)
+                         // This handles both cases: when document has uniqueId and when it doesn't (data integrity fix)
+                         (isAdmin() && request.resource.data.uniqueId == uniqueId) ||
                          // Regular users can update only their own transportation info
                          (
                            // Check if user's uniqueId matches (normalized comparison)
@@ -131,8 +132,12 @@ service cloud.firestore {
                                       'departureDate', 'departureTime', 'departurePlace', 'departureFlightTrain', 'dropoffNeeded',
                                       'postShibirTour', 'travelupdateAt', 'tourupdateAt', 'updatedAt']) &&
                            // Ensure critical fields are not modified
-                           request.resource.data.uniqueId == resource.data.uniqueId &&
-                           request.resource.data.normalizedId == resource.data.normalizedId &&
+                           // Handle case where document might not have uniqueId (compare with document ID parameter)
+                           (request.resource.data.uniqueId == uniqueId || 
+                            (resource.data.uniqueId != null && request.resource.data.uniqueId == resource.data.uniqueId)) &&
+                           // Preserve normalizedId if it exists
+                           (resource.data.normalizedId == null || request.resource.data.normalizedId == resource.data.normalizedId) &&
+                           // Preserve name and email for regular users
                            request.resource.data.name == resource.data.name &&
                            request.resource.data.email == resource.data.email
                          )

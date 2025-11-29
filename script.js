@@ -2264,13 +2264,13 @@ function switchTransportationTab(index) {
 // Helper function to create transportation card HTML for a single person (as tab pane - no collapse)
 function createTransportationCardHTML(transportationData, index, isExpanded = false) {
     const { name, uniqueId, pickupLocation, arrivalDate, arrivalTime, flightTrainNumber,
-            returnDate, returnTime, returnFlightTrainNumber, pickupNeeded, dropoffNeeded } = transportationData;
+            returnDate, returnTime, returnFlightTrainNumber, dropoffLocation, pickupNeeded, dropoffNeeded } = transportationData;
     
     const safeName = escapeHtml(name || '');
     const safeUniqueId = escapeHtml(uniqueId || '');
     
     const hasArrivalInfo = pickupLocation || arrivalDate || arrivalTime || flightTrainNumber;
-    const hasReturnInfo = returnDate || returnTime || returnFlightTrainNumber;
+    const hasReturnInfo = dropoffLocation || returnDate || returnTime || returnFlightTrainNumber;
     const hasAnyInfo = hasArrivalInfo || hasReturnInfo;
     
     // Check if pickup/dropoff was explicitly set to "No"
@@ -2325,6 +2325,10 @@ function createTransportationCardHTML(transportationData, index, isExpanded = fa
                         <div class="info-item">
                             <span class="info-label">Drop Off Needed:</span>
                             <span class="info-value">${formatValue(dropoffNeeded) || 'Not specified'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Drop off Location:</span>
+                            <span class="info-value">${formatValue(dropoffLocation) || 'Not specified'}</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Date:</span>
@@ -2515,6 +2519,7 @@ function loadTransportationInfo(user) {
                                 const returnDate = regData.departureDate || regData['Date of Departure Train/Flight'] || regData.returnDate || regData['Return Date'] || regData['ReturnDate'] || '';
                                 const returnTime = regData.departureTime || regData['Time of Departure Train/Flight'] || regData.returnTime || regData['Return Time'] || regData['ReturnTime'] || '';
                                 const returnFlightTrainNumber = regData.departureFlightTrain || regData['Departure Flight/Train Number'] || regData.returnFlightTrainNumber || regData['Return Flight/Train Number'] || regData['ReturnFlightTrainNumber'] || '';
+                                const dropoffLocation = regData.departurePlace || regData['Place of Departure Train/Flight'] || regData.dropoffLocation || regData['Drop off Location'] || regData['DropoffLocation'] || '';
                                 const pickupNeeded = regData.pickupNeeded || regData['Do you need a pickup on arrival?'] || '';
                                 const dropoffNeeded = regData.dropoffNeeded || regData['Do you need a drop off for departure?'] || '';
                                 
@@ -2528,6 +2533,7 @@ function loadTransportationInfo(user) {
                                     returnDate,
                                     returnTime,
                                     returnFlightTrainNumber,
+                                    dropoffLocation,
                                     pickupNeeded,
                                     dropoffNeeded
                                 };
@@ -2639,6 +2645,7 @@ function editTransportationSection(uniqueId, section) {
                 const returnDate = data.departureDate || data['Date of Departure Train/Flight'] || data.returnDate || data['Return Date'] || data['ReturnDate'] || '';
                 const returnTime = data.departureTime || data['Time of Departure Train/Flight'] || data.returnTime || data['Return Time'] || data['ReturnTime'] || '';
                 const returnFlightTrainNumber = data.departureFlightTrain || data['Departure Flight/Train Number'] || data.returnFlightTrainNumber || data['Return Flight/Train Number'] || data['ReturnFlightTrainNumber'] || '';
+                const dropoffLocation = data.departurePlace || data['Place of Departure Train/Flight'] || data.dropoffLocation || data['Drop off Location'] || data['DropoffLocation'] || '';
                 const pickupNeeded = data.pickupNeeded || data['Do you need a pickup on arrival?'] || '';
                 const dropoffNeeded = data.dropoffNeeded || data['Do you need a drop off for departure?'] || '';
 
@@ -2646,6 +2653,10 @@ function editTransportationSection(uniqueId, section) {
                     // Determine if pickup is needed (default to 'Yes' if fields are filled, 'No' if empty)
                     const needsPickup = pickupNeeded === 'Yes' || pickupNeeded === 'yes' || (pickupNeeded === '' && (pickupLocation || arrivalDate || arrivalTime || flightTrainNumber));
                     const showArrivalFields = needsPickup;
+                } else if (section === 'return') {
+                    // Determine if dropoff is needed (default to 'Yes' if fields are filled, 'No' if empty)
+                    const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (dropoffLocation || returnDate || returnTime || returnFlightTrainNumber));
+                    const showReturnFields = needsDropoff;
                     
                     transportationInfo.innerHTML = `
                         <h3>Edit Arrival Information</h3>
@@ -2700,9 +2711,9 @@ function editTransportationSection(uniqueId, section) {
                             </div>
                         </form>
                     `;
-                } else {
+                } else if (section === 'return') {
                     // Determine if dropoff is needed (default to 'Yes' if fields are filled, 'No' if empty)
-                    const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (returnDate || returnTime || returnFlightTrainNumber));
+                    const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (dropoffLocation || returnDate || returnTime || returnFlightTrainNumber));
                     const showReturnFields = needsDropoff;
                     
                     transportationInfo.innerHTML = `
@@ -2720,6 +2731,24 @@ function editTransportationSection(uniqueId, section) {
                                 </div>
                                 <div id="returnFieldsContainer" style="display: ${showReturnFields ? 'block' : 'none'};">
                                     <p class="form-note">All fields below are required if you need drop off.</p>
+                                    <div class="form-group">
+                                        <label for="dropoffLocation">Drop off Location: <span class="required">*</span></label>
+                                    <select id="dropoffLocation" onchange="handleDropoffLocationChange(); validateTransportationSection('return');" required>
+                                        <option value="">Select drop off location</option>
+                                        <option value="Rajiv Gandhi International Airport (RGIA)" ${dropoffLocation === 'Rajiv Gandhi International Airport (RGIA)' ? 'selected' : ''}>Rajiv Gandhi International Airport (RGIA)</option>
+                                        <option value="Secunderabad Railway Station" ${dropoffLocation === 'Secunderabad Railway Station' ? 'selected' : ''}>Secunderabad Railway Station</option>
+                                        <option value="Nampally Railway Station" ${dropoffLocation === 'Nampally Railway Station' ? 'selected' : ''}>Nampally Railway Station</option>
+                                        <option value="Kacheguda Railway Station" ${dropoffLocation === 'Kacheguda Railway Station' ? 'selected' : ''}>Kacheguda Railway Station</option>
+                                        <option value="Cherlapally Railway Station" ${dropoffLocation === 'Cherlapally Railway Station' ? 'selected' : ''}>Cherlapally Railway Station</option>
+                                        <option value="Lingampally Railway Station" ${dropoffLocation === 'Lingampally Railway Station' ? 'selected' : ''}>Lingampally Railway Station</option>
+                                        <option value="Mahatma Gandhi Bus Station (MGBS)" ${dropoffLocation === 'Mahatma Gandhi Bus Station (MGBS)' ? 'selected' : ''}>Mahatma Gandhi Bus Station (MGBS)</option>
+                                        <option value="Jubilee Bus Station (JBS)" ${dropoffLocation === 'Jubilee Bus Station (JBS)' ? 'selected' : ''}>Jubilee Bus Station (JBS)</option>
+                                        <option value="Other" ${dropoffLocation !== '' && dropoffLocation !== 'Rajiv Gandhi International Airport (RGIA)' && dropoffLocation !== 'Secunderabad Railway Station' && dropoffLocation !== 'Nampally Railway Station' && dropoffLocation !== 'Kacheguda Railway Station' && dropoffLocation !== 'Cherlapally Railway Station' && dropoffLocation !== 'Lingampally Railway Station' && dropoffLocation !== 'Mahatma Gandhi Bus Station (MGBS)' && dropoffLocation !== 'Jubilee Bus Station (JBS)' ? 'selected' : ''}>Other</option>
+                                    </select>
+                                    <div id="dropoffLocationOtherContainer" style="display: none; margin-top: 0.5rem;">
+                                        <input type="text" id="dropoffLocationOther" placeholder="Please specify other location" value="${dropoffLocation !== '' && dropoffLocation !== 'Rajiv Gandhi International Airport (RGIA)' && dropoffLocation !== 'Secunderabad Railway Station' && dropoffLocation !== 'Nampally Railway Station' && dropoffLocation !== 'Kacheguda Railway Station' && dropoffLocation !== 'Cherlapally Railway Station' && dropoffLocation !== 'Lingampally Railway Station' && dropoffLocation !== 'Mahatma Gandhi Bus Station (MGBS)' && dropoffLocation !== 'Jubilee Bus Station (JBS)' ? dropoffLocation : ''}" onchange="validateTransportationSection('return')">
+                                    </div>
+                                </div>
                                     <div class="form-group">
                                         <label for="returnDate">Return Date: <span class="required">*</span></label>
                                     <input type="date" id="returnDate" value="${returnDate}" onchange="validateTransportationSection('return')" required>
@@ -2788,13 +2817,21 @@ function editTransportationSection(uniqueId, section) {
                             }
                             
                             if (dropoffNeeded === 'Yes') {
+                                const dropoffLocationSelect = document.getElementById('dropoffLocation')?.value.trim() || '';
+                                const dropoffLocationOther = document.getElementById('dropoffLocationOther')?.value.trim() || '';
+                                const dropoffLocation = dropoffLocationSelect === 'Other' ? dropoffLocationOther : dropoffLocationSelect;
                                 const returnDate = document.getElementById('returnDate')?.value.trim() || '';
                                 const returnTime = document.getElementById('returnTime')?.value.trim() || '';
                                 const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
                                 
-                                if (!returnDate || !returnTime || !returnFlightTrainNumber) {
-                                    showNotification('Please fill all return details: Date, Time, and Flight/Train Number are required.', 'error');
+                                if (!dropoffLocation || !returnDate || !returnTime || !returnFlightTrainNumber) {
+                                    showNotification('Please fill all return details: Drop off Location, Date, Time, and Flight/Train Number are required.', 'error');
                                     validateTransportationSection('return');
+                                    return;
+                                }
+                                
+                                if (dropoffLocationSelect === 'Other' && !dropoffLocationOther) {
+                                    showNotification('Please specify the other drop off location.', 'error');
                                     return;
                                 }
                             }
@@ -2830,12 +2867,13 @@ function editTransportation(uniqueId) {
                 const returnDate = data['Date of Departure Train/Flight'] || data.returnDate || data['Return Date'] || data['ReturnDate'] || '';
                 const returnTime = data['Time of Departure Train/Flight'] || data.returnTime || data['Return Time'] || data['ReturnTime'] || '';
                 const returnFlightTrainNumber = data['Departure Flight/Train Number'] || data.returnFlightTrainNumber || data['Return Flight/Train Number'] || data['ReturnFlightTrainNumber'] || '';
+                const dropoffLocation = data['Place of Departure Train/Flight'] || data.departurePlace || data.dropoffLocation || data['Drop off Location'] || data['DropoffLocation'] || '';
                 const pickupNeeded = data['Do you need a pickup on arrival?'] || data.pickupNeeded || '';
                 const dropoffNeeded = data['Do you need a drop off for departure?'] || data.dropoffNeeded || '';
                 
                 // Determine if pickup/dropoff is needed (default to 'Yes' if fields are filled, 'No' if empty)
                 const needsPickup = pickupNeeded === 'Yes' || pickupNeeded === 'yes' || (pickupNeeded === '' && (pickupLocation || arrivalDate || arrivalTime || flightTrainNumber));
-                const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (returnDate || returnTime || returnFlightTrainNumber));
+                const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (dropoffLocation || returnDate || returnTime || returnFlightTrainNumber));
                 const showArrivalFields = needsPickup;
                 const showReturnFields = needsDropoff;
 
@@ -2899,6 +2937,24 @@ function editTransportation(uniqueId) {
                             <div id="returnFieldsContainer" style="display: ${showReturnFields ? 'block' : 'none'};">
                                 <p class="form-note">If you enter any return detail, all return fields are required.</p>
                                 <div class="form-group">
+                                    <label for="dropoffLocation">Drop off Location:</label>
+                                <select id="dropoffLocation" onchange="handleDropoffLocationChange(); validateTransportationSection('return');">
+                                    <option value="">Select drop off location</option>
+                                    <option value="Rajiv Gandhi International Airport (RGIA)" ${dropoffLocation === 'Rajiv Gandhi International Airport (RGIA)' ? 'selected' : ''}>Rajiv Gandhi International Airport (RGIA)</option>
+                                    <option value="Secunderabad Railway Station" ${dropoffLocation === 'Secunderabad Railway Station' ? 'selected' : ''}>Secunderabad Railway Station</option>
+                                    <option value="Nampally Railway Station" ${dropoffLocation === 'Nampally Railway Station' ? 'selected' : ''}>Nampally Railway Station</option>
+                                    <option value="Kacheguda Railway Station" ${dropoffLocation === 'Kacheguda Railway Station' ? 'selected' : ''}>Kacheguda Railway Station</option>
+                                    <option value="Cherlapally Railway Station" ${dropoffLocation === 'Cherlapally Railway Station' ? 'selected' : ''}>Cherlapally Railway Station</option>
+                                    <option value="Lingampally Railway Station" ${dropoffLocation === 'Lingampally Railway Station' ? 'selected' : ''}>Lingampally Railway Station</option>
+                                    <option value="Mahatma Gandhi Bus Station (MGBS)" ${dropoffLocation === 'Mahatma Gandhi Bus Station (MGBS)' ? 'selected' : ''}>Mahatma Gandhi Bus Station (MGBS)</option>
+                                    <option value="Jubilee Bus Station (JBS)" ${dropoffLocation === 'Jubilee Bus Station (JBS)' ? 'selected' : ''}>Jubilee Bus Station (JBS)</option>
+                                    <option value="Other" ${dropoffLocation !== '' && dropoffLocation !== 'Rajiv Gandhi International Airport (RGIA)' && dropoffLocation !== 'Secunderabad Railway Station' && dropoffLocation !== 'Nampally Railway Station' && dropoffLocation !== 'Kacheguda Railway Station' && dropoffLocation !== 'Cherlapally Railway Station' && dropoffLocation !== 'Lingampally Railway Station' && dropoffLocation !== 'Mahatma Gandhi Bus Station (MGBS)' && dropoffLocation !== 'Jubilee Bus Station (JBS)' ? 'selected' : ''}>Other</option>
+                                </select>
+                                <div id="dropoffLocationOtherContainer" style="display: none; margin-top: 0.5rem;">
+                                    <input type="text" id="dropoffLocationOther" placeholder="Please specify other location" value="${dropoffLocation !== '' && dropoffLocation !== 'Rajiv Gandhi International Airport (RGIA)' && dropoffLocation !== 'Secunderabad Railway Station' && dropoffLocation !== 'Nampally Railway Station' && dropoffLocation !== 'Kacheguda Railway Station' && dropoffLocation !== 'Cherlapally Railway Station' && dropoffLocation !== 'Lingampally Railway Station' && dropoffLocation !== 'Mahatma Gandhi Bus Station (MGBS)' && dropoffLocation !== 'Jubilee Bus Station (JBS)' ? dropoffLocation : ''}" onchange="validateTransportationSection('return')">
+                                </div>
+                            </div>
+                                <div class="form-group">
                                     <label for="returnDate">Return Date:</label>
                                 <input type="date" id="returnDate" value="${returnDate}" onchange="validateTransportationSection('return')">
                             </div>
@@ -2957,14 +3013,22 @@ function editTransportation(uniqueId) {
                         }
                         
                         if (dropoffNeeded === 'Yes') {
+                            const dropoffLocationSelect = document.getElementById('dropoffLocation')?.value.trim() || '';
+                            const dropoffLocationOther = document.getElementById('dropoffLocationOther')?.value.trim() || '';
+                            const dropoffLocation = dropoffLocationSelect === 'Other' ? dropoffLocationOther : dropoffLocationSelect;
                             const returnDate = document.getElementById('returnDate')?.value.trim() || '';
                             const returnTime = document.getElementById('returnTime')?.value.trim() || '';
                             const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
                             
                             // Check return validation
-                            if (!returnDate || !returnTime || !returnFlightTrainNumber) {
-                                showNotification('Please fill all return details (Date, Time, and Flight/Train Number) when drop off is needed.', 'error');
+                            if (!dropoffLocation || !returnDate || !returnTime || !returnFlightTrainNumber) {
+                                showNotification('Please fill all return details (Drop off Location, Date, Time, and Flight/Train Number) when drop off is needed.', 'error');
                                 validateTransportationSection('return');
+                                return;
+                            }
+                            
+                            if (dropoffLocationSelect === 'Other' && !dropoffLocationOther) {
+                                showNotification('Please specify the other drop off location.', 'error');
                                 return;
                             }
                         }
@@ -2998,6 +3062,7 @@ function saveTransportationInfo(uniqueId) {
     let returnDate = '';
     let returnTime = '';
     let returnFlightTrainNumber = '';
+    let dropoffLocation = '';
     
     if (pickupNeeded === 'Yes') {
         const pickupLocationSelect = document.getElementById('pickupLocation')?.value.trim() || '';
@@ -3009,6 +3074,9 @@ function saveTransportationInfo(uniqueId) {
     }
     
     if (dropoffNeeded === 'Yes') {
+        const dropoffLocationSelect = document.getElementById('dropoffLocation')?.value.trim() || '';
+        const dropoffLocationOther = document.getElementById('dropoffLocationOther')?.value.trim() || '';
+        dropoffLocation = dropoffLocationSelect === 'Other' ? dropoffLocationOther : dropoffLocationSelect;
         returnDate = document.getElementById('returnDate')?.value.trim() || '';
         returnTime = document.getElementById('returnTime')?.value.trim() || '';
         returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
@@ -3057,7 +3125,7 @@ function saveTransportationInfo(uniqueId) {
                             arrivalFlightTrain: flightTrainNumber || '',
                             departureDate: returnDate || '',
                             departureTime: returnTime || '',
-                            departurePlace: '', // Will be set if needed
+                            departurePlace: dropoffLocation || '',
                             departureFlightTrain: returnFlightTrainNumber || '',
                             pickupNeeded: pickupNeeded || '',
                             dropoffNeeded: dropoffNeeded || '',
@@ -3153,17 +3221,27 @@ function saveTransportationSection(uniqueId, section) {
         }
         
         if (dropoffNeeded === 'Yes') {
+            const dropoffLocationSelect = document.getElementById('dropoffLocation')?.value.trim() || '';
+            const dropoffLocationOther = document.getElementById('dropoffLocationOther')?.value.trim() || '';
+            dropoffLocation = dropoffLocationSelect === 'Other' ? dropoffLocationOther : dropoffLocationSelect;
             returnDate = document.getElementById('returnDate')?.value.trim() || '';
             returnTime = document.getElementById('returnTime')?.value.trim() || '';
             returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim() || '';
             
-            // Validate all return fields are filled
-            if (!returnDate || !returnTime || !returnFlightTrainNumber) {
-                showNotification('Please fill all return details: Date, Time, and Flight/Train Number are required.', 'error');
+            // Validate all return fields are filled (including dropoff location)
+            if (!dropoffLocation || !returnDate || !returnTime || !returnFlightTrainNumber) {
+                showNotification('Please fill all return details: Drop off Location, Date, Time, and Flight/Train Number are required.', 'error');
+                return;
+            }
+            
+            // Validate "Other" option requires text input
+            if (dropoffLocationSelect === 'Other' && !dropoffLocationOther) {
+                showNotification('Please specify the other drop off location.', 'error');
                 return;
             }
         } else {
             // If No, clear all return fields
+            dropoffLocation = '';
             returnDate = '';
             returnTime = '';
             returnFlightTrainNumber = '';
@@ -3245,6 +3323,7 @@ function saveTransportationSection(uniqueId, section) {
                         } else if (section === 'return') {
                             updateData.departureDate = returnDate;
                             updateData.departureTime = returnTime;
+                            updateData.departurePlace = dropoffLocation;
                             updateData.departureFlightTrain = returnFlightTrainNumber;
                             updateData.dropoffNeeded = dropoffNeeded;
                         }
@@ -3281,6 +3360,24 @@ function handlePickupLocationChange() {
     
     if (pickupLocationSelect && otherContainer && otherInput) {
         if (pickupLocationSelect.value === 'Other') {
+            otherContainer.style.display = 'block';
+            otherInput.required = true;
+        } else {
+            otherContainer.style.display = 'none';
+            otherInput.required = false;
+            otherInput.value = '';
+        }
+    }
+}
+
+// Handle dropoff location dropdown change - show/hide "Other" textbox
+function handleDropoffLocationChange() {
+    const dropoffLocationSelect = document.getElementById('dropoffLocation');
+    const otherContainer = document.getElementById('dropoffLocationOtherContainer');
+    const otherInput = document.getElementById('dropoffLocationOther');
+    
+    if (dropoffLocationSelect && otherContainer && otherInput) {
+        if (dropoffLocationSelect.value === 'Other') {
             otherContainer.style.display = 'block';
             otherInput.required = true;
         } else {
@@ -3357,18 +3454,34 @@ function toggleReturnFields() {
         if (needsDropoff) {
             returnFieldsContainer.style.display = 'block';
             // Make fields required
+            const dropoffLocation = document.getElementById('dropoffLocation');
             const returnDate = document.getElementById('returnDate');
             const returnTime = document.getElementById('returnTime');
             const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber');
+            if (dropoffLocation) dropoffLocation.required = true;
             if (returnDate) returnDate.required = true;
             if (returnTime) returnTime.required = true;
             if (returnFlightTrainNumber) returnFlightTrainNumber.required = true;
         } else {
             returnFieldsContainer.style.display = 'none';
             // Make fields not required and clear them
+            const dropoffLocation = document.getElementById('dropoffLocation');
+            const dropoffLocationOther = document.getElementById('dropoffLocationOther');
+            const dropoffLocationOtherContainer = document.getElementById('dropoffLocationOtherContainer');
             const returnDate = document.getElementById('returnDate');
             const returnTime = document.getElementById('returnTime');
             const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber');
+            if (dropoffLocation) {
+                dropoffLocation.required = false;
+                dropoffLocation.value = '';
+            }
+            if (dropoffLocationOtherContainer) {
+                dropoffLocationOtherContainer.style.display = 'none';
+            }
+            if (dropoffLocationOther) {
+                dropoffLocationOther.required = false;
+                dropoffLocationOther.value = '';
+            }
             if (returnDate) {
                 returnDate.required = false;
                 returnDate.value = '';
@@ -3427,16 +3540,19 @@ function validateTransportationSection(section) {
             });
         }
     } else if (section === 'return') {
+        const dropoffLocationSelect = document.getElementById('dropoffLocation')?.value.trim();
+        const dropoffLocationOther = document.getElementById('dropoffLocationOther')?.value.trim();
+        const dropoffLocation = dropoffLocationSelect === 'Other' ? dropoffLocationOther : dropoffLocationSelect;
         const returnDate = document.getElementById('returnDate')?.value.trim();
         const returnTime = document.getElementById('returnTime')?.value.trim();
         const returnFlightTrainNumber = document.getElementById('returnFlightTrainNumber')?.value.trim();
         
-        const hasPartial = returnDate || returnTime || returnFlightTrainNumber;
-        const hasAll = returnDate && returnTime && returnFlightTrainNumber;
+        const hasPartial = dropoffLocation || returnDate || returnTime || returnFlightTrainNumber;
+        const hasAll = dropoffLocation && returnDate && returnTime && returnFlightTrainNumber;
         
         if (hasPartial && !hasAll) {
             isValid = false;
-            const inputs = ['returnDate', 'returnTime', 'returnFlightTrainNumber'];
+            const inputs = ['dropoffLocation', 'returnDate', 'returnTime', 'returnFlightTrainNumber'];
             inputs.forEach(id => {
                 const input = document.getElementById(id);
                 if (input && !input.value.trim()) {
@@ -3445,11 +3561,22 @@ function validateTransportationSection(section) {
                     input.style.borderColor = '';
                 }
             });
+            // Also check dropoffLocationOther if "Other" is selected
+            if (dropoffLocationSelect === 'Other') {
+                const dropoffLocationOtherInput = document.getElementById('dropoffLocationOther');
+                if (dropoffLocationOtherInput && !dropoffLocationOtherInput.value.trim()) {
+                    dropoffLocationOtherInput.style.borderColor = '#ff6b6b';
+                } else if (dropoffLocationOtherInput) {
+                    dropoffLocationOtherInput.style.borderColor = '';
+                }
+            }
         } else {
-            ['returnDate', 'returnTime', 'returnFlightTrainNumber'].forEach(id => {
+            ['dropoffLocation', 'returnDate', 'returnTime', 'returnFlightTrainNumber'].forEach(id => {
                 const input = document.getElementById(id);
                 if (input) input.style.borderColor = '';
             });
+            const dropoffLocationOtherInput = document.getElementById('dropoffLocationOther');
+            if (dropoffLocationOtherInput) dropoffLocationOtherInput.style.borderColor = '';
         }
     }
     
@@ -4732,6 +4859,30 @@ async function saveParticipantEdits() {
         return;
     }
     
+    // Double-check user document exists and has admin role (required for Firestore rules)
+    const db = firebase.firestore();
+    let userDoc;
+    try {
+        userDoc = await db.collection('users').doc(user.uid).get();
+        if (!userDoc.exists) {
+            showNotification('Error: Your user account is not properly set up. Please contact an administrator.', 'error');
+            console.error('User document does not exist for uid:', user.uid);
+            return;
+        }
+        
+        const userData = userDoc.data();
+        const userRole = userData?.role;
+        if (userRole !== 'admin' && userRole !== 'superadmin') {
+            showNotification('Permission denied. Only administrators can update participant information.', 'error');
+            console.error('User does not have admin role. Current role:', userRole);
+            return;
+        }
+    } catch (error) {
+        console.error('Error verifying user permissions:', error);
+        showNotification('Error verifying permissions. Please try again.', 'error');
+        return;
+    }
+    
     const isAdminUser = await isAdmin(user);
     if (!isAdminUser) {
         showNotification('Permission denied. Only administrators can update participant information.', 'error');
@@ -4747,16 +4898,44 @@ async function saveParticipantEdits() {
     
     inputs.forEach(input => {
         const fieldName = input.getAttribute('data-field-name');
-        updatedData[fieldName] = input.value.trim();
+        // Skip uniqueId from inputs - we'll set it explicitly below
+        if (fieldName !== 'uniqueId') {
+            updatedData[fieldName] = input.value.trim();
+        }
     });
+    
+    // Verify the existing registration document exists and has uniqueId
+    let existingRegDoc;
+    try {
+        existingRegDoc = await db.collection('registrations').doc(currentParticipantUniqueId).get();
+        if (!existingRegDoc.exists) {
+            showNotification('Error: Registration document not found.', 'error');
+            return;
+        }
+        
+        const existingData = existingRegDoc.data();
+        // Ensure uniqueId exists in the document (required by Firestore rules)
+        // If it doesn't exist, this is a data integrity issue - the document should always have uniqueId
+        if (!existingData.uniqueId) {
+            console.warn('Registration document missing uniqueId field. This may cause permission errors.');
+            // We'll still try to update, but the Firestore rule may fail
+        }
+    } catch (error) {
+        console.error('Error fetching existing registration:', error);
+        showNotification('Error fetching registration data. Please try again.', 'error');
+        return;
+    }
     
     // Preserve critical fields as required by Firebase security rules
     // uniqueId must be preserved and match the document ID (required for admin updates)
+    // Always set uniqueId to ensure it exists (matches document ID)
     updatedData.uniqueId = currentParticipantUniqueId;
     
     // Preserve normalizedId if it exists (should not be changed)
-    if (currentParticipantData.normalizedId) {
+    if (currentParticipantData?.normalizedId) {
         updatedData.normalizedId = currentParticipantData.normalizedId;
+    } else if (existingRegDoc?.data()?.normalizedId) {
+        updatedData.normalizedId = existingRegDoc.data().normalizedId;
     }
     
     // Note: As an admin, we can update name and email if they're in the form inputs
@@ -4772,8 +4951,6 @@ async function saveParticipantEdits() {
     }
     
     try {
-        const db = firebase.firestore();
-        
         // Update the document (only updates specified fields, preserves others)
         await db.collection('registrations').doc(currentParticipantUniqueId).update(updatedData);
         
@@ -4787,9 +4964,18 @@ async function saveParticipantEdits() {
         
     } catch (error) {
         console.error('Error updating participant:', error);
+        console.error('Error details:', {
+            code: error.code,
+            message: error.message,
+            stack: error.stack
+        });
+        console.error('Update data:', updatedData);
+        console.error('User UID:', user.uid);
+        console.error('User role:', userDoc?.data()?.role);
+        
         let errorMsg = 'Error updating participant information. Please try again.';
         if (error.code === 'permission-denied') {
-            errorMsg = 'Permission denied. You do not have permission to update this registration. Please ensure you are logged in as an administrator.';
+            errorMsg = 'Permission denied. You do not have permission to update this registration. Please ensure you are logged in as an administrator and that your user account has the correct role in Firestore.';
         } else if (error.message) {
             errorMsg = error.message;
         }
