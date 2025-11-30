@@ -39,7 +39,7 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // Read Excel file - support custom path via environment variable
-const excelFilePath = process.env.EXCEL_FILE_PATH || 'Registrations_21_11.xlsx';
+const excelFilePath = process.env.EXCEL_FILE_PATH || 'dataprocessing/Registrations_11_29.xlsx';
 let workbook;
 try {
     workbook = XLSX.readFile(excelFilePath);
@@ -97,6 +97,9 @@ async function importData() {
                 }
             }
 
+            // Map "Place of Departure Train/Flight" to "departurePlace"
+            const departurePlace = row['Place of Departure Train/Flight'] || row['Place of Departure'] || row['departurePlace'] || '';
+            
             // Create registration document with normalized field names
             const registrationData = {
                 uniqueId: praveshikaIdString,
@@ -109,6 +112,7 @@ async function importData() {
                 Shreni: shreni, // Keep original column name too
                 barcode: barcode,
                 Barcode: barcode, // Keep original column name too
+                departurePlace: departurePlace, // Map "Place of Departure Train/Flight" to "departurePlace"
                 // Include all other fields from Excel
                 ...row,
                 importedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -126,12 +130,65 @@ async function importData() {
         }
     }
 
-    // Write email -> UIDs mappings to Firebase
-    console.log(`\nCreating email to UIDs mappings...`);
+    // Write email -> UIDs mappings to Firebase (merge with existing mappings)
+    console.log(`\nUpdating email to UIDs mappings (merging with existing)...`);
     let emailMappingCount = 0;
     let emailMappingErrors = 0;
 
-    for (const [normalizedEmail, uids] of emailToUidsMap.entries()) {
+    for (const [normalizedEmail, newUids] of emailToUidsMap.entries()) {
+        try {
+            // Get existing emailToUids document if it exists
+            const existingDoc = await db.collection('emailToUids').doc(normalizedEmail).get();
+            let allUids = [...newUids];
+            
+            if (existingDoc.exists) {
+                const existingData = existingDoc.data();
+                const existingUids = existingData.uids || [];
+                // Merge UIDs, removing duplicates
+                allUids = [...new Set([...existingUids, ...newUids])].sort();
+                console.log(`  Merging ${normalizedEmail}: ${existingUids.length} existing + ${newUids.length} new = ${allUids.length} total`);
+            }
+            
+            await db.collection('emailToUids').doc(normalizedEmail).set({
+                email: normalizedEmail,
+                uids: allUids,
+                count: allUids.length,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            emailMappingCount++;
+        } catch (error) {
+            console.error(`✗ Error updating email mapping for ${normalizedEmail}:`, error.message);
+            emailMappingErrors++;
+        }
+    }
+    
+    // After import, sync all emailToUids from all registrations to ensure completeness
+    console.log(`\nSyncing all emailToUids from all registrations to ensure completeness...`);
+    const allRegistrationsSnapshot = await db.collection('registrations').get();
+    const allEmailMap = new Map();
+    
+    allRegistrationsSnapshot.forEach((doc) => {
+        const data = doc.data() || {};
+        const emailRaw = data.email || data['Email address'] || data['Email'] || data['email address'] || '';
+        const uniqueIdRaw = data.uniqueId || data['Praveshika ID'] || data['Unique ID'] || doc.id;
+        
+        if (emailRaw && uniqueIdRaw) {
+            const normalizedEmail = emailRaw.toLowerCase().trim();
+            const uniqueId = String(uniqueIdRaw).trim();
+            
+            if (normalizedEmail && uniqueId) {
+                if (!allEmailMap.has(normalizedEmail)) {
+                    allEmailMap.set(normalizedEmail, new Set());
+                }
+                allEmailMap.get(normalizedEmail).add(uniqueId);
+            }
+        }
+    });
+    
+    let syncCount = 0;
+    let syncErrors = 0;
+    for (const [normalizedEmail, uidSet] of allEmailMap.entries()) {
+        const uids = Array.from(uidSet).sort();
         try {
             await db.collection('emailToUids').doc(normalizedEmail).set({
                 email: normalizedEmail,
@@ -139,12 +196,14 @@ async function importData() {
                 count: uids.length,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
-            emailMappingCount++;
+            syncCount++;
         } catch (error) {
-            console.error(`✗ Error creating email mapping for ${normalizedEmail}:`, error.message);
-            emailMappingErrors++;
+            console.error(`✗ Error syncing email mapping for ${normalizedEmail}:`, error.message);
+            syncErrors++;
         }
     }
+    
+    console.log(`Synced ${syncCount} email mappings from all registrations`);
 
     console.log(`\nImport completed!`);
     console.log(`Success: ${successCount}`);

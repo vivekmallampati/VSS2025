@@ -4615,7 +4615,7 @@ async function searchParticipantByUniqueId() {
     await searchParticipantByLoginId();
 }
 
-// Search participant by Email (group match)
+// Search participant by Email (group match) - using emailToUids collection
 async function searchParticipantByEmail() {
     const emailInput = document.getElementById('lookupEmail');
     if (!emailInput) return;
@@ -4633,19 +4633,68 @@ async function searchParticipantByEmail() {
     
     try {
         const db = firebase.firestore();
-        const emailLower = email.toLowerCase();
-        
-        // Fetch all registrations and filter client-side for case-insensitive email match
-        const allRegistrations = await db.collection('registrations').limit(1000).get();
+        const emailLower = email.toLowerCase().trim();
         const results = [];
         
-        allRegistrations.docs.forEach(doc => {
-            const data = doc.data();
-            const regEmail = (data.email || data['Email address'] || '').toLowerCase();
-            if (regEmail.includes(emailLower)) {
-                results.push(doc);
-            }
-        });
+        // First, try exact match using emailToUids collection
+        const emailToUidsDoc = await db.collection('emailToUids').doc(emailLower).get();
+        
+        if (emailToUidsDoc.exists) {
+            // Found exact match - get all UIDs for this email
+            const emailToUidsData = emailToUidsDoc.data();
+            const uids = emailToUidsData.uids || [];
+            
+            // Fetch all registration documents for these UIDs
+            const registrationPromises = uids.map(uid => 
+                db.collection('registrations').doc(uid).get()
+                    .then(doc => doc.exists ? doc : null)
+                    .catch(error => {
+                        console.error(`Error fetching registration for ${uid}:`, error);
+                        return null;
+                    })
+            );
+            
+            const registrationDocs = await Promise.all(registrationPromises);
+            registrationDocs.forEach(doc => {
+                if (doc) results.push(doc);
+            });
+        } else {
+            // No exact match - try partial search in emailToUids collection
+            // Get all emailToUids documents and filter for emails containing the search term
+            const allEmailToUids = await db.collection('emailToUids').get();
+            const matchingEmails = [];
+            
+            allEmailToUids.docs.forEach(doc => {
+                const emailData = doc.data();
+                const docEmail = (emailData.email || doc.id).toLowerCase();
+                if (docEmail.includes(emailLower)) {
+                    matchingEmails.push(doc);
+                }
+            });
+            
+            // Collect all UIDs from matching emails
+            const allUids = new Set();
+            matchingEmails.forEach(doc => {
+                const emailData = doc.data();
+                const uids = emailData.uids || [];
+                uids.forEach(uid => allUids.add(uid));
+            });
+            
+            // Fetch all registration documents for these UIDs
+            const registrationPromises = Array.from(allUids).map(uid => 
+                db.collection('registrations').doc(uid).get()
+                    .then(doc => doc.exists ? doc : null)
+                    .catch(error => {
+                        console.error(`Error fetching registration for ${uid}:`, error);
+                        return null;
+                    })
+            );
+            
+            const registrationDocs = await Promise.all(registrationPromises);
+            registrationDocs.forEach(doc => {
+                if (doc) results.push(doc);
+            });
+        }
         
         if (results.length === 0) {
             showNotification('No participants found with this email', 'info');
@@ -7408,21 +7457,47 @@ async function advancedSearch() {
         let searchType = null;
         
         if (email) {
-            // Email search: find all users with matching email (case-insensitive)
+            // Email search: use emailToUids collection to find all Praveshika IDs linked to matching emails
             searchType = 'email';
-            const emailLower = email.toLowerCase();
+            const emailLower = email.toLowerCase().trim();
+            const allUids = new Set();
             
-            // Fetch all registrations and filter client-side for case-insensitive email match
-            // Note: This approach works but may be slow with large datasets
-            // For production, consider using a search service or indexing
-            const allRegistrations = await db.collection('registrations').limit(1000).get();
+            // First, try exact match using emailToUids collection
+            const emailToUidsDoc = await db.collection('emailToUids').doc(emailLower).get();
             
-            allRegistrations.docs.forEach(doc => {
-                const data = doc.data();
-                const regEmail = (data.email || data['Email address'] || '').toLowerCase();
-                if (regEmail.includes(emailLower)) {
-                    results.push(doc);
-                }
+            if (emailToUidsDoc.exists) {
+                // Found exact match - get all UIDs for this email
+                const emailToUidsData = emailToUidsDoc.data();
+                const uids = emailToUidsData.uids || [];
+                uids.forEach(uid => allUids.add(uid));
+            } else {
+                // No exact match - try partial search in emailToUids collection
+                // Get all emailToUids documents and filter for emails containing the search term
+                const allEmailToUids = await db.collection('emailToUids').get();
+                
+                allEmailToUids.docs.forEach(doc => {
+                    const emailData = doc.data();
+                    const docEmail = (emailData.email || doc.id).toLowerCase();
+                    if (docEmail.includes(emailLower)) {
+                        const uids = emailData.uids || [];
+                        uids.forEach(uid => allUids.add(uid));
+                    }
+                });
+            }
+            
+            // Fetch all registration documents for these UIDs
+            const registrationPromises = Array.from(allUids).map(uid => 
+                db.collection('registrations').doc(uid).get()
+                    .then(doc => doc.exists ? doc : null)
+                    .catch(error => {
+                        console.error(`Error fetching registration for ${uid}:`, error);
+                        return null;
+                    })
+            );
+            
+            const registrationDocs = await Promise.all(registrationPromises);
+            registrationDocs.forEach(doc => {
+                if (doc) results.push(doc);
             });
         } else if (name) {
             // Name search: case-insensitive partial search

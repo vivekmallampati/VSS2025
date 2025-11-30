@@ -5,15 +5,15 @@ services:
     volumes:
       # Mount the service account key from your local machine
       - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
-      # Mount the latest Registrations_21_11.xlsx file
-      - ./dataprocessing/Registrations_21_11.xlsx:/app/Registrations_21_11.xlsx:ro
+      # Mount the latest Registrations_11_29.xlsx file
+      - ./dataprocessing/Registrations_11_29.xlsx:/app/dataprocessing/Registrations_11_29.xlsx:ro
     environment:
       - NODE_ENV=production
       # Default Excel file path (can be overridden)
-      - EXCEL_FILE_PATH=/app/Registrations_21_11.xlsx
+      - EXCEL_FILE_PATH=/app/dataprocessing/Registrations_11_29.xlsx
       # Service account path (defaults to /app/secrets/serviceAccountKey.json)
       - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
-    # The script will upload Registrations_21_11.xlsx to Firestore with normalized structure
+    # The script will upload Registrations_11_29.xlsx to Firestore with normalized structure
 
   approve-registrations:
     build: .

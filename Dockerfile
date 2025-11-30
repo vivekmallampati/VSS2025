@@ -18,7 +18,7 @@ RUN npm install
 # 1. The excel-import service mounts it as a volume in docker-compose.yml
 # 2. The normalize-field-names script doesn't need it (it updates existing Firestore documents)
 # If you need the Excel file in the image, mount it as a volume or copy it separately
-ENV EXCEL_FILE_PATH=Registrations_21_11.xlsx
+ENV EXCEL_FILE_PATH=/app/dataprocessing/Registrations_11_29.xlsx
 
 # The service account key should be mounted as a volume or passed at runtime
 # We'll create a directory for it
