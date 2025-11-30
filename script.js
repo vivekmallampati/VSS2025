@@ -4615,6 +4615,58 @@ async function searchParticipantByUniqueId() {
     await searchParticipantByLoginId();
 }
 
+// Search participant by Name
+async function searchParticipantByName() {
+    const nameInput = document.getElementById('lookupName');
+    if (!nameInput) return;
+    
+    const name = nameInput.value.trim();
+    if (!name) {
+        showNotification('Please enter a name to search', 'error');
+        return;
+    }
+    
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const nameLower = name.toLowerCase();
+        const results = [];
+        
+        // Fetch all registrations and filter client-side for case-insensitive partial name match
+        const allRegistrations = await db.collection('registrations').limit(1000).get();
+        
+        allRegistrations.docs.forEach(doc => {
+            const data = doc.data();
+            const regName = (data.name || data['Full Name'] || '').toLowerCase();
+            if (regName.includes(nameLower)) {
+                results.push(doc);
+            }
+        });
+        
+        if (results.length === 0) {
+            showNotification('No participants found with this name', 'info');
+            clearParticipantLookupResults();
+            return;
+        }
+        
+        if (results.length === 1) {
+            const regData = results[0].data();
+            const uniqueId = regData.uniqueId || results[0].id;
+            displayParticipantLookupResults(regData, uniqueId);
+        } else {
+            // Show selection list
+            displayParticipantSelectionList(results, 'name');
+        }
+    } catch (error) {
+        console.error('Error searching participant by name:', error);
+        showNotification('Error searching participant: ' + error.message, 'error');
+    }
+}
+
 // Search participant by Email (group match) - using emailToUids collection
 async function searchParticipantByEmail() {
     const emailInput = document.getElementById('lookupEmail');
@@ -4708,7 +4760,7 @@ async function searchParticipantByEmail() {
             displayParticipantLookupResults(regData, uniqueId);
         } else {
             // Show selection list
-            displayParticipantSelectionList(results);
+            displayParticipantSelectionList(results, 'email');
         }
     } catch (error) {
         console.error('Error searching participant by email:', error);
@@ -4716,8 +4768,8 @@ async function searchParticipantByEmail() {
     }
 }
 
-// Display participant selection list (when email search returns multiple results)
-function displayParticipantSelectionList(docs) {
+// Display participant selection list (when email or name search returns multiple results)
+function displayParticipantSelectionList(docs, searchType = 'email') {
     const resultsDiv = document.getElementById('participantLookupResults');
     const detailsDiv = document.getElementById('participantLookupDetails');
     
@@ -4727,8 +4779,9 @@ function displayParticipantSelectionList(docs) {
         detailsDiv.style.display = 'none';
     }
     
+    const searchTypeText = searchType === 'name' ? 'with this name' : 'with this email';
     let html = `<div class="participant-search-results">
-        <h4>${docs.length} participant(s) found with this email. Please select:</h4>
+        <h4>${docs.length} participant(s) found ${searchTypeText}. Please select:</h4>
         <ul style="list-style: none; padding: 0;">`;
     
     docs.forEach(doc => {
@@ -7431,6 +7484,58 @@ async function searchByPraveshikaIdDirect(uniqueId) {
     }
 }
 
+// Search by name for check-in
+async function searchByNameForCheckin() {
+    const nameInput = document.getElementById('searchByNameCheckin');
+    if (!nameInput) return;
+    
+    const name = nameInput.value.trim();
+    if (!name) {
+        showNotification('Please enter a name to search', 'error');
+        return;
+    }
+    
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const nameLower = name.toLowerCase();
+        const results = [];
+        
+        // Fetch all registrations and filter client-side for case-insensitive partial name match
+        const allRegistrations = await db.collection('registrations').limit(1000).get();
+        
+        allRegistrations.docs.forEach(doc => {
+            const data = doc.data();
+            const regName = (data.name || data['Full Name'] || '').toLowerCase();
+            if (regName.includes(nameLower)) {
+                results.push(doc);
+            }
+        });
+        
+        if (results.length === 0) {
+            showNotification('No participants found with this name', 'info');
+            clearParticipantInfo();
+            return;
+        }
+        
+        if (results.length === 1) {
+            const regData = results[0].data();
+            const uniqueId = regData.uniqueId || results[0].id;
+            displayParticipantInfo(regData, uniqueId);
+        } else {
+            // Show list of results
+            displayParticipantSearchResults(results, 'name');
+        }
+    } catch (error) {
+        console.error('Error searching by name:', error);
+        showNotification('Error searching: ' + error.message, 'error');
+    }
+}
+
 // Advanced search by name or email
 async function advancedSearch() {
     const nameInput = document.getElementById('searchByName');
@@ -7702,8 +7807,10 @@ function clearParticipantInfo() {
     // Clear inputs
     const barcodeInput = document.getElementById('barcodeInput');
     const manualInput = document.getElementById('manualPraveshikaId');
+    const nameSearchInput = document.getElementById('searchByNameCheckin');
     if (barcodeInput) barcodeInput.value = '';
     if (manualInput) manualInput.value = '';
+    if (nameSearchInput) nameSearchInput.value = '';
 }
 
 // Setup checkin form

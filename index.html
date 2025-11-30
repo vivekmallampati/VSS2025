@@ -1796,7 +1796,7 @@
                         <!-- Search Section -->
                         <div class="participant-lookup-search" style="background: #f5f5f5; padding: 2rem; border-radius: 8px; margin-bottom: 2rem;">
                             <h3>Search Participant</h3>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
                                 <div class="form-group">
                                     <label for="lookupUniqueId">Search by Login ID (Praveshika ID):</label>
                                     <div style="display: flex; gap: 0.5rem;">
@@ -1810,6 +1810,13 @@
                                     <div style="display: flex; gap: 0.5rem;">
                                         <input type="email" id="lookupEmail" class="form-input" placeholder="Enter email address" autocomplete="off">
                                         <button class="btn btn-primary" onclick="searchParticipantByEmail()">Search</button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="lookupName">Search by Name:</label>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        <input type="text" id="lookupName" class="form-input" placeholder="Enter participant name" autocomplete="off">
+                                        <button class="btn btn-primary" onclick="searchParticipantByName()">Search</button>
                                     </div>
                                 </div>
                             </div>
@@ -1869,6 +1876,7 @@
                                 <div class="search-tabs">
                                     <button class="search-tab-btn active" onclick="switchSearchMode('barcode')">Barcode Scan</button>
                                     <button class="search-tab-btn" onclick="switchSearchMode('manual')">Manual Entry</button>
+                                    <button class="search-tab-btn" onclick="switchSearchMode('name')">Search by Name</button>
                                     <button class="search-tab-btn" onclick="switchSearchMode('advanced')">Advanced Search</button>
                                     <button class="search-tab-btn" onclick="switchSearchMode('batch')">Batch Checkin</button>
                                 </div>
@@ -1894,6 +1902,12 @@
                                 <div id="searchMode-manual" class="search-mode">
                                     <input type="text" id="manualPraveshikaId" class="form-input" placeholder="Enter Praveshika ID" autocomplete="off">
                                     <button class="btn btn-primary" onclick="searchByPraveshikaId()">Search</button>
+                                </div>
+
+                                <!-- Search by Name Mode -->
+                                <div id="searchMode-name" class="search-mode">
+                                    <input type="text" id="searchByNameCheckin" class="form-input" placeholder="Enter participant name" autocomplete="off">
+                                    <button class="btn btn-primary" onclick="searchByNameForCheckin()">Search</button>
                                 </div>
 
                                 <!-- Advanced Search Mode -->
