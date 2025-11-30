@@ -2653,10 +2653,6 @@ function editTransportationSection(uniqueId, section) {
                     // Determine if pickup is needed (default to 'Yes' if fields are filled, 'No' if empty)
                     const needsPickup = pickupNeeded === 'Yes' || pickupNeeded === 'yes' || (pickupNeeded === '' && (pickupLocation || arrivalDate || arrivalTime || flightTrainNumber));
                     const showArrivalFields = needsPickup;
-                } else if (section === 'return') {
-                    // Determine if dropoff is needed (default to 'Yes' if fields are filled, 'No' if empty)
-                    const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (dropoffLocation || returnDate || returnTime || returnFlightTrainNumber));
-                    const showReturnFields = needsDropoff;
                     
                     transportationInfo.innerHTML = `
                         <h3>Edit Arrival Information</h3>
@@ -2712,6 +2708,9 @@ function editTransportationSection(uniqueId, section) {
                         </form>
                     `;
                 } else if (section === 'return') {
+                    // Determine if dropoff is needed (default to 'Yes' if fields are filled, 'No' if empty)
+                    const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (dropoffLocation || returnDate || returnTime || returnFlightTrainNumber));
+                    const showReturnFields = needsDropoff;
                     // Determine if dropoff is needed (default to 'Yes' if fields are filled, 'No' if empty)
                     const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (dropoffLocation || returnDate || returnTime || returnFlightTrainNumber));
                     const showReturnFields = needsDropoff;
