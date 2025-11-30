@@ -372,6 +372,8 @@ function closeModal(modalId, options = {}) {
 function openLogin() {
     openModal('loginModal');
 }
+// Ensure openLogin is available globally for inline onclick handlers
+window.openLogin = openLogin;
 
 function closeLogin() {
     closeModal('loginModal', {
@@ -2708,9 +2710,6 @@ function editTransportationSection(uniqueId, section) {
                         </form>
                     `;
                 } else if (section === 'return') {
-                    // Determine if dropoff is needed (default to 'Yes' if fields are filled, 'No' if empty)
-                    const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (dropoffLocation || returnDate || returnTime || returnFlightTrainNumber));
-                    const showReturnFields = needsDropoff;
                     // Determine if dropoff is needed (default to 'Yes' if fields are filled, 'No' if empty)
                     const needsDropoff = dropoffNeeded === 'Yes' || dropoffNeeded === 'yes' || (dropoffNeeded === '' && (dropoffLocation || returnDate || returnTime || returnFlightTrainNumber));
                     const showReturnFields = needsDropoff;
