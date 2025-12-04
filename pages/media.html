@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media - Vishwa Sangh Shibir 2025</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="../docs/logo.png">
+    <script>
+        function openLogin() {
+            const loginModal = document.getElementById('loginModal');
+            if (loginModal) {
+                loginModal.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+            }
+        }
+        window.openLogin = openLogin;
+    </script>
+</head>
+<body>
+    <div id="header-placeholder"></div>
+
+    <main class="main-content">
+        <section id="media" class="tab-content active">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Media</h2>
+                    <p>Photos and videos from VSS2025</p>
+                </div>
+                <div class="media-filters" style="display: flex; align-items: center; gap: 1rem;">
+                    <button
+                        id="btnVideos"
+                        class="media-toggle-btn btn btn-primary"
+                        onclick="switchMediaView('videos')"
+                        type="button"
+                        style="margin-right: 0.5rem;"
+                    >Videos</button>
+                    <button
+                        id="btnImages"
+                        class="media-toggle-btn btn btn-secondary"
+                        onclick="switchMediaView('images')"
+                        type="button"
+                    >Images</button>
+                </div>
+                <script>
+                  // Ensure correct highlighting of selection
+                  function updateMediaButtons(selected) {
+                      const btnVideos = document.getElementById('btnVideos');
+                      const btnImages = document.getElementById('btnImages');
+                      if (!btnVideos || !btnImages) return;
+                      if (selected === 'videos') {
+                          btnVideos.classList.add('btn-primary');
+                          btnVideos.classList.remove('btn-secondary');
+                          btnImages.classList.add('btn-secondary');
+                          btnImages.classList.remove('btn-primary');
+                      } else {
+                          btnImages.classList.add('btn-primary');
+                          btnImages.classList.remove('btn-secondary');
+                          btnVideos.classList.add('btn-secondary');
+                          btnVideos.classList.remove('btn-primary');
+                      }
+                  }
+                  // Patch the switchMediaView function if not already present
+                  (function() {
+                    window._origSwitchMediaView = window.switchMediaView;
+                    window.switchMediaView = function(type) {
+                        if(window._origSwitchMediaView) window._origSwitchMediaView(type);
+                        updateMediaButtons(type);
+                    }
+                    // Set initial state
+                    document.addEventListener("DOMContentLoaded", function() {updateMediaButtons('videos')});
+                  })();
+                </script>
+                <div id="mediaVideos" class="media-section">
+                    <div class="video-wrapper">
+                        <iframe width="560" height="315" src="https://www.youtube.com/embed/pV9kMswEfqM" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                </div>
+                <div id="mediaImages" class="media-section" style="display:none;">
+                    <div class="image-grid">
+                        <img src="../docs/logo.png" alt="VSS2025" loading="lazy">
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="footer-placeholder"></div>
+    <div id="modals-placeholder"></div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="../firebase-config.js"></script>
+    <script src="../components/loader.js"></script>
+    <script src="../script.js"></script>
+</body>
+</html>
+

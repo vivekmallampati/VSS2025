@@ -56,6 +56,19 @@
       gtag('js', new Date());
       gtag('config', 'G-FQ9MSQ4890');
     </script>
+    <script>
+        // Ensure openLogin is available immediately for inline onclick handlers
+        // This will be overridden when script.js loads
+        function openLogin() {
+            // Fallback: try to find and open the login modal
+            const loginModal = document.getElementById('loginModal');
+            if (loginModal) {
+                loginModal.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+            }
+        }
+        window.openLogin = openLogin;
+    </script>
 </head>
 <body>
     <!-- Header -->
@@ -89,6 +102,7 @@
                  <li class="has-dropdown" id="shibirarthiNavItem" style="display: none;">
                     <a href="#shibirarthi" class="nav-link" data-tab="shibirarthi">Shibirarthi Info </a>
                 </li>
+                <li id="shibirResourcesNavItem" style="display: none;"><a href="#shibir-resources" class="nav-link" data-tab="shibir-resources">Shibir Resources</a></li>
                 <li id="myProfileNavItem" style="display: none;"><a href="#myprofile" class="nav-link" data-tab="myprofile">My Profile</a></li>
                 <li id="myTransportationNavItem" style="display: none;"><a href="#mytransportation" class="nav-link" data-tab="mytransportation">My Transportation</a></li>
                 <li id="myToursNavItem" style="display: none;"><a href="#mytours" class="nav-link" data-tab="mytours">My Tours</a></li>
@@ -765,6 +779,53 @@
                     <h2>Download Official Letter</h2>
                     <p>Click the button below to download the official letter in Word format for your records.</p>
                     <button class="btn btn-primary" onclick="downloadDocument('shibirarthi')">📄 Download Official Letter</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Shibir Resources Tab -->
+        <section id="shibir-resources" class="tab-content">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Shibir Resources</h2>
+                    <p>Essential resources and materials for Shibirarthis</p>
+                </div>
+                
+                <div class="resources-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2rem;">
+                    <!-- Resource 1: VSS Orientation Slide Pack -->
+                    <div class="resource-card" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s;">
+                        <div class="resource-icon" style="font-size: 3rem; margin-bottom: 1rem; text-align: center;">📊</div>
+                        <h3 style="margin-bottom: 1rem; color: #333; text-align: center;">VSS Orientation Slide Pack</h3>
+                        <p style="color: #666; margin-bottom: 1.5rem; text-align: center;">Countrywise pre-shibir orientation presentation</p>
+                        <div style="text-align: center;">
+                            <a href="docs/VSS2025 countrywise pre-shibir orientation.pptx" download class="btn btn-primary" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'">
+                                📥 Download Presentation
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Resource 2: Vyayamyog Tutorial Video -->
+                    <div class="resource-card" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s;">
+                        <div class="resource-icon" style="font-size: 3rem; margin-bottom: 1rem; text-align: center;">🎥</div>
+                        <h3 style="margin-bottom: 1rem; color: #333; text-align: center;">Vyayamyog Tutorial Video</h3>
+                        <p style="color: #666; margin-bottom: 1.5rem; text-align: center;">Learn Vyayamyog exercises and practices</p>
+                        <div style="text-align: center;">
+                            <a href="docs/VyayamYog.mp4" download class="btn btn-primary" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'">
+                                📥 Download Video
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Resource 3: VSS Program Book -->
+                    <div class="resource-card" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s;">
+                        <div class="resource-icon" style="font-size: 3rem; margin-bottom: 1rem; text-align: center;">📖</div>
+                        <h3 style="margin-bottom: 1rem; color: #333; text-align: center;">VSS Program Book</h3>
+                        <p style="color: #666; margin-bottom: 1.5rem; text-align: center;">Complete program schedule and information</p>
+                        <div style="text-align: center; padding: 1rem; background: #fff9e6; border-radius: 4px; border-left: 4px solid #ff9900;">
+                            <p style="margin: 0; color: #666; font-style: italic;">⏳ In Progress</p>
+                            <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">This resource will be available soon</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>

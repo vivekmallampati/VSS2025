@@ -33,7 +33,7 @@ function waitForFirebase(callback, maxRetries = 50) {
 }
 
 // Protected tabs that require authentication
-const PROTECTED_TABS = ['shibirarthi', 'myprofile', 'mytransportation', 'mytours', 'checkin', 'admin-dashboard', 'user-management', 'participant-lookup'];
+const PROTECTED_TABS = ['shibirarthi', 'shibir-resources', 'myprofile', 'mytransportation', 'mytours', 'checkin', 'admin-dashboard', 'user-management', 'participant-lookup'];
 
 // Helper function to check if a tab is protected
 function isProtectedTab(tabName) {
@@ -161,6 +161,7 @@ function canAccessProtectedTab(tabName) {
         
         // Check if the nav item is visible (additional check)
         const navItemId = tabName === 'shibirarthi' ? 'shibirarthiNavItem' : 
+                         tabName === 'shibir-resources' ? 'shibirResourcesNavItem' :
                          tabName + 'NavItem';
         const navItem = document.getElementById(navItemId);
         if (navItem && navItem.style.display === 'none') {
@@ -177,6 +178,38 @@ function canAccessProtectedTab(tabName) {
 // Track if we're still initializing auth to prevent premature login prompts
 let authInitializing = true;
 let loginModalOpened = false;
+
+// Load page-specific content when on a separate page
+function loadPageContent(pageName) {
+    if (window.firebase && firebase.auth) {
+        const user = firebase.auth().currentUser;
+        if (user) {
+            switch(pageName) {
+                case 'checkin':
+                    initializeCheckinInterface();
+                    break;
+                case 'myprofile':
+                    loadUserProfile(user);
+                    break;
+                case 'mytransportation':
+                    loadTransportationInfo(user);
+                    break;
+                case 'mytours':
+                    loadToursInfo(user);
+                    break;
+                case 'admin-dashboard':
+                    loadAdminDashboard(user);
+                    break;
+                case 'user-management':
+                    loadUserManagementPage(user);
+                    break;
+                case 'participant-lookup':
+                    loadParticipantLookupPage(user);
+                    break;
+            }
+        }
+    }
+}
 
 function activateTab(tabName, skipAuthCheck = false) {
     // During initialization, skip auth check to prevent premature login prompts
@@ -264,39 +297,94 @@ function activateTab(tabName, skipAuthCheck = false) {
 }
 
 // Tab Navigation Functionality with URL hash support
+// Updated to support both tab-based (index.html) and page-based navigation
 document.addEventListener('DOMContentLoaded', function() {
     const navLinks = document.querySelectorAll('.nav-link');
     const tabContents = document.querySelectorAll('.tab-content');
 
-    // Handle nav link clicks
+    // Handle nav link clicks - support both page-based and tab-based navigation
     navLinks.forEach(link => {
         link.addEventListener('click', function(e) {
-            e.preventDefault();
+            const href = this.getAttribute('href');
             const targetTab = this.getAttribute('data-tab');
+            const targetPage = this.getAttribute('data-page');
+            
+            // If link has an href and it's not a hash link, let it navigate normally
+            if (href && !href.startsWith('#')) {
+                // Page-based navigation - check auth before navigating
+                const pageName = targetPage || href.split('/').pop().replace('.html', '') || 'home';
+                
+                if (isProtectedTab(pageName) && !canAccessProtectedTab(pageName)) {
+                    e.preventDefault();
+                    // Show login modal or redirect
+                    if (!loginModalOpened) {
+                        loginModalOpened = true;
+                        openLogin();
+                        setTimeout(() => {
+                            loginModalOpened = false;
+                        }, 1000);
+                    }
+                    return;
+                }
+                // Allow normal navigation for page-based links
+                return;
+            }
+            
+            // Tab-based navigation (for index.html)
+            e.preventDefault();
             if (targetTab) {
-                // activateTab function will handle authentication check
                 activateTab(targetTab);
             }
         });
     });
 
     // Handle hash changes (browser back/forward buttons, direct URL access)
+    // Only for tab-based navigation (index.html)
     window.addEventListener('hashchange', function() {
-        const hash = window.location.hash.substring(1); // Remove #
-        if (hash) {
-            // activateTab function will handle authentication check
-            activateTab(hash);
-        } else {image.png
-            activateTab('home');
+        // Only handle hash navigation if we're on index.html with tab-based system
+        if (document.querySelectorAll('.tab-content').length > 1) {
+            const hash = window.location.hash.substring(1); // Remove #
+            if (hash) {
+                activateTab(hash);
+            } else {
+                activateTab('home');
+            }
         }
     });
 
     // Handle initial page load - wait for Firebase to initialize first
-    const initialHash = window.location.hash.substring(1);
+    // For page-based navigation, load page-specific content
+    const currentPath = window.location.pathname;
+    const isPageBased = currentPath.includes('/pages/') || currentPath.endsWith('.html');
     
-    // Wait for Firebase to be initialized before checking auth state
-    waitForFirebase(function() {
-        if (window.firebase && firebase.auth) {
+    if (isPageBased) {
+        // Extract page name from path
+        const pageName = currentPath.split('/').pop().replace('.html', '').replace('index.html', 'home') || 'home';
+        
+        // Check if protected page and user is authenticated
+        if (isProtectedTab(pageName)) {
+            waitForFirebase(function() {
+                if (!canAccessProtectedTab(pageName)) {
+                    // Redirect to home or show login
+                    window.location.href = '/';
+                    return;
+                }
+                // Load page-specific content
+                loadPageContent(pageName);
+            });
+        } else {
+            // Public page - just load content
+            waitForFirebase(function() {
+                loadPageContent(pageName);
+            });
+        }
+    } else {
+        // Tab-based navigation (index.html) - original code
+        const initialHash = window.location.hash.substring(1);
+        
+        // Wait for Firebase to be initialized before checking auth state
+        waitForFirebase(function() {
+            if (window.firebase && firebase.auth) {
             // Mark that we're initializing - this prevents premature login prompts
             authInitializing = true;
             
@@ -317,16 +405,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Unsubscribe after first auth state change to prevent duplicate calls
                 unsubscribe();
             });
-        } else {
-            // If Firebase not available, mark as initialized and activate based on hash
-            authInitializing = false;
-            if (initialHash) {
-                activateTab(initialHash);
             } else {
-                activateTab('home');
+                // If Firebase not available, mark as initialized and activate based on hash
+                authInitializing = false;
+                if (initialHash) {
+                    activateTab(initialHash);
+                } else {
+                    activateTab('home');
+                }
             }
-        }
-    });
+        });
+    }
 
     // Media filter default
     const mediaSelect = document.getElementById('mediaType');
@@ -498,49 +587,7 @@ function downloadDocument(type) {
     showNotification(`Downloading ${fileName}...`, 'success');
 }
 
-// Donation Functionality
-function donate(type) {
-    let donationType, amount;
-    
-    switch(type) {
-        case 'gold':
-            donationType = 'Gold Contribution';
-            amount = '₹10,00,000';
-            break;
-        case 'silver':
-            donationType = 'Silver Contribution';
-            amount = '₹5,00,000';
-            break;
-        case 'full-page':
-            donationType = 'Full Page Advertisement';
-            amount = '₹10,00,000';
-            break;
-        case 'half-page':
-            donationType = 'Half Page Advertisement';
-            amount = '₹5,00,000';
-            break;
-        default:
-            console.error('Unknown donation type:', type);
-            return;
-    }
-    
-    // Show donation confirmation
-    const confirmed = confirm(
-        `You are about to make a ${donationType} of ${amount}.\n\n` +
-        `Please make cheques payable to:\n` +
-        `Shri Vishwa Niketan\n` +
-        `101, Viswa Residency, Chitra Layout\n` +
-        `L. B. Nagar, Hyderabad - 500074\n\n` +
-        `For more details, please contact:\n` +
-        `Phone: +91-90000 04096\n` +
-        `Email: info@vss2025.org\n\n` +
-        `Would you like to proceed?`
-    );
-    
-    if (confirmed) {
-        showNotification(`Thank you for your interest in ${donationType}! Please contact us for payment details.`, 'success');
-    }
-}
+
 
 // EmailJS Configuration
 // To set up EmailJS:
@@ -1465,6 +1512,7 @@ async function handleAuthStateChange(user) {
     const aboutNavItem = document.getElementById('aboutNavItem');
     const mediaNavItem = document.getElementById('mediaNavItem');
     const shibirarthiNavItem = document.getElementById('shibirarthiNavItem');
+    const shibirResourcesNavItem = document.getElementById('shibirResourcesNavItem');
     const myProfileNavItem = document.getElementById('myProfileNavItem');
     const myTransportationNavItem = document.getElementById('myTransportationNavItem');
     const myToursNavItem = document.getElementById('myToursNavItem');
@@ -1513,6 +1561,9 @@ async function handleAuthStateChange(user) {
         // Show protected tabs for all authenticated users
         if (shibirarthiNavItem) {
             shibirarthiNavItem.style.display = '';
+        }
+        if (shibirResourcesNavItem) {
+            shibirResourcesNavItem.style.display = '';
         }
         if (myProfileNavItem) {
             myProfileNavItem.style.display = '';
@@ -1583,6 +1634,9 @@ async function handleAuthStateChange(user) {
         // Hide protected tabs
         if (shibirarthiNavItem) {
             shibirarthiNavItem.style.display = 'none';
+        }
+        if (shibirResourcesNavItem) {
+            shibirResourcesNavItem.style.display = 'none';
         }
         if (myProfileNavItem) {
             myProfileNavItem.style.display = 'none';
