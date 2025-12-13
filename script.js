@@ -4400,7 +4400,8 @@ async function createNewUser(name, email, uniqueId, role) {
     const trimmedUniqueId = uniqueId.trim();
     
     // Generate secure random password
-    const tempPassword = generateSecurePassword(12);
+    // const tempPassword = generateSecurePassword(12);
+    const tempPassword = "Vss@2025";
     
     try {
         // Store current auth credentials to restore later
