@@ -46,6 +46,18 @@
         .analytics-section.expanded .analytics-section-content {
             display: block;
         }
+        .half-page-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }
+        @media (max-width: 768px) {
+            .half-page-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
     
     <!-- Google tag (gtag.js) -->
@@ -786,83 +798,125 @@
         <!-- Shibir Resources Tab -->
         <section id="shibir-resources" class="tab-content">
             <div class="container">
-                <div class="section-header">
-                    <h2>Shibir Resources</h2>
-                    <p>Essential resources and materials for Shibirarthis</p>
+                <div id="shibirResourcesLoading" style="text-align: center; padding: 2rem;">
+                    <p>Loading resources...</p>
                 </div>
-                
-                <!-- VSS Orientation Slide Pack - Display PDF Inline -->
-                <div style="margin-top: 2rem; margin-bottom: 3rem;">
-                    <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
-                            <div>
-                                <h3 style="margin: 0; color: #333; display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="font-size: 1.5rem;">📊</span>
-                                    VSS Orientation Slide Pack
-                                </h3>
-                                <p style="margin: 0.5rem 0 0 0; color: #666;">Countrywise pre-shibir orientation presentation</p>
-                            </div>
-                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                <a href="docs/VSS2025_countrywise_preshibir_orientation.pdf" download class="btn btn-primary" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'">
-                                    📥 Download PDF
-                                </a>
-                                <a href="docs/VSS2025 countrywise pre-shibir orientation.pptx" download class="btn btn-secondary" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #6c757d; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap;" onmouseover="this.style.background='#5a6268'" onmouseout="this.style.background='#6c757d'">
-                                    📥 Download PPTX
-                                </a>
-                            </div>
-                        </div>
-                        <div style="border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden; background: #f5f5f5; position: relative;">
-                            <iframe 
-                                src="docs/VSS2025_countrywise_preshibir_orientation.pdf#toolbar=1&navpanes=1&scrollbar=1" 
-                                style="width: 100%; height: 80vh; min-height: 600px; border: none; display: block;"
-                                type="application/pdf"
-                                title="VSS Orientation Slide Pack PDF">
-                                <p style="padding: 2rem; text-align: center; color: #666;">
-                                    Your browser does not support inline PDF viewing. 
-                                    <a href="docs/VSS2025_countrywise_preshibir_orientation.pdf" target="_blank" style="color: #0066cc; text-decoration: underline; display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px;">
-                                        Open PDF in New Tab
+                <div id="shibirResourcesContent" style="display: none;">
+                    <div class="section-header">
+                        <h2>Shibir Resources</h2>
+                        <p>Essential resources and materials for Shibirarthis</p>
+                    </div>
+                    
+                    <!-- Top Section: Sarvajanik Karyakram and Vyayamyog Side by Side -->
+                    <div class="half-page-grid">
+                        <!-- Sarvajanik Karyakram Image - Left Half -->
+                        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                                <div>
+                                    <h3 style="margin: 0; color: #333; display: flex; align-items: center; gap: 0.5rem;">
+                                        <span style="font-size: 1.5rem;">📋</span>
+                                        Sarvajanik Karyakram
+                                    </h3>
+                                    <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">Event invitation and information</p>
+                                </div>
+                                <div>
+                                    <a href="docs/SarvajanikKaryakram.jpg" download class="btn btn-primary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap; font-size: 0.9rem;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'" onclick="return checkAuthBeforeDownload(event)">
+                                        📥 Download
                                     </a>
-                                </p>
-                            </iframe>
+                                </div>
+                            </div>
+                            <div style="text-align: center; background: #f5f5f5; border-radius: 4px; padding: 1rem;">
+                                <img src="docs/SarvajanikKaryakram.jpg" alt="Sarvajanik Karyakram" style="max-width: 100%; max-height: 400px; height: auto; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" onclick="window.open('docs/SarvajanikKaryakram.jpg', '_blank')" title="Click to view full size">
+                            </div>
+                        </div>
+
+                        <!-- Vyayamyog Tutorial Video - Right Half -->
+                        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                                <div>
+                                    <h3 style="margin: 0; color: #333; display: flex; align-items: center; gap: 0.5rem;">
+                                        <span style="font-size: 1.5rem;">🎥</span>
+                                        Vyayamyog Tutorial Video
+                                    </h3>
+                                    <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">Learn Vyayamyog exercises and practices</p>
+                                </div>
+                                <div>
+                                    <a href="docs/VyayamYog.mp4" download class="btn btn-primary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap; font-size: 0.9rem;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'" onclick="return checkAuthBeforeDownload(event)">
+                                        📥 Download
+                                    </a>
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 1rem;">
+                                <video 
+                                    id="vyayamyogVideo"
+                                    controls 
+                                    style="width: 100%; max-width: 100%; border-radius: 8px; background: #000;"
+                                    preload="metadata"
+                                    poster="">
+                                    <source src="" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- VSS Orientation Slide Pack - Display PDF Inline -->
+                    <div style="margin-top: 2rem; margin-bottom: 3rem;">
+                        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                                <div>
+                                    <h3 style="margin: 0; color: #333; display: flex; align-items: center; gap: 0.5rem;">
+                                        <span style="font-size: 1.5rem;">📊</span>
+                                        VSS Orientation Slide Pack
+                                    </h3>
+                                    <p style="margin: 0.5rem 0 0 0; color: #666;">Countrywise pre-shibir orientation presentation</p>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <a href="docs/VSS2025_countrywise_preshibir_orientation.pdf" download class="btn btn-primary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'" onclick="return checkAuthBeforeDownload(event)">
+                                        📥 Download PDF
+                                    </a>
+                                    <a href="docs/VSS2025 countrywise pre-shibir orientation.pptx" download class="btn btn-secondary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #6c757d; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap;" onmouseover="this.style.background='#5a6268'" onmouseout="this.style.background='#6c757d'" onclick="return checkAuthBeforeDownload(event)">
+                                        📥 Download PPTX
+                                    </a>
+                                </div>
+                            </div>
+                            <div style="border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden; background: #f5f5f5; position: relative;">
+                                <iframe 
+                                    id="orientationPdfIframe"
+                                    src="" 
+                                    style="width: 100%; height: 80vh; min-height: 600px; border: none; display: block;"
+                                    type="application/pdf"
+                                    title="VSS Orientation Slide Pack PDF">
+                                    <p style="padding: 2rem; text-align: center; color: #666;">
+                                        Your browser does not support inline PDF viewing. 
+                                        <a href="docs/VSS2025_countrywise_preshibir_orientation.pdf" target="_blank" style="color: #0066cc; text-decoration: underline; display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px;">
+                                            Open PDF in New Tab
+                                        </a>
+                                    </p>
+                                </iframe>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Other Resources -->
+                    <div class="resources-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2rem;">
+
+                        <!-- Resource: VSS Program Book -->
+                        <div class="resource-card" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s;">
+                            <div class="resource-icon" style="font-size: 3rem; margin-bottom: 1rem; text-align: center;">📖</div>
+                            <h3 style="margin-bottom: 1rem; color: #333; text-align: center;">VSS Program Book</h3>
+                            <p style="color: #666; margin-bottom: 1.5rem; text-align: center;">Complete program schedule and information</p>
+                            <div style="text-align: center; padding: 1rem; background: #fff9e6; border-radius: 4px; border-left: 4px solid #ff9900;">
+                                <p style="margin: 0; color: #666; font-style: italic;">⏳ In Progress</p>
+                                <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">This resource will be available soon</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Other Resources -->
-                <div class="resources-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2rem;">
-
-                    <!-- Resource 2: Vyayamyog Tutorial Video -->
-                    <div class="resource-card" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s;">
-                        <div class="resource-icon" style="font-size: 3rem; margin-bottom: 1rem; text-align: center;">🎥</div>
-                        <h3 style="margin-bottom: 1rem; color: #333; text-align: center;">Vyayamyog Tutorial Video</h3>
-                        <p style="color: #666; margin-bottom: 1.5rem; text-align: center;">Learn Vyayamyog exercises and practices</p>
-                        <div style="margin-bottom: 1.5rem;">
-                            <video 
-                                controls 
-                                style="width: 100%; max-width: 100%; border-radius: 8px; background: #000;"
-                                preload="metadata"
-                                poster="">
-                                <source src="docs/VyayamYog.mp4" type="video/mp4">
-                                Your browser does not support the video tag.
-                            </video>
-                        </div>
-                        <div style="text-align: center;">
-                            <a href="docs/VyayamYog.mp4" download class="btn btn-primary" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'">
-                                📥 Download Video
-                            </a>
-                        </div>
-                    </div>
-
-                    <!-- Resource 3: VSS Program Book -->
-                    <div class="resource-card" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s;">
-                        <div class="resource-icon" style="font-size: 3rem; margin-bottom: 1rem; text-align: center;">📖</div>
-                        <h3 style="margin-bottom: 1rem; color: #333; text-align: center;">VSS Program Book</h3>
-                        <p style="color: #666; margin-bottom: 1.5rem; text-align: center;">Complete program schedule and information</p>
-                        <div style="text-align: center; padding: 1rem; background: #fff9e6; border-radius: 4px; border-left: 4px solid #ff9900;">
-                            <p style="margin: 0; color: #666; font-style: italic;">⏳ In Progress</p>
-                            <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">This resource will be available soon</p>
-                        </div>
-                    </div>
+                <div id="shibirResourcesUnauthorized" style="display: none; text-align: center; padding: 3rem;">
+                    <h2>Authentication Required</h2>
+                    <p>Please log in to access Shibir Resources.</p>
+                    <button class="btn btn-primary" onclick="openLogin()">Login</button>
                 </div>
             </div>
         </section>
@@ -1959,10 +2013,11 @@
                         <!-- Checkin Type Tabs -->
                         <div class="checkin-type-tabs">
                             <button class="checkin-type-tab active" data-checkin-type="pickup_location" onclick="switchCheckinType('pickup_location')">Pickup Location</button>
-                            <button class="checkin-type-tab" data-checkin-type="venue_entrance" onclick="switchCheckinType('venue_entrance')">Venue Entrance</button>
+                            <button class="checkin-type-tab" data-checkin-type="registration" onclick="switchCheckinType('registration')">Registration</button>
+                            <button class="checkin-type-tab" data-checkin-type="shulk_paid" onclick="switchCheckinType('shulk_paid')">Shulk Paid</button>
+                            <button class="checkin-type-tab" data-checkin-type="kit_collected" onclick="switchCheckinType('kit_collected')">Kit Collected</button>
+                            <button class="checkin-type-tab" data-checkin-type="ganvesh_collected" onclick="switchCheckinType('ganvesh_collected')">Ganvesh Collected</button>
                             <button class="checkin-type-tab" data-checkin-type="cloak_room" onclick="switchCheckinType('cloak_room')">Cloak Room</button>
-                            <button class="checkin-type-tab" data-checkin-type="accommodation" onclick="switchCheckinType('accommodation')">Accommodation</button>
-                            <button class="checkin-type-tab" data-checkin-type="food" onclick="switchCheckinType('food')">Food</button>
                             <button class="checkin-type-tab" data-checkin-type="post_tour" onclick="switchCheckinType('post_tour')">Post Tour</button>
                         </div>
 
@@ -2042,18 +2097,34 @@
                                         <label for="checkinPickupLocation">Pickup Location:</label>
                                         <input type="text" id="checkinPickupLocation" class="form-input" placeholder="Enter pickup location">
                                     </div>
+                                    <div class="form-group" id="shulkPaidFields" style="display: none;">
+                                        <label>Payment Method: <span class="required">*</span></label>
+                                        <div style="display: flex; gap: 2rem; margin-top: 0.5rem;">
+                                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                                <input type="radio" name="shulkPaymentMethod" value="Cash" id="shulkPaymentCash">
+                                                <span>Cash</span>
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                                <input type="radio" name="shulkPaymentMethod" value="Digital" id="shulkPaymentDigital">
+                                                <span>Digital</span>
+                                            </label>
+                                        </div>
+                                    </div>
                                     <div class="form-group" id="cloakRoomFields" style="display: none;">
-                                        <label for="checkinBagCount">Number of Bags:</label>
-                                        <input type="number" id="checkinBagCount" class="form-input" min="0" placeholder="Enter bag count">
-                                        <label for="checkinLockerId" style="margin-top: 0.5rem;">Locker ID:</label>
-                                        <input type="text" id="checkinLockerId" class="form-input" placeholder="Enter locker ID">
+                                        <label for="checkinTagId">Tag ID:</label>
+                                        <input type="text" id="checkinTagId" class="form-input" placeholder="Enter tag ID">
+                                        <label for="checkinItemCount" style="margin-top: 0.5rem;">Number of Items:</label>
+                                        <input type="number" id="checkinItemCount" class="form-input" min="0" placeholder="Enter number of items">
                                     </div>
                                     <div class="form-group">
                                         <label for="checkinNotes">Notes (optional):</label>
                                         <textarea id="checkinNotes" class="form-input" rows="3" placeholder="Add any notes..."></textarea>
                                     </div>
-                                    <button type="submit" class="btn btn-primary">Check In</button>
-                                    <button type="button" class="btn btn-secondary" onclick="clearCheckinForm()">Clear</button>
+                                    <div style="display: flex; gap: 1rem;">
+                                        <button type="submit" class="btn btn-primary">Check In</button>
+                                        <button type="button" id="cloakRoomCheckoutBtn" class="btn btn-warning" style="display: none;" onclick="performCloakRoomCheckout()">Checkout</button>
+                                        <button type="button" class="btn btn-secondary" onclick="clearCheckinForm()">Clear</button>
+                                    </div>
                                 </form>
                             </div>
 
@@ -2079,10 +2150,11 @@
                                         <select id="historyFilterType" class="form-input" onchange="applyHistoryFilters()">
                                             <option value="">All Types</option>
                                             <option value="pickup_location">Pickup Location</option>
-                                            <option value="venue_entrance">Venue Entrance</option>
+                                            <option value="registration">Registration</option>
+                                            <option value="shulk_paid">Shulk Paid</option>
+                                            <option value="kit_collected">Kit Collected</option>
+                                            <option value="ganvesh_collected">Ganvesh Collected</option>
                                             <option value="cloak_room">Cloak Room</option>
-                                            <option value="accommodation">Accommodation</option>
-                                            <option value="food">Food</option>
                                             <option value="post_tour">Post Tour</option>
                                         </select>
                                     </div>

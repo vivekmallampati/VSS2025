@@ -81,10 +81,11 @@ service cloud.firestore {
       // Map checkin types to team names
       let teamMap = {
         'pickup_location': 'transportation',
-        'venue_entrance': 'venue_entrance',
+        'registration': 'registration',
+        'shulk_paid': 'shulk_paid',
+        'kit_collected': 'kit_collected',
+        'ganvesh_collected': 'ganvesh_collected',
         'cloak_room': 'cloak_room',
-        'accommodation': 'accommodation',
-        'food': 'food',
         'post_tour': 'post_tour'
       };
       let requiredTeam = teamMap[checkinType];

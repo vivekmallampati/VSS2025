@@ -129,14 +129,15 @@ async function hasAccessToCheckinType(user, checkinType) {
     const isVolunteerUser = await isVolunteer(user);
     if (!isVolunteerUser) return false;
     
+    // Volunteers can only see their assigned teams
     const teams = await getVolunteerTeams(user);
-    // Map checkin types to team names
     const teamMap = {
         'pickup_location': 'transportation',
-        'venue_entrance': 'venue_entrance',
+        'registration': 'registration',
+        'shulk_paid': 'shulk_paid',
+        'kit_collected': 'kit_collected',
+        'ganvesh_collected': 'ganvesh_collected',
         'cloak_room': 'cloak_room',
-        'accommodation': 'accommodation',
-        'food': 'food',
         'post_tour': 'post_tour'
     };
     
@@ -206,7 +207,13 @@ function loadPageContent(pageName) {
                 case 'participant-lookup':
                     loadParticipantLookupPage(user);
                     break;
+                case 'shibir-resources':
+                    initializeShibirResources(user);
+                    break;
             }
+        } else if (pageName === 'shibir-resources') {
+            // Show unauthorized message if not logged in
+            initializeShibirResources(null);
         }
     }
 }
@@ -287,13 +294,73 @@ function activateTab(tabName, skipAuthCheck = false) {
                     case 'participant-lookup':
                         loadParticipantLookupPage(user);
                         break;
+                    case 'shibir-resources':
+                        initializeShibirResources(user);
+                        break;
                 }
+            } else if (tabName === 'shibir-resources') {
+                // Show unauthorized message if not logged in
+                initializeShibirResources(null);
             }
         }
         
         // Scroll to top of page
         window.scrollTo(0, 0);
     }
+}
+
+// Initialize Shibir Resources page with authentication check
+function initializeShibirResources(user) {
+    const loadingDiv = document.getElementById('shibirResourcesLoading');
+    const contentDiv = document.getElementById('shibirResourcesContent');
+    const unauthorizedDiv = document.getElementById('shibirResourcesUnauthorized');
+    
+    if (!loadingDiv || !contentDiv || !unauthorizedDiv) return;
+    
+    if (!user) {
+        // User not logged in - show unauthorized message
+        loadingDiv.style.display = 'none';
+        contentDiv.style.display = 'none';
+        unauthorizedDiv.style.display = 'block';
+        return;
+    }
+    
+    // User is logged in - show content
+    loadingDiv.style.display = 'none';
+    unauthorizedDiv.style.display = 'none';
+    contentDiv.style.display = 'block';
+    
+    // Load resources (PDF, video) only when authenticated
+    const pdfIframe = document.getElementById('orientationPdfIframe');
+    if (pdfIframe) {
+        pdfIframe.src = 'docs/VSS2025_countrywise_preshibir_orientation.pdf#toolbar=1&navpanes=1&scrollbar=1';
+    }
+    
+    const videoElement = document.getElementById('vyayamyogVideo');
+    if (videoElement && videoElement.querySelector('source')) {
+        videoElement.querySelector('source').src = 'docs/VyayamYog.mp4';
+        videoElement.load();
+    }
+}
+
+// Check authentication before allowing download
+function checkAuthBeforeDownload(event) {
+    if (!window.firebase || !firebase.auth) {
+        event.preventDefault();
+        showNotification('Please log in to download resources', 'error');
+        return false;
+    }
+    
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        event.preventDefault();
+        showNotification('Please log in to download resources', 'error');
+        openLogin();
+        return false;
+    }
+    
+    // User is authenticated - allow download
+    return true;
 }
 
 // Tab Navigation Functionality with URL hash support
@@ -7450,10 +7517,11 @@ let checkinNotificationSettings = {
 // Checkin type labels
 const CHECKIN_TYPE_LABELS = {
     'pickup_location': 'Pickup Location',
-    'venue_entrance': 'Venue Entrance',
+    'registration': 'Registration',
+    'shulk_paid': 'Shulk Paid',
+    'kit_collected': 'Kit Collected',
+    'ganvesh_collected': 'Ganvesh Collected',
     'cloak_room': 'Cloak Room',
-    'accommodation': 'Accommodation',
-    'food': 'Food',
     'post_tour': 'Post Tour'
 };
 
@@ -7538,10 +7606,11 @@ async function filterCheckinTypeTabs(user) {
     const teams = await getVolunteerTeams(user);
     const teamMap = {
         'pickup_location': 'transportation',
-        'venue_entrance': 'venue_entrance',
+        'registration': 'registration',
+        'shulk_paid': 'shulk_paid',
+        'kit_collected': 'kit_collected',
+        'ganvesh_collected': 'ganvesh_collected',
         'cloak_room': 'cloak_room',
-        'accommodation': 'accommodation',
-        'food': 'food',
         'post_tour': 'post_tour'
     };
     
@@ -7581,8 +7650,12 @@ function switchCheckinType(checkinType) {
 // Update checkin form based on type
 function updateCheckinFormForType() {
     const pickupLocationGroup = document.getElementById('pickupLocationGroup');
+    const shulkPaidFields = document.getElementById('shulkPaidFields');
     const cloakRoomFields = document.getElementById('cloakRoomFields');
+    const cloakRoomCheckoutBtn = document.getElementById('cloakRoomCheckoutBtn');
     const checkinTypeDisplay = document.getElementById('checkinTypeDisplay');
+    const shulkPaymentCash = document.getElementById('shulkPaymentCash');
+    const shulkPaymentDigital = document.getElementById('shulkPaymentDigital');
     
     if (checkinTypeDisplay) {
         checkinTypeDisplay.textContent = CHECKIN_TYPE_LABELS[currentCheckinType] || currentCheckinType;
@@ -7592,8 +7665,32 @@ function updateCheckinFormForType() {
         pickupLocationGroup.style.display = currentCheckinType === 'pickup_location' ? 'block' : 'none';
     }
     
+    if (shulkPaidFields) {
+        const isShulkPaid = currentCheckinType === 'shulk_paid';
+        shulkPaidFields.style.display = isShulkPaid ? 'block' : 'none';
+        // Set required attribute only when shulk_paid is active
+        if (shulkPaymentCash) {
+            if (isShulkPaid) {
+                shulkPaymentCash.setAttribute('required', 'required');
+            } else {
+                shulkPaymentCash.removeAttribute('required');
+            }
+        }
+        if (shulkPaymentDigital) {
+            if (isShulkPaid) {
+                shulkPaymentDigital.setAttribute('required', 'required');
+            } else {
+                shulkPaymentDigital.removeAttribute('required');
+            }
+        }
+    }
+    
     if (cloakRoomFields) {
         cloakRoomFields.style.display = currentCheckinType === 'cloak_room' ? 'block' : 'none';
+    }
+    
+    if (cloakRoomCheckoutBtn) {
+        cloakRoomCheckoutBtn.style.display = currentCheckinType === 'cloak_room' ? 'inline-block' : 'none';
     }
 }
 
@@ -8082,20 +8179,65 @@ async function performCheckin() {
         
         const regData = regDoc.data();
         
-        // Check if already checked in for this check-in type
-        const existingCheckinQuery = await db.collection('checkins')
-            .where('uniqueId', '==', uniqueIdToCheckIn)
-            .where('checkinType', '==', currentCheckinType)
-            .limit(1)
-            .get();
+        // Check if Registration check-in is required for certain types
+        const typesRequiringRegistration = ['shulk_paid', 'kit_collected', 'ganvesh_collected', 'cloak_room'];
+        if (typesRequiringRegistration.includes(currentCheckinType)) {
+            const registrationCheckin = await db.collection('checkins')
+                .where('uniqueId', '==', uniqueIdToCheckIn)
+                .where('checkinType', '==', 'registration')
+                .limit(1)
+                .get();
+            
+            if (registrationCheckin.empty) {
+                showNotification('Registration check-in must be completed before this check-in type. Please complete Registration first.', 'error');
+                return;
+            }
+        }
         
-        if (!existingCheckinQuery.empty) {
-            const existingCheckin = existingCheckinQuery.docs[0].data();
-            const timestamp = existingCheckin.timestamp?.toDate();
-            const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
-            const typeLabel = CHECKIN_TYPE_LABELS[currentCheckinType] || currentCheckinType;
-            showNotification(`Already checked in for ${typeLabel} at ${timeStr}. Duplicate check-ins are not allowed.`, 'error');
-            return;
+        // Check if already checked in for this check-in type
+        // For cloak_room, allow new check-in if previous one has been checked out
+        if (currentCheckinType === 'cloak_room') {
+            // Get the most recent cloak room check-in
+            const existingCheckinQuery = await db.collection('checkins')
+                .where('uniqueId', '==', uniqueIdToCheckIn)
+                .where('checkinType', '==', 'cloak_room')
+                .orderBy('timestamp', 'desc')
+                .limit(1)
+                .get();
+            
+            if (!existingCheckinQuery.empty) {
+                const existingCheckin = existingCheckinQuery.docs[0].data();
+                // If not checked out, prevent duplicate check-in
+                if (!existingCheckin.checkedOutAt) {
+                    const timestamp = existingCheckin.timestamp?.toDate();
+                    const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+                    showNotification(`Already checked in for Cloak Room at ${timeStr}. Please checkout first before checking in again.`, 'error');
+                    return;
+                }
+                // If checked out, allow new check-in (continue below)
+            }
+        } else {
+            // For other check-in types, prevent duplicates
+            const existingCheckinQuery = await db.collection('checkins')
+                .where('uniqueId', '==', uniqueIdToCheckIn)
+                .where('checkinType', '==', currentCheckinType)
+                .limit(1)
+                .get();
+            
+            if (!existingCheckinQuery.empty) {
+                const existingCheckin = existingCheckinQuery.docs[0].data();
+                const timestamp = existingCheckin.timestamp?.toDate();
+                const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+                const typeLabel = CHECKIN_TYPE_LABELS[currentCheckinType] || currentCheckinType;
+                
+                // Special message for Registration type
+                if (currentCheckinType === 'registration') {
+                    showNotification(`Already registered at ${timeStr}. Duplicate registrations are not allowed.`, 'error');
+                } else {
+                    showNotification(`Already checked in for ${typeLabel} at ${timeStr}. Duplicate check-ins are not allowed.`, 'error');
+                }
+                return;
+            }
         }
         
         // Get user data for checkedInByName
@@ -8124,11 +8266,21 @@ async function performCheckin() {
             }
         }
         
+        if (currentCheckinType === 'shulk_paid') {
+            const paymentMethod = document.querySelector('input[name="shulkPaymentMethod"]:checked')?.value;
+            if (paymentMethod) {
+                checkinData.paymentMethod = paymentMethod;
+            } else {
+                showNotification('Please select a payment method (Cash or Digital)', 'error');
+                return;
+            }
+        }
+        
         if (currentCheckinType === 'cloak_room') {
-            const bagCount = document.getElementById('checkinBagCount')?.value;
-            const lockerId = document.getElementById('checkinLockerId')?.value.trim();
-            if (bagCount) checkinData.bagCount = parseInt(bagCount);
-            if (lockerId) checkinData.lockerId = lockerId;
+            const itemCount = document.getElementById('checkinItemCount')?.value;
+            const tagId = document.getElementById('checkinTagId')?.value.trim();
+            if (itemCount) checkinData.itemCount = parseInt(itemCount);
+            if (tagId) checkinData.tagId = tagId;
         }
         
         // Create checkin document with explicit uniqueId in the document ID
@@ -8162,10 +8314,98 @@ function clearCheckinForm() {
     const notes = document.getElementById('checkinNotes');
     if (notes) notes.value = '';
     
-    const bagCount = document.getElementById('checkinBagCount');
-    const lockerId = document.getElementById('checkinLockerId');
-    if (bagCount) bagCount.value = '';
-    if (lockerId) lockerId.value = '';
+    const itemCount = document.getElementById('checkinItemCount');
+    const tagId = document.getElementById('checkinTagId');
+    if (itemCount) itemCount.value = '';
+    if (tagId) tagId.value = '';
+    
+    // Clear radio buttons
+    const paymentRadios = document.querySelectorAll('input[name="shulkPaymentMethod"]');
+    paymentRadios.forEach(radio => radio.checked = false);
+}
+
+// Perform Cloak Room checkout
+async function performCloakRoomCheckout() {
+    if (!currentCheckinParticipantUniqueId || typeof currentCheckinParticipantUniqueId !== 'string' || currentCheckinParticipantUniqueId.trim() === '') {
+        showNotification('Please search for a participant first', 'error');
+        return;
+    }
+    
+    const uniqueId = currentCheckinParticipantUniqueId.trim();
+    
+    if (!window.firebase || !firebase.auth || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        showNotification('Please log in to perform checkout', 'error');
+        return;
+    }
+    
+    // Check permissions
+    const hasAccess = await hasAccessToCheckinType(user, 'cloak_room');
+    if (!hasAccess) {
+        showNotification('You do not have permission to perform cloak room checkout', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Find the most recent cloak room check-in for this participant
+        const checkinQuery = await db.collection('checkins')
+            .where('uniqueId', '==', uniqueId)
+            .where('checkinType', '==', 'cloak_room')
+            .orderBy('timestamp', 'desc')
+            .limit(1)
+            .get();
+        
+        if (checkinQuery.empty) {
+            showNotification('No cloak room check-in found for this participant. Please check in first.', 'error');
+            return;
+        }
+        
+        const checkinDoc = checkinQuery.docs[0];
+        const checkinData = checkinDoc.data();
+        
+        // Check if already checked out
+        if (checkinData.checkedOutAt) {
+            const checkoutTime = checkinData.checkedOutAt.toDate();
+            showNotification(`Already checked out at ${checkoutTime.toLocaleString()}`, 'error');
+            return;
+        }
+        
+        // Get user data for checkedOutByName
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        const userData = userDoc.exists ? userDoc.data() : {};
+        const checkedOutByName = userData.volunteerName || userData.name || user.email || 'Unknown';
+        
+        // Update check-in with checkout information
+        await checkinDoc.ref.update({
+            checkedOutAt: firebase.firestore.FieldValue.serverTimestamp(),
+            checkedOutBy: user.uid,
+            checkedOutByName: checkedOutByName
+        });
+        
+        // Get participant name for notification
+        const regDoc = await db.collection('registrations').doc(uniqueId).get();
+        const regData = regDoc.exists ? regDoc.data() : {};
+        const participantName = regData.name || regData['Full Name'] || uniqueId;
+        
+        showNotification(`Checkout successful for ${participantName} (${uniqueId})!`, 'success');
+        
+        // Reload recent checkins
+        await loadRecentCheckins('cloak_room');
+        
+        // Reload history if on history view
+        await loadCheckinHistory();
+        
+    } catch (error) {
+        console.error('Error performing checkout:', error);
+        showNotification('Error performing checkout: ' + error.message, 'error');
+    }
 }
 
 // Check checkin status
@@ -8429,22 +8669,63 @@ async function executeBatchCheckin(ids) {
             }
             
             // Check if already checked in for this check-in type
-            const existingCheckinQuery = await db.collection('checkins')
-                .where('uniqueId', '==', validatedUniqueId)
-                .where('checkinType', '==', currentCheckinType)
-                .limit(1)
-                .get();
-            
-            if (!existingCheckinQuery.empty) {
-                const existingCheckin = existingCheckinQuery.docs[0].data();
-                const timestamp = existingCheckin.timestamp?.toDate();
-                const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
-                results.push({ uniqueId: validatedUniqueId, status: 'skipped', error: `Already checked in at ${timeStr}` });
-                failCount++;
-                continue;
+            // For cloak_room, allow new check-in if previous one has been checked out
+            if (currentCheckinType === 'cloak_room') {
+                // Get the most recent cloak room check-in
+                const existingCheckinQuery = await db.collection('checkins')
+                    .where('uniqueId', '==', validatedUniqueId)
+                    .where('checkinType', '==', 'cloak_room')
+                    .orderBy('timestamp', 'desc')
+                    .limit(1)
+                    .get();
+                
+                if (!existingCheckinQuery.empty) {
+                    const existingCheckin = existingCheckinQuery.docs[0].data();
+                    // If not checked out, prevent duplicate check-in
+                    if (!existingCheckin.checkedOutAt) {
+                        const timestamp = existingCheckin.timestamp?.toDate();
+                        const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+                        results.push({ uniqueId: validatedUniqueId, status: 'skipped', error: `Already checked in at ${timeStr}. Checkout required first.` });
+                        failCount++;
+                        continue;
+                    }
+                    // If checked out, allow new check-in (continue below)
+                }
+            } else {
+                // For other check-in types, prevent duplicates
+                const existingCheckinQuery = await db.collection('checkins')
+                    .where('uniqueId', '==', validatedUniqueId)
+                    .where('checkinType', '==', currentCheckinType)
+                    .limit(1)
+                    .get();
+                
+                if (!existingCheckinQuery.empty) {
+                    const existingCheckin = existingCheckinQuery.docs[0].data();
+                    const timestamp = existingCheckin.timestamp?.toDate();
+                    const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+                    results.push({ uniqueId: validatedUniqueId, status: 'skipped', error: `Already checked in at ${timeStr}` });
+                    failCount++;
+                    continue;
+                }
             }
             
             const regData = regDoc.data();
+            
+            // Check if Registration check-in is required for certain types
+            const typesRequiringRegistration = ['shulk_paid', 'kit_collected', 'ganvesh_collected', 'cloak_room'];
+            if (typesRequiringRegistration.includes(currentCheckinType)) {
+                const registrationCheckin = await db.collection('checkins')
+                    .where('uniqueId', '==', validatedUniqueId)
+                    .where('checkinType', '==', 'registration')
+                    .limit(1)
+                    .get();
+                
+                if (registrationCheckin.empty) {
+                    results.push({ uniqueId: validatedUniqueId, status: 'failed', error: 'Registration check-in required first' });
+                    failCount++;
+                    continue;
+                }
+            }
             
             // Build checkin data - store only Praveshika ID (explicitly use validated ID)
             const checkinData = {
@@ -8845,8 +9126,10 @@ function exportToCSV(docs, registrationsMap) {
             regInfo.email || '',
             CHECKIN_TYPE_LABELS[data.checkinType] || data.checkinType || '',
             data.pickupLocation || '',
-            data.bagCount || '',
-            data.lockerId || '',
+            data.paymentMethod || '',
+            data.itemCount || '',
+            data.tagId || '',
+            data.checkedOutAt ? data.checkedOutAt.toDate().toLocaleString() : '',
             data.checkedInByName || '',
             (data.notes || '').replace(/"/g, '""') // Escape quotes in CSV
         ];
@@ -9460,8 +9743,12 @@ async function loadCheckinStatusForProfile(uniqueIds) {
                     <div class="checkin-status-time">${escapeHtml(timestamp)}</div>
                     ${latestCheckin && latestCheckin.pickupLocation ? 
                         `<div class="checkin-status-location">Location: ${escapeHtml(latestCheckin.pickupLocation)}</div>` : ''}
-                    ${latestCheckin && latestCheckin.bagCount !== undefined ? 
-                        `<div class="checkin-status-details">Bags: ${latestCheckin.bagCount}, Locker: ${escapeHtml(latestCheckin.lockerId || 'N/A')}</div>` : ''}
+                    ${latestCheckin && latestCheckin.paymentMethod ? 
+                        `<div class="checkin-status-details">Payment Method: ${escapeHtml(latestCheckin.paymentMethod)}</div>` : ''}
+                    ${latestCheckin && latestCheckin.itemCount !== undefined ? 
+                        `<div class="checkin-status-details">Items: ${latestCheckin.itemCount}, Tag: ${escapeHtml(latestCheckin.tagId || 'N/A')}</div>` : ''}
+                    ${latestCheckin && latestCheckin.checkedOutAt ? 
+                        `<div class="checkin-status-details" style="color: #28a745;">Checked Out: ${latestCheckin.checkedOutAt.toDate().toLocaleString()}</div>` : ''}
                 </div>
             `;
         });

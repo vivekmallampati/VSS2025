@@ -143,3 +143,16 @@ services:
     command: node firestore-utils.js cancel-status
     # Updates status to "Cancelled" for specific participant IDs
 
+  approve-status:
+    build: .
+    container_name: vss2025-approve-status
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=approve-status
+    command: node firestore-utils.js approve-status
+    # Updates status to "Approved" for specific participant IDs
+

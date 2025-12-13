@@ -1201,6 +1201,104 @@ async function updateStatusToCancelled() {
     console.log(`Errors: ${errorCount}`);
 }
 
+async function updateStatusToApproved() {
+    const participantIds = [
+        'AFKK2446',
+        'AFKK2625',
+        'AFKK2696',
+        'AFKK2762',
+        'AFSK1616',
+        'AFSK2090',
+        'AFSK2737',
+        'AFYV1559',
+        'AMKK2223',
+        'AMSK1836',
+        'ARYV1501',
+        'ASKK1205',
+        'ASKK2793',
+        'ASSK2522',
+        'ASSK2739',
+        'ASSK4062',
+        'AUKK2195',
+        'AUKK2324',
+        'AUKK2683',
+        'AUSK1045',
+        'AUSK2246',
+        'EUKK1119',
+        'EUKK1517',
+        'EUKK1549',
+        'EUKK1737',
+        'EUKK1745',
+        'EUKK2006',
+        'EUKK2111',
+        'EUKK2163',
+        'EUKK2552',
+        'EUKK2714',
+        'EUKK2275',
+        'EUSK1924',
+        'EUSK2064',
+        'EUSK2065',
+        'EUSK2162',
+        'EUSK2476',
+        'EUYV1430'
+    ];
+
+    console.log(`Updating status to "Approved" for ${participantIds.length} participants...\n`);
+
+    let successCount = 0;
+    let errorCount = 0;
+    let notFoundCount = 0;
+    const batchSize = 10;
+
+    for (let i = 0; i < participantIds.length; i += batchSize) {
+        const batch = participantIds.slice(i, i + batchSize);
+        const batchPromises = batch.map(async (participantId) => {
+            try {
+                const docRef = db.collection('registrations').doc(participantId);
+                const doc = await docRef.get();
+
+                if (!doc.exists) {
+                    console.log(`⚠ Not found: ${participantId}`);
+                    notFoundCount++;
+                    return { success: false, notFound: true };
+                }
+
+                await docRef.update({
+                    status: 'Approved',
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+
+                const name = doc.data().name || doc.data()['Full Name'] || 'N/A';
+                console.log(`✓ Updated: ${participantId} - ${name}`);
+                return { success: true };
+            } catch (error) {
+                console.error(`✗ Error updating ${participantId}:`, error.message);
+                errorCount++;
+                return { success: false, error: error.message };
+            }
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+
+        for (const result of batchResults) {
+            if (result.success) {
+                successCount++;
+            }
+        }
+
+        // Small delay between batches to avoid rate limits
+        if (i + batchSize < participantIds.length) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    }
+
+    console.log(`\n=== Status Update Summary ===`);
+    console.log(`Total participants to update: ${participantIds.length}`);
+    console.log(`Successfully updated: ${successCount}`);
+    console.log(`Not found: ${notFoundCount}`);
+    console.log(`Errors: ${errorCount}`);
+}
+
 // ============================================================================
 // MAIN ROUTER
 // ============================================================================
@@ -1231,6 +1329,9 @@ async function main() {
             case 'cancel-status':
                 await updateStatusToCancelled();
                 break;
+            case 'approve-status':
+                await updateStatusToApproved();
+                break;
             default:
                 console.log('Usage: node firestore-utils.js <command>');
                 console.log('Commands:');
@@ -1241,6 +1342,7 @@ async function main() {
                 console.log('  remove-fields       - Remove "Shreni for Sorting" and "Registration Lookup Helper" fields');
                 console.log('  reject-status       - Update status to "Rejected" for specific participant IDs');
                 console.log('  cancel-status       - Update status to "Cancelled" for specific participant IDs');
+                console.log('  approve-status      - Update status to "Approved" for specific participant IDs');
                 process.exit(1);
         }
         console.log('\nProcess finished');
