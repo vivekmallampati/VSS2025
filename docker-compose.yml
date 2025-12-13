@@ -13,6 +13,8 @@ services:
       - EXCEL_FILE_PATH=/app/dataprocessing/Registrations_11_29.xlsx
       # Service account path (defaults to /app/secrets/serviceAccountKey.json)
       - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=import
+    command: node firestore-utils.js import
     # The script will upload Registrations_11_29.xlsx to Firestore with normalized structure
 
   approve-registrations:
@@ -72,6 +74,72 @@ services:
     environment:
       - NODE_ENV=production
       - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
-    command: node normalize-field-names.js
-    # Normalizes field names for 261 participant records from capitalized/multi-word format to camelCase
+      - COMMAND=normalize
+    command: node firestore-utils.js normalize
+    # Normalizes field names for ALL participant records from capitalized/multi-word format to camelCase
+
+  cleanup-invalid-fields:
+    build: .
+    container_name: vss2025-cleanup-invalid-fields
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=cleanup
+    command: node firestore-utils.js cleanup
+    # Removes fields with invalid Firestore characters (* ~ / [ ]) from all registrations
+
+  find-negative-phones:
+    build: .
+    container_name: vss2025-find-negative-phones
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=find-negative-phones
+    command: node firestore-utils.js find-negative-phones
+    # Finds all phone numbers that are negative numbers
+
+  remove-fields:
+    build: .
+    container_name: vss2025-remove-fields
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=remove-fields
+    command: node firestore-utils.js remove-fields
+    # Removes "Shreni for Sorting" and "Registration Lookup Helper" fields from all registrations
+
+  reject-status:
+    build: .
+    container_name: vss2025-reject-status
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=reject-status
+    command: node firestore-utils.js reject-status
+    # Updates status to "Rejected" for specific participant IDs
+
+  cancel-status:
+    build: .
+    container_name: vss2025-cancel-status
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=cancel-status
+    command: node firestore-utils.js cancel-status
+    # Updates status to "Cancelled" for specific participant IDs
 

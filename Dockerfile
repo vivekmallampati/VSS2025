@@ -6,10 +6,9 @@ WORKDIR /app
 
 # Copy package files and scripts
 COPY package.json ./
-COPY import-excel-to-firebase.js ./
+COPY firestore-utils.js ./
 COPY sync_email_to_uids.js ./
 COPY sync_user_associated_registrations.js ./
-COPY normalize-field-names.js ./
 
 # Install dependencies
 RUN npm install
@@ -24,8 +23,8 @@ ENV EXCEL_FILE_PATH=/app/dataprocessing/Registrations_11_29.xlsx
 # We'll create a directory for it
 RUN mkdir -p /app/secrets
 
-# Run the upload script
-# Default: upload Registrations_21_11.xlsx
-# Override with EXCEL_FILE_PATH environment variable
-CMD ["node", "import-excel-to-firebase.js"]
+# Run the unified script
+# Default: import (can be overridden via COMMAND env var or command line)
+# Commands: import, normalize, cleanup, find-negative-phones
+CMD ["node", "firestore-utils.js", "import"]
 

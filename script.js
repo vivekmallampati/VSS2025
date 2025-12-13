@@ -4216,11 +4216,15 @@ async function loadAdminDashboard(user) {
             stats = cachedData.stats;
         } else {
             // Cache expired or missing - fetch fresh data
-            // Fetch all registrations
+            // Fetch all registrations, but only include those with status "Approved"
             const registrationsSnapshot = await db.collection('registrations').get();
             registrations = [];
             registrationsSnapshot.forEach(doc => {
-                registrations.push(doc.data());
+                const data = doc.data();
+                // Only include registrations with status "Approved"
+                if (data.status === 'Approved') {
+                    registrations.push(data);
+                }
             });
             
             // Fetch all users
@@ -4691,13 +4695,17 @@ async function searchParticipantByName() {
         const results = [];
         
         // Fetch all registrations and filter client-side for case-insensitive partial name match
+        // Only show registrations with status "Approved"
         const allRegistrations = await db.collection('registrations').limit(1000).get();
         
         allRegistrations.docs.forEach(doc => {
             const data = doc.data();
-            const regName = (data.name || data['Full Name'] || '').toLowerCase();
-            if (regName.includes(nameLower)) {
-                results.push(doc);
+            // Only include registrations with status "Approved"
+            if (data.status === 'Approved') {
+                const regName = (data.name || data['Full Name'] || '').toLowerCase();
+                if (regName.includes(nameLower)) {
+                    results.push(doc);
+                }
             }
         });
         
@@ -4762,7 +4770,13 @@ async function searchParticipantByEmail() {
             
             const registrationDocs = await Promise.all(registrationPromises);
             registrationDocs.forEach(doc => {
-                if (doc) results.push(doc);
+                if (doc) {
+                    const data = doc.data();
+                    // Only include registrations with status "Approved"
+                    if (data.status === 'Approved') {
+                        results.push(doc);
+                    }
+                }
             });
         } else {
             // No exact match - try partial search in emailToUids collection
@@ -4798,7 +4812,13 @@ async function searchParticipantByEmail() {
             
             const registrationDocs = await Promise.all(registrationPromises);
             registrationDocs.forEach(doc => {
-                if (doc) results.push(doc);
+                if (doc) {
+                    const data = doc.data();
+                    // Only include registrations with status "Approved"
+                    if (data.status === 'Approved') {
+                        results.push(doc);
+                    }
+                }
             });
         }
         
@@ -4871,7 +4891,13 @@ async function selectParticipantFromLookup(uniqueId) {
         const regDoc = await db.collection('registrations').doc(uniqueId).get();
         
         if (regDoc.exists) {
-            displayParticipantLookupResults(regDoc.data(), uniqueId);
+            const regData = regDoc.data();
+            // Only show if status is "Approved"
+            if (regData.status !== 'Approved') {
+                showNotification('Participant not found or not approved', 'error');
+                return;
+            }
+            displayParticipantLookupResults(regData, uniqueId);
         } else {
             showNotification('Participant not found', 'error');
         }
@@ -4999,6 +5025,100 @@ function cancelParticipantEditMode() {
     displayParticipantLookupResults(currentParticipantData, currentParticipantUniqueId);
 }
 
+// Field name mapping from old format to normalized format (for Firestore compatibility)
+// Firestore field paths cannot contain: ~ * / [ ]
+const fieldNameMapping = {
+    'Age': 'age',
+    'Any Dietary Restrictions': 'dietaryRestrictions',
+    'Any Other Details': 'otherDetails',
+    'Any Pre-existing Medical Condition': 'medicalCondition',
+    'Arrival Flight/Train Number': 'arrivalFlightTrain',
+    'Associated with sangh for how many years/months': 'sanghYears',
+    'BarCode': 'barcode',
+    'Barcode': 'barcode',
+    'City of Current Residence': 'city',
+    'Country': 'country',
+    'Country of Current Residence': 'country',
+    'Date of Arrival': 'arrivalDate',
+    'Date of Departure Train/Flight': 'departureDate',
+    'Departure Flight/Train Number': 'departureFlightTrain',
+    'Do you have any responsibility in Hindu Swayamsevak Sangh?': 'hssResponsibility',
+    'Do you have any responsibility in any other organisation (e.g. VHP, Sewa International etc)?': 'otherOrgResponsibility',
+    'Do you need a drop off for departure?': 'dropoffNeeded',
+    'Do you need a pickup on arrival?': 'pickupNeeded',
+    'Educational Qualification': 'educationalQual',
+    'Email address': 'email',
+    'Emergency Contact Name': 'emergencyContactName',
+    'Emergency Contact Number': 'emergencyContactNumber',
+    'Emergency Contact Relation': 'emergencyContactRelation',
+    'Full Name': 'name',
+    'Ganvesh Kurta Shoulder Size in cm (for swayamevaks and sevikas)': 'ganveshSize',
+    'Gender': 'gender',
+    'Occupation (e.g. Engineer/Business/Homemaker/Student)': 'occupation',
+    'Phone number on which you can be contacted in Bharat (by call or WhatsApp)': 'phone',
+    'Place of Arrival': 'arrivalPlace',
+    'Place of Departure Train/Flight': 'departurePlace',
+    'Please select a post shibir tour option': 'postShibirTour',
+    'Praveshika ID': 'uniqueId',
+    'Relationship of Emergency Contact Person': 'emergencyContactRelation',
+    'SeqNum': 'seqNum',
+    'Shreni': 'shreni',
+    'Corrected Shreni': 'shreni',
+    'Default Shreni': 'shreni',
+    'Status': 'status',
+    'Time of Arrival': 'arrivalTime',
+    'Time of Departure Train/Flight': 'departureTime',
+    'Timestamp': 'createdAt',
+    'What is your current responsibility in HSS or other organisation?': 'currentResponsibility',
+    'Whatsapp Number': 'whatsapp',
+    'Which Sangh Shiksha Varg have you completed': 'shikshaVarg',
+    'Zone': 'zone',
+    'Zone/Shreni': 'zone'
+};
+
+// Validate if a field name is valid for Firestore
+// Firestore field paths cannot contain: * ~ / [ ] and cannot be empty
+function isValidFirestoreFieldName(fieldName) {
+    if (!fieldName || fieldName.trim() === '') {
+        return false;
+    }
+    // Firestore field names cannot contain these characters: * ~ / [ ]
+    const invalidChars = ['*', '~', '/', '[', ']'];
+    for (const char of invalidChars) {
+        if (fieldName.includes(char)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Normalize a field name to a valid Firestore field name
+function normalizeFieldName(fieldName) {
+    if (!fieldName) return fieldName;
+    
+    // If the field name is already valid, return it as-is
+    if (isValidFirestoreFieldName(fieldName)) {
+        // Check if it needs mapping to normalized name
+        return fieldNameMapping[fieldName] || fieldName;
+    }
+    
+    // If invalid, try to map it to a normalized name
+    if (fieldNameMapping[fieldName]) {
+        return fieldNameMapping[fieldName];
+    }
+    
+    // If no mapping exists and field name is invalid, replace invalid characters
+    // This is a fallback for any unmapped invalid field names
+    let normalized = fieldName;
+    const invalidChars = ['*', '~', '/', '[', ']'];
+    invalidChars.forEach(char => {
+        normalized = normalized.replace(new RegExp('\\' + char, 'g'), '_');
+    });
+    
+    console.warn(`Field name "${fieldName}" contains invalid characters. Using normalized name: "${normalized}"`);
+    return normalized;
+}
+
 // Save participant edits
 async function saveParticipantEdits() {
     if (!window.firebase || !firebase.firestore) {
@@ -5046,15 +5166,24 @@ async function saveParticipantEdits() {
     const fieldsDiv = document.getElementById('participantLookupFields');
     if (!fieldsDiv || !currentParticipantUniqueId) return;
     
-    // Collect all field values
+    // Collect all field values and normalize field names
     const updatedData = {};
     const inputs = fieldsDiv.querySelectorAll('input[data-field-name]');
     
     inputs.forEach(input => {
-        const fieldName = input.getAttribute('data-field-name');
+        const originalFieldName = input.getAttribute('data-field-name');
         // Skip uniqueId from inputs - we'll set it explicitly below
-        if (fieldName !== 'uniqueId') {
-            updatedData[fieldName] = input.value.trim();
+        if (originalFieldName !== 'uniqueId') {
+            // Normalize the field name to ensure it's valid for Firestore
+            const normalizedFieldName = normalizeFieldName(originalFieldName);
+            const fieldValue = input.value.trim();
+            
+            // Only add valid field names to updateData
+            if (isValidFirestoreFieldName(normalizedFieldName)) {
+                updatedData[normalizedFieldName] = fieldValue;
+            } else {
+                console.warn(`Skipping invalid field name: "${originalFieldName}" (normalized to: "${normalizedFieldName}")`);
+            }
         }
     });
     
@@ -5807,21 +5936,31 @@ async function searchParticipantByLoginId() {
             const regDoc = await db.collection('registrations').doc(loginId).get();
             if (regDoc.exists) {
                 const regData = regDoc.data();
+                // Only show if status is "Approved"
+                if (regData.status !== 'Approved') {
+                    showNotification('Participant not found or not approved', 'error');
+                    clearParticipantLookupResults();
+                    return;
+                }
+                
                 const email = regData.email || regData['Email address'] || '';
                 
-                // Find all registrations with the same email
+                // Find all registrations with the same email (only approved ones)
                 if (email) {
                     const allRegs = await db.collection('registrations').get();
                     const relatedRegs = [];
                     allRegs.docs.forEach(doc => {
                         const data = doc.data();
-                        const regEmail = (data.email || data['Email address'] || '').toLowerCase();
-                        if (regEmail === email.toLowerCase()) {
-                            relatedRegs.push({
-                                doc: doc,
-                                data: data,
-                                uniqueId: data.uniqueId || doc.id
-                            });
+                        // Only include registrations with status "Approved"
+                        if (data.status === 'Approved') {
+                            const regEmail = (data.email || data['Email address'] || '').toLowerCase();
+                            if (regEmail === email.toLowerCase()) {
+                                relatedRegs.push({
+                                    doc: doc,
+                                    data: data,
+                                    uniqueId: data.uniqueId || doc.id
+                                });
+                            }
                         }
                     });
                     
@@ -5839,22 +5978,32 @@ async function searchParticipantByLoginId() {
             }
         } else {
             const regData = regQuery.docs[0].data();
+            // Only show if status is "Approved"
+            if (regData.status !== 'Approved') {
+                showNotification('Participant not found or not approved', 'error');
+                clearParticipantLookupResults();
+                return;
+            }
+            
             const foundUniqueId = regData.uniqueId || regQuery.docs[0].id;
             const email = regData.email || regData['Email address'] || '';
             
-            // Find all registrations with the same email
+            // Find all registrations with the same email (only approved ones)
             if (email) {
                 const allRegs = await db.collection('registrations').get();
                 const relatedRegs = [];
                 allRegs.docs.forEach(doc => {
                     const data = doc.data();
-                    const regEmail = (data.email || data['Email address'] || '').toLowerCase();
-                    if (regEmail === email.toLowerCase()) {
-                        relatedRegs.push({
-                            doc: doc,
-                            data: data,
-                            uniqueId: data.uniqueId || doc.id
-                        });
+                    // Only include registrations with status "Approved"
+                    if (data.status === 'Approved') {
+                        const regEmail = (data.email || data['Email address'] || '').toLowerCase();
+                        if (regEmail === email.toLowerCase()) {
+                            relatedRegs.push({
+                                doc: doc,
+                                data: data,
+                                uniqueId: data.uniqueId || doc.id
+                            });
+                        }
                     }
                 });
                 
@@ -7656,7 +7805,13 @@ async function advancedSearch() {
             
             const registrationDocs = await Promise.all(registrationPromises);
             registrationDocs.forEach(doc => {
-                if (doc) results.push(doc);
+                if (doc) {
+                    const data = doc.data();
+                    // Only include registrations with status "Approved"
+                    if (data.status === 'Approved') {
+                        results.push(doc);
+                    }
+                }
             });
         } else if (name) {
             // Name search: case-insensitive partial search
