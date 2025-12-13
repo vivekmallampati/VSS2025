@@ -4446,16 +4446,16 @@ async function createNewUser(name, email, uniqueId, role) {
         });
         
         // Sign out the newly created user
-        // await firebase.auth().signOut();
+        await firebase.auth().signOut();
         
-        // // Send password reset email to the new user (only if email provided)
-        // if (trimmedEmail) {
-        //     try {
-        //         await firebase.auth().sendPasswordResetEmail(trimmedEmail);
-        //     } catch (emailError) {
-        //         console.warn('Could not send password reset email:', emailError);
-        //     }
-        // }
+        // Send password reset email to the new user (only if email provided)
+        if (trimmedEmail) {
+            try {
+                await firebase.auth().sendPasswordResetEmail(trimmedEmail);
+            } catch (emailError) {
+                console.warn('Could not send password reset email:', emailError);
+            }
+        }
         
         return {
             success: true,
