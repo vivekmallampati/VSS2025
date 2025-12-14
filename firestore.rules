@@ -94,7 +94,7 @@ service cloud.firestore {
       return requiredTeam != null && teams != null && requiredTeam in teams;
     }
     
-    // Registrations collection
+    // Registrations collection (only Approved shibirarthis)
     match /registrations/{uniqueId} {
       // Anyone can read for verification
       allow read: if true;
@@ -106,7 +106,7 @@ service cloud.firestore {
                        (isAdmin() || 
                         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
                          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId == uniqueId));
-      // Only admin SDK can delete
+      // Only admin SDK can delete (moved to cancelledRegistrations)
       allow delete: if false;
       
       // Allow authenticated users to update only their own transportation info
@@ -225,6 +225,27 @@ service cloud.firestore {
                    (isAdmin() || 
                     isVolunteer() || 
                     exists(/databases/$(database)/documents/users/$(request.auth.uid)));
+    }
+    
+    // Non-Shibirarthi Users collection (volunteers and admins)
+    match /nonShibirarthiUsers/{uniqueId} {
+      // Admins can read all
+      allow read: if request.auth != null && isAdmin();
+      // Users can read their own record
+      allow read: if request.auth != null && 
+                    (isOwnerOfRegistration(uniqueId) ||
+                     (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                      normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(uniqueId)));
+      // Only admins can create/update/delete
+      allow create, update, delete: if request.auth != null && isAdmin();
+    }
+    
+    // Cancelled Registrations collection
+    match /cancelledRegistrations/{uniqueId} {
+      // Only admins can read cancelled registrations
+      allow read: if request.auth != null && isAdmin();
+      // Only admins can create/update/delete (for moving between collections)
+      allow create, update, delete: if request.auth != null && isAdmin();
     }
   }
 }

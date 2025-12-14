@@ -156,3 +156,68 @@ services:
     command: node firestore-utils.js approve-status
     # Updates status to "Approved" for specific participant IDs
 
+  migrate-non-shibirarthi:
+    build: .
+    container_name: vss2025-migrate-non-shibirarthi
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=migrate-non-shibirarthi
+    command: node firestore-utils.js migrate-non-shibirarthi
+    # Migrates volunteers and admins to nonShibirarthiUsers collection
+
+  migrate-cancelled:
+    build: .
+    container_name: vss2025-migrate-cancelled
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=migrate-cancelled
+    command: node firestore-utils.js migrate-cancelled
+    # Migrates cancelled/rejected registrations to cancelledRegistrations collection
+
+  find-duplicates:
+    build: .
+    container_name: vss2025-find-duplicates
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=find-duplicates
+    command: node firestore-utils.js find-duplicates
+    # Finds all duplicates (by name+email and last 4 digits)
+
+  find-duplicates-name-email:
+    build: .
+    container_name: vss2025-find-duplicates-name-email
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=find-duplicates-name-email
+    command: node firestore-utils.js find-duplicates-name-email
+    # Finds duplicates by name and email
+
+  find-duplicates-last4:
+    build: .
+    container_name: vss2025-find-duplicates-last4
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=find-duplicates-last4
+    command: node firestore-utils.js find-duplicates-last4
+    # Finds duplicates by last 4 digits of PraveshikaID
+

@@ -827,321 +827,6 @@ async function updateStatusToRejected() {
 async function updateStatusToCancelled() {
     const participantIds = [
         'AFBA1937',
-        'AFKI1466',
-        'AFKI1789',
-        'AFKK1177',
-        'AFKK1178',
-        'AFKK1271',
-        'AFKK1278',
-        'AFKK1347',
-        'AFKK1371',
-        'AFKK1372',
-        'AFKK1460',
-        'AFKK1496',
-        'AFKK1644',
-        'AFKK1806',
-        'AFKK1843',
-        'AFKK1844',
-        'AFKK2225',
-        'AFKK2830',
-        'AFSK1341',
-        'AFSK1463',
-        'AFSK1464',
-        'AFSK1539',
-        'AFSK1818',
-        'AFSK1935',
-        'AFSK1936',
-        'AFSK2062',
-        'AFSK2084',
-        'AFSK2092',
-        'AFSK2524',
-        'AFSK2623',
-        'AFYV1367',
-        'AFYV1465',
-        'AFYV1485',
-        'AFYV1788',
-        'AFYV2052',
-        'AFYV2390',
-        'AFYV2523',
-        'AMKK1043',
-        'AMKK1053',
-        'AMKK1054',
-        'AMKK1059',
-        'AMKK1095',
-        'AMKK1202',
-        'AMKK1203',
-        'AMKK1270',
-        'AMKK1285',
-        'AMKK1587',
-        'AMKK1617',
-        'AMKK1627',
-        'AMKK1636',
-        'AMKK1804',
-        'AMKK1855',
-        'AMKK2038',
-        'AMKK2069',
-        'AMKK2113',
-        'AMKK2119',
-        'AMKK2128',
-        'AMKK2129',
-        'AMKK2143',
-        'AMKK2184',
-        'AMKK2207',
-        'AMKK2311',
-        'AMKK2336',
-        'AMKK2439',
-        'AMKK2511',
-        'AMKK2543',
-        'AMKK2554',
-        'AMKK2588',
-        'AMKK2589',
-        'AMKK2645',
-        'AMKK2662',
-        'AMKK2692',
-        'AMKK3087',
-        'AMKK3094',
-        'AMKK3095',
-        'AMKK4002',
-        'AMKK4015',
-        'AMKK4149',
-        'AMSK1584',
-        'AMSK1637',
-        'AMSK1864',
-        'AMSK2185',
-        'AMSK2438',
-        'AMSK2555',
-        'AMSK3063',
-        'AMYV1067',
-        'AMYV1638',
-        'AMYV1639',
-        'AMYV1762',
-        'AMYV2595',
-        'AMYV4018',
-        'AMYV4019',
-        'ARBA1024',
-        'ARBA1025',
-        'ARBA1344',
-        'ARBA1345',
-        'ARBA1835',
-        'ARBA4066',
-        'ARKI1022',
-        'ARKI2611',
-        'ARKI3060',
-        'ARKK1021',
-        'ARKK1208',
-        'ARKK1215',
-        'ARKK1250',
-        'ARKK1260',
-        'ARKK1262',
-        'ARKK1648',
-        'ARKK1738',
-        'ARKK1763',
-        'ARKK1832',
-        'ARKK1837',
-        'ARKK1838',
-        'ARKK1845',
-        'ARKK1856',
-        'ARKK1896',
-        'ARKK1956',
-        'ARKK1958',
-        'ARKK2548',
-        'ARKK2870',
-        'ARKK4251',
-        'ARSK1023',
-        'ARSK1233',
-        'ARSK1241',
-        'ARSK1343',
-        'ARSK1642',
-        'ARSK1663',
-        'ARSK1833',
-        'ARSK1842',
-        'ARSK1915',
-        'ARSK2310',
-        'ARSK2326',
-        'ARSK2608',
-        'ARSK2805',
-        'ARSK2806',
-        'ARSK3057',
-        'ARYV1744',
-        'ARYV1834',
-        'ARYV1858',
-        'ASBA1093',
-        'ASBA1127',
-        'ASBA1144',
-        'ASBA1263',
-        'ASBA1647',
-        'ASBA1675',
-        'ASBA1676',
-        'ASBA3044',
-        'ASBA3045',
-        'ASBA3047',
-        'ASBA4223',
-        'ASBA4224',
-        'ASFALSE4174',
-        'ASFALSE4175',
-        'ASFALSE4176',
-        'ASKI1086',
-        'ASKI1126',
-        'ASKI1143',
-        'ASKI1159',
-        'ASKI1360',
-        'ASKI1645',
-        'ASKI2014',
-        'ASKI2015',
-        'ASKI4194',
-        'ASKK1224',
-        'ASKK1505',
-        'ASKK1510',
-        'ASKK1524',
-        'ASKK1597',
-        'ASKK1651',
-        'ASKK1661',
-        'ASKK1667',
-        'ASKK1679',
-        'ASKK1682',
-        'ASKK1705',
-        'ASKK1709',
-        'ASKK1785',
-        'ASKK1821',
-        'ASKK1822',
-        'ASKK1827',
-        'ASKK1904',
-        'ASKK2056',
-        'ASKK2095',
-        'ASKK2097',
-        'ASKK2144',
-        'ASKK2229',
-        'ASKK2251',
-        'ASKK2307',
-        'ASKK2320',
-        'ASKK2346',
-        'ASKK2364',
-        'ASKK2430',
-        'ASKK2449',
-        'ASKK2450',
-        'ASKK2740',
-        'ASKK2798',
-        'ASKK2892',
-        'ASKK2956',
-        'ASKK2959',
-        'ASKK2979',
-        'ASKK2982',
-        'ASKK2983',
-        'ASKK4034',
-        'ASKK4111',
-        'ASKK4130',
-        'ASKK4200',
-        'ASSK1085',
-        'ASSK1125',
-        'ASSK1212',
-        'ASSK1358',
-        'ASSK1660',
-        'ASSK1662',
-        'ASSK1673',
-        'ASSK1683',
-        'ASSK1695',
-        'ASSK1696',
-        'ASSK1706',
-        'ASSK1713',
-        'ASSK1724',
-        'ASSK1743',
-        'ASSK1849',
-        'ASSK1866',
-        'ASSK1868',
-        'ASSK2194',
-        'ASSK2300',
-        'ASSK2318',
-        'ASSK2642',
-        'ASSK2750',
-        'ASSK2817',
-        'ASSK2840',
-        'ASSK3042',
-        'ASSK3043',
-        'ASSK3075',
-        'ASSK3080',
-        'ASSK3090',
-        'ASSK3096',
-        'ASSK4077',
-        'ASSK4121',
-        'ASSK4131',
-        'ASSK4172',
-        'ASSK4173',
-        'ASSK4192',
-        'ASSK4193',
-        'ASSK4201',
-        'ASSK4212',
-        'ASSK4221',
-        'ASSK4222',
-        'ASYV1186',
-        'ASYV1249',
-        'ASYV1252',
-        'ASYV1451',
-        'ASYV1531',
-        'ASYV1643',
-        'ASYV1646',
-        'ASYV1726',
-        'ASYV1728',
-        'ASYV1820',
-        'ASYV1892',
-        'ASYV2281',
-        'ASYV2491',
-        'ASYV2795',
-        'ASYV4110',
-        'AUKI1074',
-        'AUKK1072',
-        'AUKK1073',
-        'AUKK1316',
-        'AUKK1436',
-        'AUKK1624',
-        'AUKK1634',
-        'AUKK2005',
-        'AUKK2039',
-        'AUKK2167',
-        'AUKK2214',
-        'AUKK2215',
-        'AUKK2435',
-        'AUKK2720',
-        'AUKK2809',
-        'AUKK4202',
-        'AUSK1317',
-        'AUSK1625',
-        'AUSK2811',
-        'AUYV1318',
-        'AUYV1578',
-        'AUYV2797',
-        'EUKI2029',
-        'EUKK1014',
-        'EUKK1080',
-        'EUKK1102',
-        'EUKK1454',
-        'EUKK1482',
-        'EUKK1484',
-        'EUKK1518',
-        'EUKK1532',
-        'EUKK1548',
-        'EUKK1813',
-        'EUKK2021',
-        'EUKK2036',
-        'EUKK2067',
-        'EUKK2094',
-        'EUKK2327',
-        'EUKK2414',
-        'EUKK2469',
-        'EUKK2488',
-        'EUKK2500',
-        'EUKK2570',
-        'EUKK2630',
-        'EUSK1549',
-        'EUSK1747',
-        'EUSK2226',
-        'EUSK2391',
-        'EUSK2399',
-        'EUSK2614',
-        'EUSK4033',
-        'EUYV1770',
-        'EUYV1854',
-        'EUYV1863',
-        'EUYV1984',
         'EUYV2613'
     ];
 
@@ -1204,42 +889,6 @@ async function updateStatusToCancelled() {
 async function updateStatusToApproved() {
     const participantIds = [
         'AFKK2446',
-        'AFKK2625',
-        'AFKK2696',
-        'AFKK2762',
-        'AFSK1616',
-        'AFSK2090',
-        'AFSK2737',
-        'AFYV1559',
-        'AMKK2223',
-        'AMSK1836',
-        'ARYV1501',
-        'ASKK1205',
-        'ASKK2793',
-        'ASSK2522',
-        'ASSK2739',
-        'ASSK4062',
-        'AUKK2195',
-        'AUKK2324',
-        'AUKK2683',
-        'AUSK1045',
-        'AUSK2246',
-        'EUKK1119',
-        'EUKK1517',
-        'EUKK1549',
-        'EUKK1737',
-        'EUKK1745',
-        'EUKK2006',
-        'EUKK2111',
-        'EUKK2163',
-        'EUKK2552',
-        'EUKK2714',
-        'EUKK2275',
-        'EUSK1924',
-        'EUSK2064',
-        'EUSK2065',
-        'EUSK2162',
-        'EUSK2476',
         'EUYV1430'
     ];
 
@@ -1300,6 +949,293 @@ async function updateStatusToApproved() {
 }
 
 // ============================================================================
+// MIGRATION FUNCTIONS
+// ============================================================================
+
+// Migrate non-shibirarthi users (volunteers and admins) to separate collection
+async function migrateNonShibirarthiUsers() {
+    console.log('Starting migration of non-shibirarthi users...\n');
+    
+    let migratedCount = 0;
+    let errorCount = 0;
+    let skippedCount = 0;
+    
+    try {
+        // Fetch all registrations
+        const registrationsSnapshot = await db.collection('registrations').get();
+        console.log(`Found ${registrationsSnapshot.size} registrations to check...\n`);
+        
+        const batch = db.batch();
+        let batchCount = 0;
+        const BATCH_SIZE = 500;
+        
+        for (const doc of registrationsSnapshot.docs) {
+            const data = doc.data();
+            const uniqueId = doc.id;
+            
+            // Check if this is a volunteer or admin
+            const shreni = data.shreni || data.Shreni || '';
+            const role = data.role || '';
+            const isVolunteer = shreni.toLowerCase() === 'volunteer' || role === 'volunteer' || role === 'admin';
+            
+            if (isVolunteer) {
+                try {
+                    // Copy to nonShibirarthiUsers collection
+                    const newDocRef = db.collection('nonShibirarthiUsers').doc(uniqueId);
+                    batch.set(newDocRef, {
+                        ...data,
+                        migratedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        originalCollection: 'registrations'
+                    });
+                    
+                    // Delete from registrations
+                    const oldDocRef = db.collection('registrations').doc(uniqueId);
+                    batch.delete(oldDocRef);
+                    
+                    batchCount++;
+                    migratedCount++;
+                    
+                    if (batchCount >= BATCH_SIZE) {
+                        await batch.commit();
+                        console.log(`Migrated ${migratedCount} non-shibirarthi users so far...`);
+                        batchCount = 0;
+                    }
+                } catch (error) {
+                    console.error(`Error migrating ${uniqueId}:`, error.message);
+                    errorCount++;
+                }
+            } else {
+                skippedCount++;
+            }
+        }
+        
+        // Commit remaining batch
+        if (batchCount > 0) {
+            await batch.commit();
+        }
+        
+        console.log(`\n=== Migration Summary ===`);
+        console.log(`Total registrations checked: ${registrationsSnapshot.size}`);
+        console.log(`Migrated to nonShibirarthiUsers: ${migratedCount}`);
+        console.log(`Skipped (shibirarthis): ${skippedCount}`);
+        console.log(`Errors: ${errorCount}`);
+        
+    } catch (error) {
+        console.error('Fatal error during migration:', error);
+        throw error;
+    }
+}
+
+// Migrate cancelled/rejected registrations to separate collection
+async function migrateCancelledRegistrations() {
+    console.log('Starting migration of cancelled/rejected registrations...\n');
+    
+    let migratedCount = 0;
+    let errorCount = 0;
+    let skippedCount = 0;
+    
+    try {
+        // Fetch all registrations
+        const registrationsSnapshot = await db.collection('registrations').get();
+        console.log(`Found ${registrationsSnapshot.size} registrations to check...\n`);
+        
+        const batch = db.batch();
+        let batchCount = 0;
+        const BATCH_SIZE = 500;
+        
+        for (const doc of registrationsSnapshot.docs) {
+            const data = doc.data();
+            const uniqueId = doc.id;
+            const status = data.status || '';
+            
+            // Check if this is cancelled or rejected
+            const isCancelled = status === 'Cancelled' || status === 'Rejected';
+            
+            if (isCancelled) {
+                try {
+                    // Copy to cancelledRegistrations collection
+                    const newDocRef = db.collection('cancelledRegistrations').doc(uniqueId);
+                    batch.set(newDocRef, {
+                        ...data,
+                        migratedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        originalCollection: 'registrations',
+                        originalStatus: status
+                    });
+                    
+                    // Delete from registrations
+                    const oldDocRef = db.collection('registrations').doc(uniqueId);
+                    batch.delete(oldDocRef);
+                    
+                    batchCount++;
+                    migratedCount++;
+                    
+                    if (batchCount >= BATCH_SIZE) {
+                        await batch.commit();
+                        console.log(`Migrated ${migratedCount} cancelled registrations so far...`);
+                        batchCount = 0;
+                    }
+                } catch (error) {
+                    console.error(`Error migrating ${uniqueId}:`, error.message);
+                    errorCount++;
+                }
+            } else {
+                skippedCount++;
+            }
+        }
+        
+        // Commit remaining batch
+        if (batchCount > 0) {
+            await batch.commit();
+        }
+        
+        console.log(`\n=== Migration Summary ===`);
+        console.log(`Total registrations checked: ${registrationsSnapshot.size}`);
+        console.log(`Migrated to cancelledRegistrations: ${migratedCount}`);
+        console.log(`Skipped (approved): ${skippedCount}`);
+        console.log(`Errors: ${errorCount}`);
+        
+    } catch (error) {
+        console.error('Fatal error during migration:', error);
+        throw error;
+    }
+}
+
+// ============================================================================
+// DUPLICATE DETECTION
+// ============================================================================
+
+// Find duplicates by name and email
+async function findDuplicatesByNameAndEmail() {
+    console.log('Finding duplicates by name and email...\n');
+    
+    const nameEmailMap = new Map();
+    const duplicates = [];
+    
+    try {
+        const registrationsSnapshot = await db.collection('registrations').get();
+        console.log(`Checking ${registrationsSnapshot.size} registrations...`);
+        
+        registrationsSnapshot.forEach(doc => {
+            const data = doc.data();
+            const name = (data.name || data['Full Name'] || '').toLowerCase().trim();
+            const email = (data.email || data['Email address'] || '').toLowerCase().trim();
+            const uniqueId = data.uniqueId || doc.id;
+            
+            if (name && email) {
+                const key = `${name}|||${email}`;
+                if (!nameEmailMap.has(key)) {
+                    nameEmailMap.set(key, []);
+                }
+                nameEmailMap.get(key).push({
+                    uniqueId: uniqueId,
+                    name: data.name || data['Full Name'] || '',
+                    email: data.email || data['Email address'] || '',
+                    data: data
+                });
+            }
+        });
+        
+        // Find entries with multiple registrations
+        for (const [key, entries] of nameEmailMap.entries()) {
+            if (entries.length > 1) {
+                duplicates.push({
+                    type: 'name_email',
+                    key: key,
+                    entries: entries
+                });
+            }
+        }
+        
+        console.log(`\n=== Duplicates by Name and Email ===`);
+        console.log(`Found ${duplicates.length} duplicate groups`);
+        
+        duplicates.forEach((dup, index) => {
+            console.log(`\nGroup ${index + 1}:`);
+            dup.entries.forEach(entry => {
+                console.log(`  - ${entry.uniqueId}: ${entry.name} (${entry.email})`);
+            });
+        });
+        
+        return duplicates;
+    } catch (error) {
+        console.error('Error finding duplicates:', error);
+        throw error;
+    }
+}
+
+// Find duplicates by last 4 digits of PraveshikaID
+async function findDuplicatesByLast4Digits() {
+    console.log('Finding duplicates by last 4 digits of PraveshikaID...\n');
+    
+    const last4Map = new Map();
+    const duplicates = [];
+    
+    try {
+        const registrationsSnapshot = await db.collection('registrations').get();
+        console.log(`Checking ${registrationsSnapshot.size} registrations...`);
+        
+        registrationsSnapshot.forEach(doc => {
+            const data = doc.data();
+            const uniqueId = data.uniqueId || doc.id;
+            
+            // Extract last 4 digits
+            const last4 = uniqueId.slice(-4);
+            if (last4 && last4.length === 4 && /^\d{4}$/.test(last4)) {
+                if (!last4Map.has(last4)) {
+                    last4Map.set(last4, []);
+                }
+                last4Map.get(last4).push({
+                    uniqueId: uniqueId,
+                    name: data.name || data['Full Name'] || '',
+                    email: data.email || data['Email address'] || '',
+                    data: data
+                });
+            }
+        });
+        
+        // Find entries with multiple registrations
+        for (const [last4, entries] of last4Map.entries()) {
+            if (entries.length > 1) {
+                duplicates.push({
+                    type: 'last4',
+                    key: last4,
+                    entries: entries
+                });
+            }
+        }
+        
+        console.log(`\n=== Duplicates by Last 4 Digits ===`);
+        console.log(`Found ${duplicates.length} duplicate groups`);
+        
+        duplicates.forEach((dup, index) => {
+            console.log(`\nGroup ${index + 1} (Last 4: ${dup.key}):`);
+            dup.entries.forEach(entry => {
+                console.log(`  - ${entry.uniqueId}: ${entry.name} (${entry.email})`);
+            });
+        });
+        
+        return duplicates;
+    } catch (error) {
+        console.error('Error finding duplicates:', error);
+        throw error;
+    }
+}
+
+// Find all duplicates
+async function findAllDuplicates() {
+    console.log('Finding all duplicates...\n');
+    
+    const nameEmailDups = await findDuplicatesByNameAndEmail();
+    const last4Dups = await findDuplicatesByLast4Digits();
+    
+    return {
+        nameEmail: nameEmailDups,
+        last4: last4Dups,
+        total: nameEmailDups.length + last4Dups.length
+    };
+}
+
+// ============================================================================
 // MAIN ROUTER
 // ============================================================================
 
@@ -1332,6 +1268,39 @@ async function main() {
             case 'approve-status':
                 await updateStatusToApproved();
                 break;
+            case 'migrate-non-shibirarthi':
+                await migrateNonShibirarthiUsers();
+                break;
+            case 'migrate-cancelled':
+                await migrateCancelledRegistrations();
+                break;
+            case 'find-duplicates':
+                await findAllDuplicates();
+                break;
+            case 'find-duplicates-name-email':
+                await findDuplicatesByNameAndEmail();
+                break;
+            case 'find-duplicates-last4':
+                await findDuplicatesByLast4Digits();
+                break;
+            case 'normalize-zones':
+                await normalizeZones();
+                break;
+            case 'normalize-dates':
+                await normalizeDates();
+                break;
+            case 'normalize-pickup-locations':
+                await normalizePickupLocations();
+                break;
+            case 'normalize-post-tour':
+                await normalizePostTourOptions();
+                break;
+            case 'normalize-all':
+                await normalizeZones();
+                await normalizeDates();
+                await normalizePickupLocations();
+                await normalizePostTourOptions();
+                break;
             default:
                 console.log('Usage: node firestore-utils.js <command>');
                 console.log('Commands:');
@@ -1343,6 +1312,16 @@ async function main() {
                 console.log('  reject-status       - Update status to "Rejected" for specific participant IDs');
                 console.log('  cancel-status       - Update status to "Cancelled" for specific participant IDs');
                 console.log('  approve-status      - Update status to "Approved" for specific participant IDs');
+                console.log('  migrate-non-shibirarthi - Migrate volunteers/admins to nonShibirarthiUsers collection');
+                console.log('  migrate-cancelled   - Migrate cancelled/rejected to cancelledRegistrations collection');
+                console.log('  find-duplicates     - Find all duplicates (by name+email and last 4 digits)');
+                console.log('  find-duplicates-name-email - Find duplicates by name and email');
+                console.log('  find-duplicates-last4 - Find duplicates by last 4 digits of PraveshikaID');
+                console.log('  normalize-zones     - Normalize zones to AF, AM, AR, AU, EU, AS');
+                console.log('  normalize-dates      - Normalize dates to DD-MMM-YYYY format');
+                console.log('  normalize-pickup-locations - Normalize pickup locations to standard options');
+                console.log('  normalize-post-tour  - Normalize post tour options (Kandakurti->None, etc.)');
+                console.log('  normalize-all        - Run all normalization functions');
                 process.exit(1);
         }
         console.log('\nProcess finished');

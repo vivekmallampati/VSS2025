@@ -59,9 +59,9 @@ function extractUniqueId(data, fallbackId) {
 }
 
 async function syncEmailToUids() {
-    console.log('Fetching registrations collection...');
+    console.log('Fetching registrations collection (only approved shibirarthis)...');
     const snapshot = await db.collection('registrations').get();
-    console.log(`Fetched ${snapshot.size} registrations`);
+    console.log(`Fetched ${snapshot.size} registrations (only approved remain after migration)`);
 
     const emailMap = new Map();
     let registrationsWithoutEmail = 0;

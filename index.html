@@ -1077,6 +1077,16 @@
                     </div>
                     
                     <div id="adminDashboardData" style="display: none;">
+                        <!-- Status Filter -->
+                        <div style="margin-bottom: 2rem; padding: 1rem; background: #f5f5f5; border-radius: 8px;">
+                            <label for="dashboardStatusFilter" style="margin-right: 1rem; font-weight: bold;">Filter by Status:</label>
+                            <select id="dashboardStatusFilter" class="form-input" style="width: 200px; display: inline-block;" onchange="updateDashboardWithFilter()">
+                                <option value="registered">Registered</option>
+                                <option value="logged">Logged In</option>
+                                <option value="checkedin">Checked In</option>
+                            </select>
+                        </div>
+                        
                         <!-- Key Metrics Cards -->
                         <div class="metrics-cards">
                             <div class="metric-card">
@@ -1335,19 +1345,107 @@
                                 <span class="analytics-section-toggle">▼</span>
                             </div>
                             <div class="analytics-section-content">
+                                <div style="margin-bottom: 1rem;">
+                                    <label for="shreniGenderFilter" style="margin-right: 1rem;">Filter:</label>
+                                    <select id="shreniGenderFilter" class="form-input" style="width: 200px; display: inline-block;" onchange="updateShreniGenderTable()">
+                                        <option value="registered">Registered</option>
+                                        <option value="logged">Logged In</option>
+                                        <option value="checkedin">Checked In</option>
+                                    </select>
+                                </div>
                                 <div id="shreniGenderBreakdown" class="data-table-container">
                                     <table class="data-table">
                                         <thead>
                                             <tr>
                                                 <th>Shreni</th>
-                                                <th>Gender</th>
-                                                <th>Count</th>
+                                                <th>Female</th>
+                                                <th>Male</th>
+                                                <th>Total</th>
                                                 <th>Percentage</th>
                                             </tr>
                                         </thead>
                                         <tbody id="shreniGenderTableBody">
                                         </tbody>
                                     </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Zone Statistics Table -->
+                        <div class="analytics-section">
+                            <div class="analytics-section-header" onclick="toggleSection(this)">
+                                <h3>Zone Statistics</h3>
+                                <span class="analytics-section-toggle">▼</span>
+                            </div>
+                            <div class="analytics-section-content">
+                                <div style="margin-bottom: 1rem;">
+                                    <label for="zoneStatsFilter" style="margin-right: 1rem;">Filter:</label>
+                                    <select id="zoneStatsFilter" class="form-input" style="width: 200px; display: inline-block;" onchange="updateZoneStatsTable()">
+                                        <option value="registered">Registered</option>
+                                        <option value="logged">Logged In</option>
+                                        <option value="checkedin">Checked In</option>
+                                    </select>
+                                </div>
+                                <div id="zoneStatsBreakdown" class="data-table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Zone</th>
+                                                <th>Registered</th>
+                                                <th>Web logedin</th>
+                                                <th>Venue checkin</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="zoneStatsTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Registrations by Zone and Shreni -->
+                        <div class="analytics-section">
+                            <div class="analytics-section-header" onclick="toggleSection(this)">
+                                <h3>Registrations by Zone and Shreni</h3>
+                                <span class="analytics-section-toggle">▼</span>
+                            </div>
+                            <div class="analytics-section-content">
+                                <div style="margin-bottom: 1rem;">
+                                    <label for="zoneShreniTableFilter" style="margin-right: 1rem;">Filter:</label>
+                                    <select id="zoneShreniTableFilter" class="form-input" style="width: 200px; display: inline-block;" onchange="updateZoneShreniTable()">
+                                        <option value="registered">Registered</option>
+                                        <option value="logged">Logged In</option>
+                                        <option value="checkedin">Checked In</option>
+                                    </select>
+                                </div>
+                                <div id="zoneShreniTableBreakdown" class="data-table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Shreni/Zone</th>
+                                                <th>Karyakarta</th>
+                                                <th>Swakeeya</th>
+                                                <th>Yuva</th>
+                                                <th>Kishor</th>
+                                                <th>Baal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="zoneShreniTableTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Export Buttons -->
+                        <div class="analytics-section">
+                            <div class="analytics-section-header">
+                                <h3>Data Exports</h3>
+                            </div>
+                            <div class="analytics-section-content">
+                                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                                    <button class="btn btn-primary" onclick="exportTravelTeamData()">Export Travel Team Data (CSV)</button>
+                                    <button class="btn btn-primary" onclick="exportPostTourTeamData()">Export Post Tour Team Data (CSV)</button>
                                 </div>
                             </div>
                         </div>
@@ -1989,6 +2087,9 @@
                                     <button id="cancelEditBtn" class="btn btn-secondary" onclick="cancelParticipantEditMode()" style="display: none;">Cancel</button>
                                 </div>
                             </div>
+                            <div id="statusManagementButtons" style="margin-bottom: 1rem;">
+                                <!-- Status management buttons will be inserted here for admins -->
+                            </div>
                             <div id="participantLookupFields" style="background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #ddd;">
                                 <!-- All Registration fields will be displayed here -->
                             </div>
@@ -2101,12 +2202,8 @@
                                         <label>Payment Method: <span class="required">*</span></label>
                                         <div style="display: flex; gap: 2rem; margin-top: 0.5rem;">
                                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                                <input type="radio" name="shulkPaymentMethod" value="Cash" id="shulkPaymentCash">
+                                                <input type="radio" name="shulkPaymentMethod" value="Cash" id="shulkPaymentCash" checked>
                                                 <span>Cash</span>
-                                            </label>
-                                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                                <input type="radio" name="shulkPaymentMethod" value="Digital" id="shulkPaymentDigital">
-                                                <span>Digital</span>
                                             </label>
                                         </div>
                                     </div>
@@ -2118,7 +2215,7 @@
                                     </div>
                                     <div class="form-group">
                                         <label for="checkinNotes">Notes (optional):</label>
-                                        <textarea id="checkinNotes" class="form-input" rows="3" placeholder="Add any notes..."></textarea>
+                                        <textarea id="checkinNotes" class="form-input" rows="1" placeholder="Add any notes..." style="min-height: 40px; max-height: 60px;"></textarea>
                                     </div>
                                     <div style="display: flex; gap: 1rem;">
                                         <button type="submit" class="btn btn-primary">Check In</button>

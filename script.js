@@ -1784,7 +1784,8 @@ function createProfileCardHTML(profileData, index, isExpanded = false) {
     const { name, email, uniqueId, country, shreni, barcode, phone, whatsapp, address, city, state, postalCode,
             gender, age, occupation, educationalQual, zone, ganveshSize, sanghYears, hssResponsibility,
             currentResponsibility, otherOrgResponsibility, shikshaVarg, emergencyContactName,
-            emergencyContactNumber, emergencyContactRelation, pickupNeeded, dropoffNeeded } = profileData;
+            emergencyContactNumber, emergencyContactRelation, pickupNeeded, dropoffNeeded,
+            accommodation, ganaNumber, vahiniNumber, anikiniNumber } = profileData;
     
                 const safeName = escapeHtml(name || '');
                 const safeUniqueId = escapeHtml(uniqueId || '');
@@ -1926,6 +1927,28 @@ function createProfileCardHTML(profileData, index, isExpanded = false) {
                                 </div>
                             </div>
                         </div>
+                        ${accommodation || ganaNumber || vahiniNumber || anikiniNumber ? `
+                        <div class="profile-tile">
+                            <h4 class="tile-title">Shibir Assignment</h4>
+                            <div class="tile-content">
+                                ${accommodation ? `<div class="info-item">
+                                    <span class="info-label">Accommodation</span>
+                                    <span class="info-value">${formatValue(accommodation)}</span>
+                                </div>` : ''}
+                                ${ganaNumber ? `<div class="info-item">
+                                    <span class="info-label">Gana Number</span>
+                                    <span class="info-value">${formatValue(ganaNumber)}</span>
+                                </div>` : ''}
+                                ${vahiniNumber ? `<div class="info-item">
+                                    <span class="info-label">Vahini Number</span>
+                                    <span class="info-value">${formatValue(vahiniNumber)}</span>
+                                </div>` : ''}
+                                ${anikiniNumber ? `<div class="info-item">
+                                    <span class="info-label">Anikini Number</span>
+                                    <span class="info-value">${formatValue(anikiniNumber)}</span>
+                                </div>` : ''}
+                            </div>
+                        </div>` : ''}
                         ${address || state || postalCode ? `
                         <div class="profile-tile">
                             <h4 class="tile-title">Address Information</h4>
@@ -4106,7 +4129,7 @@ function openToursEditForm(uniqueId) {
                             <select id="postShibirTour" class="form-control">
                                 <option value="None" ${currentTour === 'None' ? 'selected' : ''}>None</option>
                                 <option value="Srisailam" ${currentTour.toString().toLowerCase().includes('srisailam') ? 'selected' : ''}>Srisailam</option>
-                                <option value="Yadadri Mandir and local sites in Bhagyanagar" ${currentTour.toString().toLowerCase().includes('yadadri') || currentTour.toString().toLowerCase().includes('bhagyanagar') ? 'selected' : ''}>Yadadri Mandir and local sites in Bhagyanagar</option>
+                                <option value="Yadadri and local tour" ${currentTour.toString().toLowerCase().includes('yadadri') || currentTour.toString().toLowerCase().includes('bhagyanagar') ? 'selected' : ''}>Yadadri and local tour</option>
                             </select>
                         </div>
                         <div class="form-actions">
@@ -4283,15 +4306,11 @@ async function loadAdminDashboard(user) {
             stats = cachedData.stats;
         } else {
             // Cache expired or missing - fetch fresh data
-            // Fetch all registrations, but only include those with status "Approved"
+            // Fetch all registrations (only approved remain after migration)
             const registrationsSnapshot = await db.collection('registrations').get();
             registrations = [];
             registrationsSnapshot.forEach(doc => {
-                const data = doc.data();
-                // Only include registrations with status "Approved"
-                if (data.status === 'Approved') {
-                    registrations.push(data);
-                }
+                registrations.push(doc.data());
             });
             
             // Fetch all users
@@ -4332,6 +4351,152 @@ async function loadAdminDashboard(user) {
     } catch (error) {
         console.error('Error loading admin dashboard:', error);
         loadingDiv.innerHTML = '<p style="color: red;">Error loading dashboard data. Please try again.</p>';
+    }
+}
+
+// Registration Status Management Functions
+
+// Move registration to cancelled collection
+async function moveToCancelled(uniqueId, reason = '') {
+    if (!window.firebase || !firebase.firestore) {
+        throw new Error('Firebase not initialized');
+    }
+    
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        throw new Error('Not authenticated');
+    }
+    
+    const isAdminUser = await isAdmin(user);
+    if (!isAdminUser) {
+        throw new Error('Permission denied. Only admins can cancel registrations.');
+    }
+    
+    const db = firebase.firestore();
+    
+    try {
+        // Get the registration document
+        const regDoc = await db.collection('registrations').doc(uniqueId).get();
+        if (!regDoc.exists) {
+            throw new Error(`Registration ${uniqueId} not found`);
+        }
+        
+        const regData = regDoc.data();
+        
+        // Copy to cancelledRegistrations
+        await db.collection('cancelledRegistrations').doc(uniqueId).set({
+            ...regData,
+            status: 'Cancelled',
+            cancelledAt: firebase.firestore.FieldValue.serverTimestamp(),
+            cancelledBy: user.uid,
+            cancelledByName: (await getUserData(user))?.name || user.email || 'Unknown',
+            cancellationReason: reason
+        });
+        
+        // Delete from registrations
+        await db.collection('registrations').doc(uniqueId).delete();
+        
+        // Update emailToUids mapping - remove this UID
+        const email = regData.email || '';
+        if (email) {
+            const normalizedEmail = email.toLowerCase().trim();
+            const emailToUidsDoc = await db.collection('emailToUids').doc(normalizedEmail).get();
+            if (emailToUidsDoc.exists) {
+                const emailData = emailToUidsDoc.data();
+                const uids = (emailData.uids || []).filter(uid => uid !== uniqueId);
+                if (uids.length > 0) {
+                    await db.collection('emailToUids').doc(normalizedEmail).update({
+                        uids: uids,
+                        count: uids.length,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } else {
+                    // Remove the emailToUids document if no UIDs remain
+                    await db.collection('emailToUids').doc(normalizedEmail).delete();
+                }
+            }
+        }
+        
+        return { success: true, uniqueId };
+    } catch (error) {
+        console.error('Error moving to cancelled:', error);
+        throw error;
+    }
+}
+
+// Restore registration from cancelled collection
+async function restoreFromCancelled(uniqueId) {
+    if (!window.firebase || !firebase.firestore) {
+        throw new Error('Firebase not initialized');
+    }
+    
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        throw new Error('Not authenticated');
+    }
+    
+    const isAdminUser = await isAdmin(user);
+    if (!isAdminUser) {
+        throw new Error('Permission denied. Only admins can restore registrations.');
+    }
+    
+    const db = firebase.firestore();
+    
+    try {
+        // Get the cancelled registration document
+        const cancelledDoc = await db.collection('cancelledRegistrations').doc(uniqueId).get();
+        if (!cancelledDoc.exists) {
+            throw new Error(`Cancelled registration ${uniqueId} not found`);
+        }
+        
+        const regData = cancelledDoc.data();
+        
+        // Remove cancellation-specific fields
+        const { cancelledAt, cancelledBy, cancelledByName, cancellationReason, migratedAt, originalCollection, originalStatus, ...cleanData } = regData;
+        
+        // Copy to registrations
+        await db.collection('registrations').doc(uniqueId).set({
+            ...cleanData,
+            status: 'Approved',
+            restoredAt: firebase.firestore.FieldValue.serverTimestamp(),
+            restoredBy: user.uid,
+            restoredByName: (await getUserData(user))?.name || user.email || 'Unknown'
+        });
+        
+        // Delete from cancelledRegistrations
+        await db.collection('cancelledRegistrations').doc(uniqueId).delete();
+        
+        // Update emailToUids mapping - add this UID back
+        const email = regData.email || '';
+        if (email) {
+            const normalizedEmail = email.toLowerCase().trim();
+            const emailToUidsDoc = await db.collection('emailToUids').doc(normalizedEmail).get();
+            if (emailToUidsDoc.exists) {
+                const emailData = emailToUidsDoc.data();
+                const uids = emailData.uids || [];
+                if (!uids.includes(uniqueId)) {
+                    uids.push(uniqueId);
+                    await db.collection('emailToUids').doc(normalizedEmail).update({
+                        uids: uids,
+                        count: uids.length,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            } else {
+                // Create new emailToUids document
+                await db.collection('emailToUids').doc(normalizedEmail).set({
+                    email: normalizedEmail,
+                    uids: [uniqueId],
+                    count: 1,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+        }
+        
+        return { success: true, uniqueId };
+    } catch (error) {
+        console.error('Error restoring from cancelled:', error);
+        throw error;
     }
 }
 
@@ -4428,10 +4593,10 @@ async function createNewUser(name, email, uniqueId, role) {
             createdBy: currentUser.uid
         });
         
-        // Also create a registration record for volunteers/admins
+        // Create a record in nonShibirarthiUsers collection for volunteers/admins
         // This allows them to have profile information like shibirarthi
         const normalizedId = trimmedUniqueId.toLowerCase().replace(/[/-]/g, '');
-        await db.collection('registrations').doc(trimmedUniqueId).set({
+        await db.collection('nonShibirarthiUsers').doc(trimmedUniqueId).set({
             uniqueId: trimmedUniqueId,
             normalizedId: normalizedId,
             name: trimmedName,
@@ -4839,11 +5004,7 @@ async function searchParticipantByEmail() {
             const registrationDocs = await Promise.all(registrationPromises);
             registrationDocs.forEach(doc => {
                 if (doc) {
-                    const data = doc.data();
-                    // Only include registrations with status "Approved"
-                    if (data.status === 'Approved') {
-                        results.push(doc);
-                    }
+                    results.push(doc);
                 }
             });
         } else {
@@ -4881,11 +5042,7 @@ async function searchParticipantByEmail() {
             const registrationDocs = await Promise.all(registrationPromises);
             registrationDocs.forEach(doc => {
                 if (doc) {
-                    const data = doc.data();
-                    // Only include registrations with status "Approved"
-                    if (data.status === 'Approved') {
-                        results.push(doc);
-                    }
+                    results.push(doc);
                 }
             });
         }
@@ -4960,14 +5117,15 @@ async function selectParticipantFromLookup(uniqueId) {
         
         if (regDoc.exists) {
             const regData = regDoc.data();
-            // Only show if status is "Approved"
-            if (regData.status !== 'Approved') {
-                showNotification('Participant not found or not approved', 'error');
-                return;
-            }
             displayParticipantLookupResults(regData, uniqueId);
         } else {
-            showNotification('Participant not found', 'error');
+            // Check if it's in cancelled collection
+            const cancelledDoc = await db.collection('cancelledRegistrations').doc(uniqueId).get();
+            if (cancelledDoc.exists) {
+                displayParticipantLookupResults(cancelledDoc.data(), uniqueId);
+            } else {
+                showNotification('Participant not found', 'error');
+            }
         }
     } catch (error) {
         console.error('Error loading participant:', error);
@@ -5003,6 +5161,55 @@ function displayParticipantLookupResults(regData, uniqueId) {
     if (editBtn) editBtn.style.display = 'inline-block';
     if (saveBtn) saveBtn.style.display = 'none';
     if (cancelBtn) cancelBtn.style.display = 'none';
+    
+    // Check if user is admin to show status management buttons
+    const user = firebase.auth().currentUser;
+    if (user) {
+        isAdmin(user).then(isAdminUser => {
+            if (isAdminUser) {
+                const statusBtnContainer = document.getElementById('statusManagementButtons');
+                if (statusBtnContainer) {
+                    // Check if registration exists in cancelled collection
+                    const db = firebase.firestore();
+                    db.collection('cancelledRegistrations').doc(uniqueId).get().then(cancelledDoc => {
+                        if (cancelledDoc.exists) {
+                            // Show restore button
+                            statusBtnContainer.innerHTML = `
+                                <div style="margin: 1rem 0; padding: 1rem; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #856404;">⚠️ This registration is cancelled</h4>
+                                    <button class="btn btn-info" onclick="handleRestoreRegistration('${uniqueId}')">
+                                        Restore to Active
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            // Show cancel button
+                            statusBtnContainer.innerHTML = `
+                                <div style="margin: 1rem 0; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
+                                    <h4 style="margin: 0 0 0.5rem 0;">Status Management</h4>
+                                    <button class="btn btn-warning" onclick="handleCancelRegistration('${uniqueId}')">
+                                        Cancel Registration
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    }).catch(() => {
+                        // On error, assume active and show cancel button
+                        if (statusBtnContainer) {
+                            statusBtnContainer.innerHTML = `
+                                <div style="margin: 1rem 0; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
+                                    <h4 style="margin: 0 0 0.5rem 0;">Status Management</h4>
+                                    <button class="btn btn-warning" onclick="handleCancelRegistration('${uniqueId}')">
+                                        Cancel Registration
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    });
+                }
+            }
+        }).catch(() => {});
+    }
     
     // Display all fields
     let html = '<div class="participant-fields-display">';
@@ -5091,6 +5298,67 @@ function enableParticipantEditMode() {
 function cancelParticipantEditMode() {
     if (!currentParticipantData || !currentParticipantUniqueId) return;
     displayParticipantLookupResults(currentParticipantData, currentParticipantUniqueId);
+}
+
+// Handle cancel registration
+async function handleCancelRegistration(uniqueId) {
+    if (!uniqueId) {
+        showNotification('Invalid registration ID', 'error');
+        return;
+    }
+    
+    const reason = prompt('Please provide a reason for cancellation (optional):');
+    if (reason === null) {
+        return; // User cancelled
+    }
+    
+    try {
+        showNotification('Cancelling registration...', 'info');
+        await moveToCancelled(uniqueId, reason || '');
+        showNotification('Registration cancelled successfully', 'success');
+        
+        // Refresh the display
+        const db = firebase.firestore();
+        const cancelledDoc = await db.collection('cancelledRegistrations').doc(uniqueId).get();
+        if (cancelledDoc.exists) {
+            displayParticipantLookupResults(cancelledDoc.data(), uniqueId);
+        } else {
+            showNotification('Error: Could not find cancelled registration', 'error');
+        }
+    } catch (error) {
+        console.error('Error cancelling registration:', error);
+        showNotification('Error cancelling registration: ' + error.message, 'error');
+    }
+}
+
+// Handle restore registration
+async function handleRestoreRegistration(uniqueId) {
+    if (!uniqueId) {
+        showNotification('Invalid registration ID', 'error');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to restore this registration to active status?')) {
+        return;
+    }
+    
+    try {
+        showNotification('Restoring registration...', 'info');
+        await restoreFromCancelled(uniqueId);
+        showNotification('Registration restored successfully', 'success');
+        
+        // Refresh the display
+        const db = firebase.firestore();
+        const regDoc = await db.collection('registrations').doc(uniqueId).get();
+        if (regDoc.exists) {
+            displayParticipantLookupResults(regDoc.data(), uniqueId);
+        } else {
+            showNotification('Error: Could not find restored registration', 'error');
+        }
+    } catch (error) {
+        console.error('Error restoring registration:', error);
+        showNotification('Error restoring registration: ' + error.message, 'error');
+    }
 }
 
 // Field name mapping from old format to normalized format (for Firestore compatibility)
@@ -5764,6 +6032,391 @@ function displayAdminStatistics(stats, registrations) {
     // Store stats globally for gender slicing
     window.dashboardStats = stats;
     window.dashboardRegistrations = registrations;
+    window.dashboardUsers = users;
+    
+    // Initialize dashboard tables with filters
+    updateDashboardWithFilter();
+}
+
+// Update dashboard based on status filter
+async function updateDashboardWithFilter() {
+    const filterValue = document.getElementById('dashboardStatusFilter')?.value || 'registered';
+    const registrations = window.dashboardRegistrations || [];
+    const users = window.dashboardUsers || [];
+    
+    // Get filtered registrations based on status
+    let filteredRegistrations = [];
+    
+    if (filterValue === 'registered') {
+        filteredRegistrations = registrations;
+    } else if (filterValue === 'logged') {
+        // Get uniqueIds that have user accounts
+        const userUniqueIds = new Set();
+        users.forEach(user => {
+            if (user.uniqueId) {
+                userUniqueIds.add(user.uniqueId);
+            }
+            // Also check associated registrations
+            if (user.associatedRegistrations) {
+                user.associatedRegistrations.forEach(reg => {
+                    if (reg.uniqueId) {
+                        userUniqueIds.add(reg.uniqueId);
+                    }
+                });
+            }
+        });
+        filteredRegistrations = registrations.filter(reg => userUniqueIds.has(reg.uniqueId));
+    } else if (filterValue === 'checkedin') {
+        // Get uniqueIds that have registration checkin
+        const db = firebase.firestore();
+        const checkinSnapshot = await db.collection('checkins')
+            .where('checkinType', '==', 'registration')
+            .get();
+        const checkedInIds = new Set();
+        checkinSnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.uniqueId) {
+                checkedInIds.add(data.uniqueId);
+            }
+        });
+        filteredRegistrations = registrations.filter(reg => checkedInIds.has(reg.uniqueId));
+    }
+    
+    // Recalculate stats with filtered data
+    const filteredStats = calculateStatistics(filteredRegistrations, users);
+    displayAdminStatistics(filteredStats, filteredRegistrations);
+    
+    // Update specific tables
+    updateShreniGenderTable();
+    updateZoneStatsTable();
+    updateZoneShreniTable();
+}
+
+// Update Shreni Gender table with filter
+async function updateShreniGenderTable() {
+    const filterValue = document.getElementById('shreniGenderFilter')?.value || 'registered';
+    const registrations = await getFilteredRegistrations(filterValue);
+    
+    const shreniGenderMap = {};
+    const shrenis = ['Karyakarta', 'Swakeeya', 'Yuva', 'Kishor', 'Baal'];
+    
+    registrations.forEach(reg => {
+        const shreni = reg.shreni || reg.Shreni || '';
+        const gender = reg.gender || reg.Gender || '';
+        
+        if (shrenis.includes(shreni)) {
+            if (!shreniGenderMap[shreni]) {
+                shreniGenderMap[shreni] = { Female: 0, Male: 0, Total: 0 };
+            }
+            if (gender.toLowerCase() === 'female') {
+                shreniGenderMap[shreni].Female++;
+            } else if (gender.toLowerCase() === 'male') {
+                shreniGenderMap[shreni].Male++;
+            }
+            shreniGenderMap[shreni].Total++;
+        }
+    });
+    
+    const total = registrations.filter(r => shrenis.includes(r.shreni || r.Shreni || '')).length;
+    
+    let html = '';
+    let grandTotalFemale = 0;
+    let grandTotalMale = 0;
+    
+    shrenis.forEach(shreni => {
+        const counts = shreniGenderMap[shreni] || { Female: 0, Male: 0, Total: 0 };
+        grandTotalFemale += counts.Female;
+        grandTotalMale += counts.Male;
+        const percentage = total > 0 ? ((counts.Total / total) * 100).toFixed(0) : 0;
+        html += `
+            <tr>
+                <td>${escapeHtml(shreni)}</td>
+                <td>${counts.Female}</td>
+                <td>${counts.Male}</td>
+                <td>${counts.Total}</td>
+                <td>${percentage}%</td>
+            </tr>
+        `;
+    });
+    
+    // Add totals row
+    const grandTotal = grandTotalFemale + grandTotalMale;
+    html += `
+        <tr style="font-weight: bold; background: #f0f0f0;">
+            <td>Total</td>
+            <td>${grandTotalFemale}</td>
+            <td>${grandTotalMale}</td>
+            <td>${grandTotal}</td>
+            <td>100%</td>
+        </tr>
+    `;
+    
+    // Add Volunteer and Others rows (if any)
+    const volunteerRegs = registrations.filter(r => (r.shreni || r.Shreni || '').toLowerCase() === 'volunteer');
+    if (volunteerRegs.length > 0) {
+        const volunteerFemale = volunteerRegs.filter(r => (r.gender || '').toLowerCase() === 'female').length;
+        const volunteerMale = volunteerRegs.filter(r => (r.gender || '').toLowerCase() === 'male').length;
+        html += `
+            <tr>
+                <td>Volunteer</td>
+                <td>${volunteerFemale}</td>
+                <td>${volunteerMale}</td>
+                <td>${volunteerRegs.length}</td>
+                <td>0%</td>
+            </tr>
+        `;
+    }
+    
+    document.getElementById('shreniGenderTableBody').innerHTML = html;
+}
+
+// Update Zone Statistics table
+async function updateZoneStatsTable() {
+    const filterValue = document.getElementById('zoneStatsFilter')?.value || 'registered';
+    const registrations = await getFilteredRegistrations(filterValue);
+    const users = window.dashboardUsers || [];
+    
+    const zones = ['SE Asia', 'AR', 'Americas', 'Europe', 'Africa', 'Australasia', 'Unknown'];
+    const zoneMap = {
+        'AS': 'SE Asia',
+        'AR': 'AR',
+        'AM': 'Americas',
+        'EU': 'Europe',
+        'AF': 'Africa',
+        'AU': 'Australasia'
+    };
+    
+    const stats = {};
+    
+    // Get logged in uniqueIds
+    const userUniqueIds = new Set();
+    users.forEach(user => {
+        if (user.uniqueId) userUniqueIds.add(user.uniqueId);
+        if (user.associatedRegistrations) {
+            user.associatedRegistrations.forEach(reg => {
+                if (reg.uniqueId) userUniqueIds.add(reg.uniqueId);
+            });
+        }
+    });
+    
+    // Get checked in uniqueIds
+    const db = firebase.firestore();
+    const checkinSnapshot = await db.collection('checkins')
+        .where('checkinType', '==', 'registration')
+        .get();
+    const checkedInIds = new Set();
+    checkinSnapshot.forEach(doc => {
+        if (doc.data().uniqueId) checkedInIds.add(doc.data().uniqueId);
+    });
+    
+    registrations.forEach(reg => {
+        const zone = zoneMap[reg.zone] || reg.zone || 'Unknown';
+        if (!stats[zone]) {
+            stats[zone] = { registered: 0, logged: 0, checkedin: 0 };
+        }
+        stats[zone].registered++;
+        if (userUniqueIds.has(reg.uniqueId)) {
+            stats[zone].logged++;
+        }
+        if (checkedInIds.has(reg.uniqueId)) {
+            stats[zone].checkedin++;
+        }
+    });
+    
+    let html = '';
+    zones.forEach(zone => {
+        const s = stats[zone] || { registered: 0, logged: 0, checkedin: 0 };
+        html += `
+            <tr>
+                <td>${escapeHtml(zone)}</td>
+                <td>${s.registered}</td>
+                <td>${s.logged}</td>
+                <td>${s.checkedin}</td>
+            </tr>
+        `;
+    });
+    
+    // Add totals
+    const totalRegistered = Object.values(stats).reduce((sum, s) => sum + s.registered, 0);
+    const totalLogged = Object.values(stats).reduce((sum, s) => sum + s.logged, 0);
+    const totalCheckedIn = Object.values(stats).reduce((sum, s) => sum + s.checkedin, 0);
+    const pctLogged = totalRegistered > 0 ? Math.round((totalLogged / totalRegistered) * 100) : 0;
+    const pctCheckedIn = totalRegistered > 0 ? Math.round((totalCheckedIn / totalRegistered) * 100) : 0;
+    
+    html += `
+        <tr style="font-weight: bold; background: #f0f0f0;">
+            <td>Total</td>
+            <td>${totalRegistered}</td>
+            <td>${totalLogged}</td>
+            <td>${totalCheckedIn}</td>
+        </tr>
+        <tr style="font-weight: bold;">
+            <td>% to Registered</td>
+            <td></td>
+            <td>${pctLogged}%</td>
+            <td>${pctCheckedIn}%</td>
+        </tr>
+    `;
+    
+    document.getElementById('zoneStatsTableBody').innerHTML = html;
+}
+
+// Update Zone Shreni table
+async function updateZoneShreniTable() {
+    const filterValue = document.getElementById('zoneShreniTableFilter')?.value || 'registered';
+    const registrations = await getFilteredRegistrations(filterValue);
+    
+    const zoneMap = {
+        'AS': 'SE Asia',
+        'AR': 'AR',
+        'AM': 'Americas',
+        'EU': 'Europe',
+        'AF': 'Africa',
+        'AU': 'Australasia'
+    };
+    const zones = ['Americas', 'Europe', 'AR', 'Africa', 'SE Asia', 'Australasia', 'Others'];
+    const shrenis = ['Karyakarta', 'Swakeeya', 'Yuva', 'Kishor', 'Baal'];
+    
+    const matrix = {};
+    zones.forEach(zone => {
+        matrix[zone] = {};
+        shrenis.forEach(shreni => {
+            matrix[zone][shreni] = 0;
+        });
+    });
+    
+    registrations.forEach(reg => {
+        const zone = zoneMap[reg.zone] || reg.zone || 'Others';
+        const shreni = reg.shreni || reg.Shreni || '';
+        if (shrenis.includes(shreni) && zones.includes(zone)) {
+            matrix[zone][shreni]++;
+        }
+    });
+    
+    let html = '';
+    zones.forEach(zone => {
+        html += '<tr><td>' + escapeHtml(zone) + '</td>';
+        shrenis.forEach(shreni => {
+            html += '<td>' + matrix[zone][shreni] + '</td>';
+        });
+        html += '</tr>';
+    });
+    
+    // Add totals row
+    html += '<tr style="font-weight: bold; background: #f0f0f0;"><td>Total</td>';
+    shrenis.forEach(shreni => {
+        const total = zones.reduce((sum, zone) => sum + (matrix[zone][shreni] || 0), 0);
+        html += '<td>' + total + '</td>';
+    });
+    html += '</tr>';
+    
+    document.getElementById('zoneShreniTableTableBody').innerHTML = html;
+}
+
+// Helper function to get filtered registrations
+async function getFilteredRegistrations(filterValue) {
+    const registrations = window.dashboardRegistrations || [];
+    const users = window.dashboardUsers || [];
+    
+    if (filterValue === 'registered') {
+        return registrations;
+    } else if (filterValue === 'logged') {
+        const userUniqueIds = new Set();
+        users.forEach(user => {
+            if (user.uniqueId) userUniqueIds.add(user.uniqueId);
+            if (user.associatedRegistrations) {
+                user.associatedRegistrations.forEach(reg => {
+                    if (reg.uniqueId) userUniqueIds.add(reg.uniqueId);
+                });
+            }
+        });
+        return registrations.filter(reg => userUniqueIds.has(reg.uniqueId));
+    } else if (filterValue === 'checkedin') {
+        const db = firebase.firestore();
+        const checkinSnapshot = await db.collection('checkins')
+            .where('checkinType', '==', 'registration')
+            .get();
+        const checkedInIds = new Set();
+        checkinSnapshot.forEach(doc => {
+            if (doc.data().uniqueId) checkedInIds.add(doc.data().uniqueId);
+        });
+        return registrations.filter(reg => checkedInIds.has(reg.uniqueId));
+    }
+    return registrations;
+}
+
+// Export Travel Team Data
+async function exportTravelTeamData() {
+    const registrations = window.dashboardRegistrations || [];
+    
+    const headers = ['Praveshika ID', 'Name', 'Email', 'Phone', 'Pickup Location', 'Arrival Date', 'Arrival Time', 
+                     'Flight/Train Number', 'Dropoff Location', 'Departure Date', 'Departure Time', 'Departure Flight/Train Number'];
+    
+    const rows = registrations.map(reg => {
+        return [
+            reg.uniqueId || '',
+            reg.name || reg['Full Name'] || '',
+            reg.email || reg['Email address'] || '',
+            reg.phone || '',
+            reg.normalizedPickupLocation || reg.arrivalPlace || reg['Place of Arrival'] || '',
+            reg.arrivalDate || reg['Date of Arrival'] || '',
+            reg.arrivalTime || reg['Time of Arrival'] || '',
+            reg.arrivalFlightTrain || reg['Arrival Flight/Train Number'] || '',
+            reg.departurePlace || reg['Place of Departure Train/Flight'] || '',
+            reg.departureDate || reg['Date of Departure Train/Flight'] || '',
+            reg.departureTime || reg['Time of Departure Train/Flight'] || '',
+            reg.departureFlightTrain || reg['Departure Flight/Train Number'] || ''
+        ];
+    });
+    
+    exportToCSV('travel_team_data.csv', headers, rows);
+}
+
+// Export Post Tour Team Data
+async function exportPostTourTeamData() {
+    const registrations = window.dashboardRegistrations || [];
+    
+    const headers = ['Praveshika ID', 'Name', 'Email', 'Phone', 'Post Tour Selection', 'Accommodation'];
+    
+    const rows = registrations.map(reg => {
+        return [
+            reg.uniqueId || '',
+            reg.name || reg['Full Name'] || '',
+            reg.email || reg['Email address'] || '',
+            reg.phone || '',
+            reg.postShibirTour || reg['Post Shibir Tour'] || 'None',
+            reg.accommodation || ''
+        ];
+    });
+    
+    exportToCSV('post_tour_team_data.csv', headers, rows);
+}
+
+// Helper function to export to CSV
+function exportToCSV(filename, headers, rows) {
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => {
+            const str = String(cell || '');
+            // Escape quotes and wrap in quotes if contains comma or quote
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        }).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showNotification(`Exported ${rows.length} records to ${filename}`, 'success');
 }
 
 // Display email corrections for late and updated registrations
@@ -7673,15 +8326,9 @@ function updateCheckinFormForType() {
         if (shulkPaymentCash) {
             if (isShulkPaid) {
                 shulkPaymentCash.setAttribute('required', 'required');
+                shulkPaymentCash.checked = true; // Set cash as default
             } else {
                 shulkPaymentCash.removeAttribute('required');
-            }
-        }
-        if (shulkPaymentDigital) {
-            if (isShulkPaid) {
-                shulkPaymentDigital.setAttribute('required', 'required');
-            } else {
-                shulkPaymentDigital.removeAttribute('required');
             }
         }
     }
@@ -7904,11 +8551,7 @@ async function advancedSearch() {
             const registrationDocs = await Promise.all(registrationPromises);
             registrationDocs.forEach(doc => {
                 if (doc) {
-                    const data = doc.data();
-                    // Only include registrations with status "Approved"
-                    if (data.status === 'Approved') {
-                        results.push(doc);
-                    }
+                    results.push(doc);
                 }
             });
         } else if (name) {
@@ -8272,7 +8915,7 @@ async function performCheckin() {
             if (paymentMethod) {
                 checkinData.paymentMethod = paymentMethod;
             } else {
-                showNotification('Please select a payment method (Cash or Digital)', 'error');
+                showNotification('Please select a payment method (Cash)', 'error');
                 return;
             }
         }
@@ -8320,9 +8963,11 @@ function clearCheckinForm() {
     if (itemCount) itemCount.value = '';
     if (tagId) tagId.value = '';
     
-    // Clear radio buttons
-    const paymentRadios = document.querySelectorAll('input[name="shulkPaymentMethod"]');
-    paymentRadios.forEach(radio => radio.checked = false);
+    // Clear radio buttons (but set cash as default)
+    const paymentCash = document.getElementById('shulkPaymentCash');
+    if (paymentCash) {
+        paymentCash.checked = true;
+    }
 }
 
 // Perform Cloak Room checkout
