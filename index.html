@@ -2116,8 +2116,6 @@
                         <div class="checkin-type-tabs">
                             <button class="checkin-type-tab active" data-checkin-type="pickup_location" onclick="switchCheckinType('pickup_location')">Pickup Location</button>
                             <button class="checkin-type-tab" data-checkin-type="registration" onclick="switchCheckinType('registration')">Registration</button>
-                            <button class="checkin-type-tab" data-checkin-type="shulk_paid" onclick="switchCheckinType('shulk_paid')">Shulk Paid</button>
-                            <button class="checkin-type-tab" data-checkin-type="kit_collected" onclick="switchCheckinType('kit_collected')">Kit Collected</button>
                             <button class="checkin-type-tab" data-checkin-type="ganvesh_collected" onclick="switchCheckinType('ganvesh_collected')">Ganvesh Collected</button>
                             <button class="checkin-type-tab" data-checkin-type="cloak_room" onclick="switchCheckinType('cloak_room')">Cloak Room</button>
                             <button class="checkin-type-tab" data-checkin-type="post_tour" onclick="switchCheckinType('post_tour')">Post Tour</button>
@@ -2199,12 +2197,20 @@
                                         <label for="checkinPickupLocation">Pickup Location:</label>
                                         <input type="text" id="checkinPickupLocation" class="form-input" placeholder="Enter pickup location">
                                     </div>
-                                    <div class="form-group" id="shulkPaidFields" style="display: none;">
-                                        <label>Payment Method: <span class="required">*</span></label>
-                                        <div style="display: flex; gap: 2rem; margin-top: 0.5rem;">
-                                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                                <input type="radio" name="shulkPaymentMethod" value="Cash" id="shulkPaymentCash" checked>
-                                                <span>Cash</span>
+                                    <div class="form-group" id="registrationOptionsGroup" style="display: none;">
+                                        <label>Actions:</label>
+                                        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <input type="checkbox" id="registrationCheck" checked>
+                                                <span>Registration</span>
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <input type="checkbox" id="shulkPaidCheck">
+                                                <span>Shulk Paid</span>
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <input type="checkbox" id="kitCollectedCheck">
+                                                <span>Kit Collected</span>
                                             </label>
                                         </div>
                                     </div>
