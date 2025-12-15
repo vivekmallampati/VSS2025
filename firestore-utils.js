@@ -1409,7 +1409,7 @@ async function normalizeDates() {
                 if (result.success) {
                     if (result.normalized && result.normalized !== arrivalDate) {
                         updates.arrivalDate = result.normalized;
-                        updates['Date of Arrival'] = result.normalized;
+                        // Only update camelCase field - skip old field names with invalid characters
                         hasUpdates = true;
                     }
                 } else {
@@ -1425,7 +1425,7 @@ async function normalizeDates() {
                 if (result.success) {
                     if (result.normalized && result.normalized !== departureDate) {
                         updates.departureDate = result.normalized;
-                        updates['Date of Departure Train/Flight'] = result.normalized;
+                        // Only update camelCase field - skip old field names with invalid characters (like "/")
                         hasUpdates = true;
                     }
                 } else {
