@@ -2014,6 +2014,34 @@
                                         </select>
                                     </div>
                                 </div>
+                                <div class="form-group" style="margin-bottom: 1rem;">
+                                    <label>Volunteer Teams (for volunteers):</label>
+                                    <p style="font-size: 0.85rem; color: #666; margin-bottom: 0.5rem;">
+                                        Select one or more teams this volunteer can perform check-ins for.
+                                    </p>
+                                    <div id="newUserTeams" style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                                        <label style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                            <input type="checkbox" value="transportation" class="volunteer-team-checkbox">
+                                            <span>Pickup Location</span>
+                                        </label>
+                                        <label style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                            <input type="checkbox" value="registration" class="volunteer-team-checkbox">
+                                            <span>Registration</span>
+                                        </label>
+                                        <label style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                            <input type="checkbox" value="ganvesh_collected" class="volunteer-team-checkbox">
+                                            <span>Ganvesh Collected</span>
+                                        </label>
+                                        <label style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                            <input type="checkbox" value="cloak_room" class="volunteer-team-checkbox">
+                                            <span>Cloak Room</span>
+                                        </label>
+                                        <label style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                            <input type="checkbox" value="post_tour" class="volunteer-team-checkbox">
+                                            <span>Post Tour</span>
+                                        </label>
+                                    </div>
+                                </div>
                                 <button type="submit" class="btn btn-primary">Create User</button>
                             </form>
                             <div id="userCreationMessage" class="user-creation-message" style="display: none; margin-top: 1rem;"></div>

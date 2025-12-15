@@ -125,9 +125,24 @@ async function hasAccessToCheckinType(user, checkinType) {
     const isAdminUser = await isAdmin(user);
     if (isAdminUser) return true;
     
-    // Volunteers: allow all checkin types (remove team restriction for now)
+    // Volunteers: restrict by assigned teams matching Firestore rules
     const isVolunteerUser = await isVolunteer(user);
-    if (isVolunteerUser) return true;
+    if (!isVolunteerUser) return false;
+    
+    const teams = await getVolunteerTeams(user);
+    if (!Array.isArray(teams) || teams.length === 0) return false;
+    
+    const teamMap = {
+        'pickup_location': 'transportation',
+        'registration': 'registration',
+        'ganvesh_collected': 'ganvesh_collected',
+        'cloak_room': 'cloak_room',
+        'post_tour': 'post_tour'
+    };
+    const requiredTeam = teamMap[checkinType];
+    if (!requiredTeam) return false;
+    
+    return teams.includes(requiredTeam);
     
     // Default deny
     return false;
@@ -146,7 +161,10 @@ function canAccessProtectedTab(tabName) {
             return false;
         }
         
-        // Check if the nav item is visible (additional check)
+        // Volunteers: only CheckIn tab is considered accessible
+        // (UI already hides other tabs, but this is an extra guard)
+        // We can't await here, so we rely on nav visibility as an additional check.
+        
         const navItemId = tabName === 'shibirarthi' ? 'shibirarthiNavItem' : 
                          tabName === 'shibir-resources' ? 'shibirResourcesNavItem' :
                          tabName + 'NavItem';
@@ -1580,6 +1598,7 @@ async function handleAuthStateChange(user) {
         const isAdminUser = await isAdmin(user);
         const canPerformCheckinUser = await canPerformCheckin(user);
         const canViewDashboardUser = await canViewDashboard(user);
+        const isVolunteerUser = await isVolunteer(user);
         
         // User is logged in
         if (loginBtn) {
@@ -1599,71 +1618,96 @@ async function handleAuthStateChange(user) {
             };
         }
         
-        // Hide public tabs (Home, About, Media) when logged in
-        if (homeNavItem) {
-            homeNavItem.style.display = 'none';
-        }
-        if (aboutNavItem) {
-            aboutNavItem.style.display = 'none';
-        }
-        if (mediaNavItem) {
-            mediaNavItem.style.display = 'none';
-        }
-        
-        // Show appropriate tabs based on user role
-        // Show protected tabs for all authenticated users
-        if (shibirarthiNavItem) {
-            shibirarthiNavItem.style.display = '';
-        }
-        if (shibirResourcesNavItem) {
-            shibirResourcesNavItem.style.display = '';
-        }
-        if (myProfileNavItem) {
-            myProfileNavItem.style.display = '';
-            loadUserProfile(user);
-        }
-        if (myTransportationNavItem) {
-            myTransportationNavItem.style.display = '';
-            loadTransportationInfo(user);
-        }
-        if (myToursNavItem) {
-            myToursNavItem.style.display = '';
-            loadToursInfo(user);
-        }
-        
-        // Show checkin tab for superadmin, admin, or volunteers
-        if (checkinNavItem) {
-            if (canPerformCheckinUser) {
+        if (isVolunteerUser && !isAdminUser && !isSuperadminUser) {
+            // Volunteers: CheckIn-only experience (plus logout)
+            if (homeNavItem) homeNavItem.style.display = 'none';
+            if (aboutNavItem) homeNavItem.style.display = 'none';
+            if (mediaNavItem) mediaNavItem.style.display = 'none';
+            if (shibirarthiNavItem) shibirarthiNavItem.style.display = 'none';
+            if (shibirResourcesNavItem) shibirResourcesNavItem.style.display = 'none';
+            if (myProfileNavItem) myProfileNavItem.style.display = 'none';
+            if (myTransportationNavItem) myTransportationNavItem.style.display = 'none';
+            if (myToursNavItem) myToursNavItem.style.display = 'none';
+            if (adminDashboardNavItem) adminDashboardNavItem.style.display = 'none';
+            if (userManagementNavItem) userManagementNavItem.style.display = 'none';
+            if (participantLookupNavItem) participantLookupNavItem.style.display = 'none';
+            
+            if (checkinNavItem && canPerformCheckinUser) {
                 checkinNavItem.style.display = '';
-            } else {
+            } else if (checkinNavItem) {
                 checkinNavItem.style.display = 'none';
             }
-        }
-        
-        // Show admin dashboard for both superadmins and admins
-        if (adminDashboardNavItem) {
-            if (isAdminUser) {
-                adminDashboardNavItem.style.display = '';
-            } else {
-                adminDashboardNavItem.style.display = 'none';
+            
+            // Force navigation to CheckIn tab
+            window.history.pushState(null, null, '#checkin');
+            activateTab('checkin', true);
+        } else {
+            // Admins / superadmins / regular authenticated users
+            // Hide public tabs (Home, About, Media) when logged in
+            if (homeNavItem) {
+                homeNavItem.style.display = 'none';
             }
-        }
-        
-        // Show user management only for superadmins
-        if (userManagementNavItem) {
-            if (isSuperadminUser) {
-                userManagementNavItem.style.display = '';
-            } else {
-                userManagementNavItem.style.display = 'none';
+            if (aboutNavItem) {
+                aboutNavItem.style.display = 'none';
             }
-        }
-        
-        // Show participant lookup for both superadmins and admins
-        if (participantLookupNavItem) {
-            if (isAdminUser) {
-                participantLookupNavItem.style.display = '';
-            } else {
-                participantLookupNavItem.style.display = 'none';
+            if (mediaNavItem) {
+                mediaNavItem.style.display = 'none';
+            }
+            
+            // Show protected tabs for all authenticated shibirarthis/admins
+            if (shibirarthiNavItem) {
+                shibirarthiNavItem.style.display = '';
+            }
+            if (shibirResourcesNavItem) {
+                shibirResourcesNavItem.style.display = '';
+            }
+            if (myProfileNavItem) {
+                myProfileNavItem.style.display = '';
+                loadUserProfile(user);
+            }
+            if (myTransportationNavItem) {
+                myTransportationNavItem.style.display = '';
+                loadTransportationInfo(user);
+            }
+            if (myToursNavItem) {
+                myToursNavItem.style.display = '';
+                loadToursInfo(user);
+            }
+            
+            // Show checkin tab for superadmin, admin, or volunteers
+            if (checkinNavItem) {
+                if (canPerformCheckinUser) {
+                    checkinNavItem.style.display = '';
+                } else {
+                    checkinNavItem.style.display = 'none';
+                }
+            }
+            
+            // Show admin dashboard for both superadmins and admins
+            if (adminDashboardNavItem) {
+                if (isAdminUser) {
+                    adminDashboardNavItem.style.display = '';
+                } else {
+                    adminDashboardNavItem.style.display = 'none';
+                }
+            }
+            
+            // Show user management only for superadmins
+            if (userManagementNavItem) {
+                if (isSuperadminUser) {
+                    userManagementNavItem.style.display = '';
+                } else {
+                    userManagementNavItem.style.display = 'none';
+                }
+            }
+            
+            // Show participant lookup for both superadmins and admins
+            if (participantLookupNavItem) {
+                if (isAdminUser) {
+                    participantLookupNavItem.style.display = '';
+                } else {
+                    participantLookupNavItem.style.display = 'none';
+                }
             }
         }
     } else {
@@ -4383,22 +4427,32 @@ async function moveToCancelled(uniqueId, reason = '') {
         await db.collection('registrations').doc(uniqueId).delete();
         
         // Update emailToUids mapping - remove this UID
+        // NOTE: This is best-effort and may be blocked by security rules;
+        // in that case we log a warning but do NOT fail the cancellation.
         const email = regData.email || '';
         if (email) {
-            const normalizedEmail = email.toLowerCase().trim();
-            const emailToUidsDoc = await db.collection('emailToUids').doc(normalizedEmail).get();
-            if (emailToUidsDoc.exists) {
-                const emailData = emailToUidsDoc.data();
-                const uids = (emailData.uids || []).filter(uid => uid !== uniqueId);
-                if (uids.length > 0) {
-                    await db.collection('emailToUids').doc(normalizedEmail).update({
-                        uids: uids,
-                        count: uids.length,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+            try {
+                const normalizedEmail = email.toLowerCase().trim();
+                const emailToUidsDoc = await db.collection('emailToUids').doc(normalizedEmail).get();
+                if (emailToUidsDoc.exists) {
+                    const emailData = emailToUidsDoc.data();
+                    const uids = (emailData.uids || []).filter(uid => uid !== uniqueId);
+                    if (uids.length > 0) {
+                        await db.collection('emailToUids').doc(normalizedEmail).update({
+                            uids: uids,
+                            count: uids.length,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else {
+                        // Remove the emailToUids document if no UIDs remain
+                        await db.collection('emailToUids').doc(normalizedEmail).delete();
+                    }
+                }
+            } catch (e) {
+                if (e.code === 'permission-denied') {
+                    console.warn('Skipping emailToUids cleanup due to security rules; will rely on backend sync scripts.', e);
                 } else {
-                    // Remove the emailToUids document if no UIDs remain
-                    await db.collection('emailToUids').doc(normalizedEmail).delete();
+                    throw e;
                 }
             }
         }
@@ -4511,7 +4565,7 @@ function generateSecurePassword(length = 12) {
 }
 
 // Create a new user (volunteer or admin)
-async function createNewUser(name, email, uniqueId, role) {
+async function createNewUser(name, email, uniqueId, role, volunteerTeams = []) {
     if (!window.firebase || !firebase.auth || !firebase.firestore) {
         throw new Error('Firebase not initialized');
     }
@@ -4573,6 +4627,7 @@ async function createNewUser(name, email, uniqueId, role) {
             name: trimmedName,
             uniqueId: trimmedUniqueId,
             role: role,
+            volunteerTeams: role === 'volunteer' ? volunteerTeams : [],
             country: 'Bharat',
             shreni: 'Volunteer',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -4592,6 +4647,7 @@ async function createNewUser(name, email, uniqueId, role) {
             shreni: 'Volunteer',
             Shreni: 'Volunteer',
             role: role,
+            volunteerTeams: role === 'volunteer' ? volunteerTeams : [],
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             createdBy: currentUser.uid
         });
@@ -4756,7 +4812,12 @@ function displayUserManagementUI(users) {
                 <td>${escapeHtml(user.name || 'N/A')}</td>
                 <td>${escapeHtml(user.email || 'N/A')}</td>
                 <td>${escapeHtml(user.uniqueId || '-')}</td>
-                <td><span class="role-badge ${roleBadgeClass}">${escapeHtml(user.role || 'N/A')}</span></td>
+                <td>
+                    <span class="role-badge ${roleBadgeClass}">${escapeHtml(user.role || 'N/A')}</span>
+                    ${user.role === 'volunteer' && Array.isArray(user.volunteerTeams) && user.volunteerTeams.length > 0
+                        ? `<div style="margin-top: 0.25rem; font-size: 0.8em; color: #555;">Teams: ${escapeHtml(user.volunteerTeams.join(', '))}</div>`
+                        : ''}
+                </td>
                 <td>${createdDate}</td>
             </tr>
         `;
@@ -4791,6 +4852,15 @@ async function handleUserCreationSubmit(event) {
     const email = emailInput.value.trim();
     const uniqueId = idInput ? idInput.value.trim() : '';
     const role = roleSelect.value;
+    const teamCheckboxes = document.querySelectorAll('#newUserTeams .volunteer-team-checkbox');
+    const volunteerTeams = [];
+    if (role === 'volunteer') {
+        teamCheckboxes.forEach(cb => {
+            if (cb.checked) {
+                volunteerTeams.push(cb.value);
+            }
+        });
+    }
     
     // Disable form during submission
     if (submitButton) submitButton.disabled = true;
@@ -4801,7 +4871,7 @@ async function handleUserCreationSubmit(event) {
     }
     
     try {
-        const result = await createNewUser(name, email, uniqueId, role);
+        const result = await createNewUser(name, email, uniqueId, role, volunteerTeams);
         
         // Show success message with important note about re-authentication
         if (messageContainer) {
@@ -4830,6 +4900,8 @@ async function handleUserCreationSubmit(event) {
         emailInput.value = '';
         if (idInput) idInput.value = '';
         roleSelect.value = 'volunteer';
+        // Clear team selections
+        teamCheckboxes.forEach(cb => { cb.checked = false; });
         
     } catch (error) {
         console.error('Error creating user:', error);
@@ -8289,8 +8361,41 @@ async function filterCheckinTypeTabs(user) {
         return;
     }
     
-    // Volunteers: show all tabs (simplified access)
-    tabs.forEach(tab => tab.style.display = '');
+    // Volunteers: show only tabs their teams allow
+    const teams = await getVolunteerTeams(user);
+    if (!Array.isArray(teams) || teams.length === 0) {
+        // No teams assigned: hide all checkin tabs
+        tabs.forEach(tab => tab.style.display = 'none');
+        return;
+    }
+    
+    const teamMap = {
+        'pickup_location': 'transportation',
+        'registration': 'registration',
+        'ganvesh_collected': 'ganvesh_collected',
+        'cloak_room': 'cloak_room',
+        'post_tour': 'post_tour'
+    };
+    
+    let firstVisibleTabId = null;
+    
+    tabs.forEach(tab => {
+        const checkinType = tab.getAttribute('data-checkin-type');
+        const requiredTeam = teamMap[checkinType];
+        if (requiredTeam && teams.includes(requiredTeam)) {
+            tab.style.display = '';
+            if (!firstVisibleTabId) {
+                firstVisibleTabId = checkinType;
+            }
+        } else {
+            tab.style.display = 'none';
+        }
+    });
+    
+    // Ensure currentCheckinType is valid for this volunteer
+    if (firstVisibleTabId) {
+        currentCheckinType = firstVisibleTabId;
+    }
 }
 
 // Switch checkin type

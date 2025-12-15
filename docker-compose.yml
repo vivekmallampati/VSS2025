@@ -182,6 +182,22 @@ services:
     command: node firestore-utils.js migrate-cancelled
     # Migrates cancelled/rejected registrations to cancelledRegistrations collection
 
+  import-volunteers:
+    build: .
+    container_name: vss2025-import-volunteers
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+      # Mount the volunteers CSV/Excel file
+      - ./dataprocessing/volunteers.csv:/app/dataprocessing/volunteers.csv:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - VOLUNTEER_CSV_PATH=/app/dataprocessing/volunteers.csv
+      - COMMAND=import-volunteers
+    command: node firestore-utils.js import-volunteers
+    # Imports/updates volunteers with role and volunteerTeams from CSV/XLSX
+
   find-duplicates:
     build: .
     container_name: vss2025-find-duplicates

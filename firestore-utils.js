@@ -163,6 +163,74 @@ async function fetchAllRegistrations(pageSize = 3000) {
 }
 
 // ============================================================================
+// VOLUNTEER CSV IMPORT
+// ============================================================================
+
+async function importVolunteersFromCsv() {
+    const csvPath = process.env.VOLUNTEER_CSV_PATH || 'dataprocessing/volunteers.csv';
+    let workbook;
+    try {
+        workbook = XLSX.readFile(csvPath);
+    } catch (e) {
+        console.error(`Error: Volunteer CSV/Excel file not found at ${csvPath}`);
+        console.error('Set VOLUNTEER_CSV_PATH environment variable to specify a different path.');
+        process.exit(1);
+    }
+
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(worksheet);
+
+    console.log(`Found ${rows.length} volunteer rows in ${csvPath}`);
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const row of rows) {
+        try {
+            const name = (row.name || row.Name || '').toString().trim();
+            const email = (row.email || row.Email || '').toString().trim();
+            const uniqueId = (row.uniqueId || row.UniqueId || row.ID || '').toString().trim();
+            const role = (row.role || row.Role || 'volunteer').toString().trim().toLowerCase();
+            const teamsRaw = (row.volunteerTeams || row.teams || '').toString().trim();
+
+            if (!name || !uniqueId) {
+                console.warn('Skipping row: missing name or uniqueId', row);
+                errorCount++;
+                continue;
+            }
+
+            const volunteerTeams = teamsRaw
+                ? teamsRaw.split(/[;,]/).map(t => t.trim()).filter(Boolean)
+                : [];
+
+            const userRef = db.collection('users').doc(uniqueId);
+            await userRef.set({
+                name,
+                email: email || null,
+                uniqueId,
+                role: role === 'admin' ? 'admin' : 'volunteer',
+                volunteerTeams,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            successCount++;
+            if (successCount % 50 === 0) {
+                console.log(`Imported/updated ${successCount} volunteers so far...`);
+            }
+        } catch (e) {
+            console.error('Error importing volunteer row:', e);
+            errorCount++;
+        }
+    }
+
+    console.log('\\n=== Volunteer Import Summary ===');
+    console.log(`Rows processed: ${rows.length}`);
+    console.log(`Success: ${successCount}`);
+    console.log(`Errors: ${errorCount}`);
+}
+
+// ============================================================================
 // IMPORT FUNCTION
 // ============================================================================
 
@@ -1932,6 +2000,9 @@ async function main() {
         switch (command) {
             case 'import':
                 await importExcelData();
+                break;
+            case 'import-volunteers':
+                await importVolunteersFromCsv();
                 break;
             case 'normalize':
                 await normalizeFieldNames();
