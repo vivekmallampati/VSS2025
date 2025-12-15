@@ -125,26 +125,12 @@ async function hasAccessToCheckinType(user, checkinType) {
     const isAdminUser = await isAdmin(user);
     if (isAdminUser) return true;
     
-    // Volunteers need to check their assigned teams
+    // Volunteers: allow all checkin types (remove team restriction for now)
     const isVolunteerUser = await isVolunteer(user);
-    if (!isVolunteerUser) return false;
+    if (isVolunteerUser) return true;
     
-    // Volunteers can only see their assigned teams
-    const teams = await getVolunteerTeams(user);
-    const teamMap = {
-        'pickup_location': 'transportation',
-        'registration': 'registration',
-        'shulk_paid': 'shulk_paid',
-        'kit_collected': 'kit_collected',
-        'ganvesh_collected': 'ganvesh_collected',
-        'cloak_room': 'cloak_room',
-        'post_tour': 'post_tour'
-    };
-    
-    const requiredTeam = teamMap[checkinType];
-    if (!requiredTeam) return false;
-    
-    return teams.includes(requiredTeam);
+    // Default deny
+    return false;
 }
 
 // Helper function to check if user can access a protected tab
@@ -5898,6 +5884,8 @@ function calculateStatistics(registrations, users) {
 }
 
 function displayAdminStatistics(stats, registrations, users = []) {
+    // Guard: ensure users is always defined to avoid ReferenceError
+    const safeUsers = Array.isArray(users) ? users : [];
     // Update metric cards with null checks
     const totalRegistrationsEl = document.getElementById('totalRegistrations');
     if (totalRegistrationsEl) {
@@ -6032,7 +6020,7 @@ function displayAdminStatistics(stats, registrations, users = []) {
     // Store stats globally for gender slicing
     window.dashboardStats = stats;
     window.dashboardRegistrations = registrations;
-    window.dashboardUsers = users;
+    window.dashboardUsers = safeUsers;
     
     // Initialize dashboard tables with filters
     updateDashboardWithFilter();
@@ -6390,6 +6378,51 @@ async function exportPostTourTeamData() {
     });
     
     exportToCSV('post_tour_team_data.csv', headers, rows);
+}
+
+// Export Tours Data (broader tour-focused slice)
+async function exportToursData() {
+    const registrations = window.dashboardRegistrations || [];
+    
+    const headers = [
+        'Praveshika ID',
+        'Name',
+        'Email',
+        'Phone',
+        'Zone',
+        'Shreni',
+        'Gender',
+        'Post Tour Selection',
+        'Accommodation',
+        'Arrival Date',
+        'Arrival Time',
+        'Arrival Place',
+        'Departure Date',
+        'Departure Time',
+        'Departure Place'
+    ];
+    
+    const rows = registrations.map(reg => {
+        return [
+            reg.uniqueId || '',
+            reg.name || reg['Full Name'] || '',
+            reg.email || reg['Email address'] || '',
+            reg.phone || '',
+            reg.zone || reg.Zone || '',
+            reg.shreni || reg.Shreni || '',
+            reg.gender || reg.Gender || '',
+            reg.postShibirTour || reg['Post Shibir Tour'] || reg['Post Shibir Tours'] || reg['Please select a post shibir tour option'] || 'None',
+            reg.accommodation || '',
+            reg.arrivalDate || reg['Date of Arrival'] || '',
+            reg.arrivalTime || reg['Time of Arrival'] || '',
+            reg.normalizedPickupLocation || reg.arrivalPlace || reg['Place of Arrival'] || '',
+            reg.departureDate || reg['Date of Departure Train/Flight'] || '',
+            reg.departureTime || reg['Time of Departure Train/Flight'] || '',
+            reg.departurePlace || reg['Place of Departure Train/Flight'] || ''
+        ];
+    });
+    
+    exportToCSV('tours_data.csv', headers, rows);
 }
 
 // Helper function to export to CSV

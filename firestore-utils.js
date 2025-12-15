@@ -1447,7 +1447,19 @@ async function normalizeDates() {
             if (hasUpdates) {
                 const docRef = db.collection('registrations').doc(doc.id);
                 updates.normalizedAt = admin.firestore.FieldValue.serverTimestamp();
-                batch.update(docRef, updates);
+                
+                // Filter out any field names with invalid Firestore characters (* ~ / [ ])
+                const validUpdates = {};
+                const invalidChars = /[*~\/\[\]]/;
+                for (const [key, value] of Object.entries(updates)) {
+                    if (!invalidChars.test(key)) {
+                        validUpdates[key] = value;
+                    } else {
+                        console.log(`  Skipping invalid field name: "${key}" for PraveshikaID: ${praveshikaId}`);
+                    }
+                }
+                
+                batch.update(docRef, validUpdates);
                 batchCount++;
                 updatedCount++;
                 
