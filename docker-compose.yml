@@ -221,3 +221,68 @@ services:
     command: node firestore-utils.js find-duplicates-last4
     # Finds duplicates by last 4 digits of PraveshikaID
 
+  normalize-zones:
+    build: .
+    container_name: vss2025-normalize-zones
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=normalize-zones
+    command: node firestore-utils.js normalize-zones
+    # Normalizes zones to AF, AM, AR, AU, EU, AS format
+
+  normalize-dates:
+    build: .
+    container_name: vss2025-normalize-dates
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=normalize-dates
+    command: node firestore-utils.js normalize-dates
+    # Normalizes pickup/dropoff dates to DD-MMM-YYYY format
+
+  normalize-pickup-locations:
+    build: .
+    container_name: vss2025-normalize-pickup-locations
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=normalize-pickup-locations
+    command: node firestore-utils.js normalize-pickup-locations
+    # Normalizes pickup locations to standard dropdown options
+
+  normalize-post-tour:
+    build: .
+    container_name: vss2025-normalize-post-tour
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=normalize-post-tour
+    command: node firestore-utils.js normalize-post-tour
+    # Normalizes post tour options (Kandakurti->None, etc.)
+
+  normalize-all:
+    build: .
+    container_name: vss2025-normalize-all
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=normalize-all
+    command: node firestore-utils.js normalize-all
+    # Runs all normalization functions (zones, dates, pickup locations, post tour)
+

@@ -4332,7 +4332,7 @@ async function loadAdminDashboard(user) {
         }
         
         // Display statistics
-        displayAdminStatistics(stats, registrations);
+        displayAdminStatistics(stats, registrations, users);
         
         // Load transportation analytics
         loadTransportationAnalytics(registrations);
@@ -5897,7 +5897,7 @@ function calculateStatistics(registrations, users) {
     return stats;
 }
 
-function displayAdminStatistics(stats, registrations) {
+function displayAdminStatistics(stats, registrations, users = []) {
     // Update metric cards with null checks
     const totalRegistrationsEl = document.getElementById('totalRegistrations');
     if (totalRegistrationsEl) {
@@ -6084,7 +6084,7 @@ async function updateDashboardWithFilter() {
     
     // Recalculate stats with filtered data
     const filteredStats = calculateStatistics(filteredRegistrations, users);
-    displayAdminStatistics(filteredStats, filteredRegistrations);
+    displayAdminStatistics(filteredStats, filteredRegistrations, users);
     
     // Update specific tables
     updateShreniGenderTable();

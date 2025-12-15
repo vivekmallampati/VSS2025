@@ -1101,6 +1101,680 @@ async function migrateCancelledRegistrations() {
 }
 
 // ============================================================================
+// DATA NORMALIZATION
+// ============================================================================
+
+// Zone normalization mapping
+const zoneMapping = {
+    'africa': 'AF',
+    'af': 'AF',
+    'americas': 'AM',
+    'am': 'AM',
+    'ar': 'AR',
+    'australasia': 'AU',
+    'au': 'AU',
+    'europe': 'EU',
+    'eu': 'EU',
+    'se asia': 'AS',
+    'seasia': 'AS',
+    'southeast asia': 'AS',
+    'as': 'AS',
+    'asia': 'AS'
+};
+
+// Normalize zone to standard format
+function normalizeZone(zone) {
+    if (!zone) return '';
+    const zoneTrimmed = zone.toString().trim();
+    const zoneLower = zoneTrimmed.toLowerCase();
+    
+    // First, check for exact match
+    if (zoneMapping[zoneLower]) {
+        return zoneMapping[zoneLower];
+    }
+    
+    // If no exact match, check if it starts with a zone code
+    // This handles cases like "ARBA", "ARKK", "ARYV", "ARSK" -> "AR"
+    const zoneCodes = ['af', 'am', 'ar', 'au', 'eu', 'as'];
+    for (const code of zoneCodes) {
+        if (zoneLower.startsWith(code)) {
+            return zoneMapping[code];
+        }
+    }
+    
+    // If no match, return uppercase version
+    return zoneTrimmed.toUpperCase();
+}
+
+// Normalize zones in all registrations
+async function normalizeZones() {
+    console.log('Normalizing zones...\n');
+    
+    let updatedCount = 0;
+    let errorCount = 0;
+    
+    try {
+        const registrationsSnapshot = await db.collection('registrations').get();
+        console.log(`Processing ${registrationsSnapshot.size} registrations...`);
+        
+        let batch = db.batch();
+        let batchCount = 0;
+        const BATCH_SIZE = 500;
+        
+        for (const doc of registrationsSnapshot.docs) {
+            const data = doc.data();
+            const currentZone = data.zone || data.Zone || data['Zone/Shreni'] || '';
+            const normalizedZone = normalizeZone(currentZone);
+            
+            if (currentZone && normalizedZone && currentZone !== normalizedZone) {
+                const docRef = db.collection('registrations').doc(doc.id);
+                batch.update(docRef, {
+                    zone: normalizedZone,
+                    Zone: normalizedZone,
+                    normalizedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                batchCount++;
+                updatedCount++;
+                
+                if (batchCount >= BATCH_SIZE) {
+                    await batch.commit();
+                    console.log(`Updated ${updatedCount} registrations so far...`);
+                    batch = db.batch(); // Create new batch
+                    batchCount = 0;
+                }
+            }
+        }
+        
+        if (batchCount > 0) {
+            await batch.commit();
+        }
+        
+        console.log(`\n=== Zone Normalization Summary ===`);
+        console.log(`Total registrations checked: ${registrationsSnapshot.size}`);
+        console.log(`Zones normalized: ${updatedCount}`);
+        console.log(`Errors: ${errorCount}`);
+        
+    } catch (error) {
+        console.error('Error normalizing zones:', error);
+        throw error;
+    }
+}
+
+// Normalize date to DD-MMM-YYYY format
+function normalizeDate(dateStr) {
+    if (!dateStr) return { success: true, normalized: '' };
+    
+    const str = dateStr.toString().trim();
+    
+    // Check if already in DD-MMM-YYYY format (e.g., "14-DEC-2025")
+    const alreadyNormalized = str.match(/^(\d{2})-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)-(\d{4})$/i);
+    if (alreadyNormalized) {
+        // Validate the date
+        const day = parseInt(alreadyNormalized[1], 10);
+        const monthStr = alreadyNormalized[2].toUpperCase();
+        const year = parseInt(alreadyNormalized[3], 10);
+        const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+        const monthIndex = months.indexOf(monthStr);
+        
+        if (monthIndex !== -1 && day >= 1 && day <= 31 && year >= 1900 && year <= 2100) {
+            // Return in standardized format (uppercase month)
+            return { success: true, normalized: `${String(day).padStart(2, '0')}-${monthStr}-${year}` };
+        }
+    }
+    
+    // Try to parse various date formats
+    let date = null;
+    
+    // Try Excel serial date (number)
+    if (!isNaN(str) && str.indexOf('/') === -1 && str.indexOf('-') === -1) {
+        const excelDate = parseFloat(str);
+        // Excel epoch is 1900-01-01, but JavaScript uses 1970-01-01
+        // Excel dates are days since 1900-01-01, but there's a bug: it treats 1900 as a leap year
+        // So we need to adjust: (excelDate - 2) * 86400000 + new Date('1900-01-01').getTime()
+        const excelEpoch = new Date(1899, 11, 30).getTime();
+        date = new Date(excelEpoch + (excelDate - 1) * 86400000);
+        
+        if (!isNaN(date.getTime())) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            const month = months[date.getMonth()];
+            const year = date.getFullYear();
+            return { success: true, normalized: `${day}-${month}-${year}` };
+        }
+    }
+    
+    // Try yyyy-mm-dd format (ISO format, unambiguous)
+    const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (isoMatch) {
+        const year = parseInt(isoMatch[1], 10);
+        const month = parseInt(isoMatch[2], 10) - 1; // JavaScript months are 0-indexed
+        const day = parseInt(isoMatch[3], 10);
+        date = new Date(year, month, day);
+        
+        if (!isNaN(date.getTime()) && date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+            const dayStr = String(day).padStart(2, '0');
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            const monthStr = months[month];
+            return { success: true, normalized: `${dayStr}-${monthStr}-${year}` };
+        }
+    }
+    
+    // Try mm/dd/yyyy or dd/mm/yyyy format (ambiguous, need to try both carefully)
+    const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) {
+        const part1 = parseInt(slashMatch[1], 10);
+        const part2 = parseInt(slashMatch[2], 10);
+        const year = parseInt(slashMatch[3], 10);
+        
+        // Validate year range
+        if (year < 1900 || year > 2100) {
+            return { success: false, normalized: str, original: str };
+        }
+        
+        let mmddValid = false;
+        let ddmmValid = false;
+        let mmddDate = null;
+        let ddmmDate = null;
+        
+        // Try mm/dd/yyyy (if part1 is 1-12, it could be month)
+        if (part1 >= 1 && part1 <= 12 && part2 >= 1 && part2 <= 31) {
+            const month = part1 - 1; // JavaScript months are 0-indexed
+            const day = part2;
+            mmddDate = new Date(year, month, day);
+            
+            if (!isNaN(mmddDate.getTime()) && 
+                mmddDate.getFullYear() === year && 
+                mmddDate.getMonth() === month && 
+                mmddDate.getDate() === day) {
+                mmddValid = true;
+            }
+        }
+        
+        // Try dd/mm/yyyy (if part2 is 1-12, it could be month)
+        if (part2 >= 1 && part2 <= 12 && part1 >= 1 && part1 <= 31) {
+            const month = part2 - 1; // JavaScript months are 0-indexed
+            const day = part1;
+            ddmmDate = new Date(year, month, day);
+            
+            if (!isNaN(ddmmDate.getTime()) && 
+                ddmmDate.getFullYear() === year && 
+                ddmmDate.getMonth() === month && 
+                ddmmDate.getDate() === day) {
+                ddmmValid = true;
+            }
+        }
+        
+        // If both are valid and different, it's ambiguous - fail to avoid wrong interpretation
+        if (mmddValid && ddmmValid) {
+            // Check if they're the same date (e.g., 05/05/2025)
+            if (mmddDate.getTime() === ddmmDate.getTime()) {
+                // Same date, safe to use either
+                const day = mmddDate.getDate();
+                const month = mmddDate.getMonth();
+                const dayStr = String(day).padStart(2, '0');
+                const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+                const monthStr = months[month];
+                return { success: true, normalized: `${dayStr}-${monthStr}-${year}` };
+            } else {
+                // Ambiguous - both interpretations are valid but different
+                // Prefer dd/mm/yyyy as it's more common internationally, but only if part1 > 12 (unambiguous)
+                // Otherwise, fail to avoid wrong interpretation
+                if (part1 > 12) {
+                    // part1 > 12 means it can't be a month, so must be dd/mm/yyyy
+                    const day = ddmmDate.getDate();
+                    const month = ddmmDate.getMonth();
+                    const dayStr = String(day).padStart(2, '0');
+                    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+                    const monthStr = months[month];
+                    return { success: true, normalized: `${dayStr}-${monthStr}-${year}` };
+                } else if (part2 > 12) {
+                    // part2 > 12 means it can't be a month, so must be mm/dd/yyyy
+                    const day = mmddDate.getDate();
+                    const month = mmddDate.getMonth();
+                    const dayStr = String(day).padStart(2, '0');
+                    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+                    const monthStr = months[month];
+                    return { success: true, normalized: `${dayStr}-${monthStr}-${year}` };
+                } else {
+                    // Both parts are <= 12, ambiguous - fail
+                    return { success: false, normalized: str, original: str };
+                }
+            }
+        }
+        
+        // Only one is valid, use that one
+        if (mmddValid) {
+            const day = mmddDate.getDate();
+            const month = mmddDate.getMonth();
+            const dayStr = String(day).padStart(2, '0');
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            const monthStr = months[month];
+            return { success: true, normalized: `${dayStr}-${monthStr}-${year}` };
+        }
+        
+        if (ddmmValid) {
+            const day = ddmmDate.getDate();
+            const month = ddmmDate.getMonth();
+            const dayStr = String(day).padStart(2, '0');
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            const monthStr = months[month];
+            return { success: true, normalized: `${dayStr}-${monthStr}-${year}` };
+        }
+    }
+    
+    // Try standard Date parsing as fallback
+    date = new Date(str);
+    if (!isNaN(date.getTime())) {
+        // Validate that the parsed date makes sense (not too far in past/future)
+        const year = date.getFullYear();
+        if (year >= 1900 && year <= 2100) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            const month = months[date.getMonth()];
+            return { success: true, normalized: `${day}-${month}-${year}` };
+        }
+    }
+    
+    // Could not parse - return failure
+    return { success: false, normalized: str, original: str };
+}
+
+// Normalize dates in all registrations
+async function normalizeDates() {
+    console.log('Normalizing dates...\n');
+    
+    let updatedCount = 0;
+    let errorCount = 0;
+    const failedPraveshikaIds = [];
+    
+    try {
+        const registrationsSnapshot = await db.collection('registrations').get();
+        console.log(`Processing ${registrationsSnapshot.size} registrations...`);
+        
+        let batch = db.batch();
+        let batchCount = 0;
+        const BATCH_SIZE = 500;
+        
+        for (const doc of registrationsSnapshot.docs) {
+            const data = doc.data();
+            const updates = {};
+            let hasUpdates = false;
+            let hasFailures = false;
+            const praveshikaId = data.praveshikaId || data.PraveshikaID || data.uniqueId || doc.id;
+            
+            // Normalize arrival date
+            const arrivalDate = data.arrivalDate || data['Date of Arrival'] || '';
+            if (arrivalDate) {
+                const result = normalizeDate(arrivalDate);
+                if (result.success) {
+                    if (result.normalized && result.normalized !== arrivalDate) {
+                        updates.arrivalDate = result.normalized;
+                        updates['Date of Arrival'] = result.normalized;
+                        hasUpdates = true;
+                    }
+                } else {
+                    hasFailures = true;
+                    console.log(`  Warning: Could not normalize arrival date "${arrivalDate}" for PraveshikaID: ${praveshikaId}`);
+                }
+            }
+            
+            // Normalize departure date
+            const departureDate = data.departureDate || data['Date of Departure Train/Flight'] || '';
+            if (departureDate) {
+                const result = normalizeDate(departureDate);
+                if (result.success) {
+                    if (result.normalized && result.normalized !== departureDate) {
+                        updates.departureDate = result.normalized;
+                        updates['Date of Departure Train/Flight'] = result.normalized;
+                        hasUpdates = true;
+                    }
+                } else {
+                    hasFailures = true;
+                    console.log(`  Warning: Could not normalize departure date "${departureDate}" for PraveshikaID: ${praveshikaId}`);
+                }
+            }
+            
+            // Track PraveshikaIDs that failed to normalize
+            if (hasFailures) {
+                failedPraveshikaIds.push({
+                    praveshikaId: praveshikaId,
+                    arrivalDate: arrivalDate || 'N/A',
+                    departureDate: departureDate || 'N/A'
+                });
+                errorCount++;
+            }
+            
+            if (hasUpdates) {
+                const docRef = db.collection('registrations').doc(doc.id);
+                updates.normalizedAt = admin.firestore.FieldValue.serverTimestamp();
+                batch.update(docRef, updates);
+                batchCount++;
+                updatedCount++;
+                
+                if (batchCount >= BATCH_SIZE) {
+                    await batch.commit();
+                    console.log(`Updated ${updatedCount} registrations so far...`);
+                    batch = db.batch(); // Create new batch
+                    batchCount = 0;
+                }
+            }
+        }
+        
+        if (batchCount > 0) {
+            await batch.commit();
+        }
+        
+        console.log(`\n=== Date Normalization Summary ===`);
+        console.log(`Total registrations checked: ${registrationsSnapshot.size}`);
+        console.log(`Dates normalized: ${updatedCount}`);
+        console.log(`Failed to normalize: ${errorCount}`);
+        
+        if (failedPraveshikaIds.length > 0) {
+            console.log(`\n=== PraveshikaIDs with Failed Date Normalization ===`);
+            console.log(`Total: ${failedPraveshikaIds.length}`);
+            console.log('\nPraveshikaID | Arrival Date | Departure Date');
+            console.log('-----------------------------------------------');
+            for (const failure of failedPraveshikaIds) {
+                console.log(`${failure.praveshikaId} | ${failure.arrivalDate} | ${failure.departureDate}`);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error normalizing dates:', error);
+        throw error;
+    }
+}
+
+// Pickup location normalization mapping
+// Note: Short codes like 'hyd', 'sc', 'hyb', 'kcg' are NOT mapped directly
+// They must be combined with location type (airport, station, etc.)
+const pickupLocationMapping = {
+    // Rajiv Gandhi International Airport (RGIA) variations - must include "airport"
+    'rgia': 'Rajiv Gandhi International Airport (RGIA)',
+    'rajiv gandhi': 'Rajiv Gandhi International Airport (RGIA)',
+    'hyderabad airport': 'Rajiv Gandhi International Airport (RGIA)',
+    'hyd airport': 'Rajiv Gandhi International Airport (RGIA)',
+    'hyderabad airport (hyd)': 'Rajiv Gandhi International Airport (RGIA)',
+    'hyderabad airport hyd': 'Rajiv Gandhi International Airport (RGIA)',
+    'airport (hyd)': 'Rajiv Gandhi International Airport (RGIA)',
+    'airport hyd': 'Rajiv Gandhi International Airport (RGIA)',
+    // Secunderabad Railway Station variations
+    'secunderabad': 'Secunderabad Railway Station',
+    'secunderabad railway': 'Secunderabad Railway Station',
+    'secunderabad station': 'Secunderabad Railway Station',
+    'secunderabad station (sc)': 'Secunderabad Railway Station',
+    'secunderabad station sc': 'Secunderabad Railway Station',
+    'secunderabad (sc)': 'Secunderabad Railway Station',
+    'secunderabad sc': 'Secunderabad Railway Station',
+    // Nampally Railway Station variations
+    'nampally': 'Nampally Railway Station',
+    'nampally railway': 'Nampally Railway Station',
+    'nampally station': 'Nampally Railway Station',
+    'nampally station (hyb)': 'Nampally Railway Station',
+    'nampally station hyb': 'Nampally Railway Station',
+    'nampally (hyb)': 'Nampally Railway Station',
+    'nampally hyb': 'Nampally Railway Station',
+    'hyderabad decan': 'Nampally Railway Station',
+    'hyderabad deccan': 'Nampally Railway Station',
+    'hyderabad decan station': 'Nampally Railway Station',
+    'hyderabad deccan station': 'Nampally Railway Station',
+    // Kacheguda Railway Station variations
+    'kacheguda': 'Kacheguda Railway Station',
+    'kacheguda railway': 'Kacheguda Railway Station',
+    'kacheguda station': 'Kacheguda Railway Station',
+    'kachiguda': 'Kacheguda Railway Station',
+    'kachiguda station': 'Kacheguda Railway Station',
+    'kachiguda station (kcg)': 'Kacheguda Railway Station',
+    'kachiguda station kcg': 'Kacheguda Railway Station',
+    'kacheguda station (kcg)': 'Kacheguda Railway Station',
+    'kacheguda station kcg': 'Kacheguda Railway Station',
+    'kachiguda (kcg)': 'Kacheguda Railway Station',
+    'kachiguda kcg': 'Kacheguda Railway Station',
+    'kacheguda (kcg)': 'Kacheguda Railway Station',
+    'kacheguda kcg': 'Kacheguda Railway Station',
+    // Other locations
+    'cherlapally': 'Cherlapally Railway Station',
+    'cherlapally railway': 'Cherlapally Railway Station',
+    'cherlapally station': 'Cherlapally Railway Station',
+    'lingampally': 'Lingampally Railway Station',
+    'lingampally railway': 'Lingampally Railway Station',
+    'lingampally station': 'Lingampally Railway Station',
+    'mgbs': 'Mahatma Gandhi Bus Station (MGBS)',
+    'gandhi bus station': 'Mahatma Gandhi Bus Station (MGBS)',
+    'jbs': 'Jubilee Bus Station (JBS)',
+    'jubilee bus station': 'Jubilee Bus Station (JBS)'
+};
+
+// Normalize pickup location
+function normalizePickupLocation(location) {
+    if (!location) return '';
+    
+    const locationTrimmed = location.toString().trim();
+    const locationLower = locationTrimmed.toLowerCase();
+    
+    // Check if it's already one of the standard options (exact match, case-insensitive)
+    const standardOptions = [
+        'Rajiv Gandhi International Airport (RGIA)',
+        'Secunderabad Railway Station',
+        'Nampally Railway Station',
+        'Kacheguda Railway Station',
+        'Cherlapally Railway Station',
+        'Lingampally Railway Station',
+        'Mahatma Gandhi Bus Station (MGBS)',
+        'Jubilee Bus Station (JBS)',
+        'Other'
+    ];
+    
+    // Check for exact match (case-insensitive)
+    for (const option of standardOptions) {
+        if (locationLower === option.toLowerCase()) {
+            return option; // Return the standard format
+        }
+    }
+    
+    // Special handling for standalone codes - don't map them
+    // HYD alone should NOT map to RGIA (could be anything)
+    // SC, HYB, KCG alone should NOT map (too ambiguous)
+    const standaloneCodes = ['hyd', 'sc', 'hyb', 'kcg'];
+    const trimmedLower = locationLower.trim();
+    if (standaloneCodes.includes(trimmedLower)) {
+        return 'Other'; // Don't map standalone codes
+    }
+    
+    // Check mapping patterns (order matters - check more specific patterns first)
+    // Sort by key length (longer keys first) to match more specific patterns first
+    const sortedMappings = Object.entries(pickupLocationMapping).sort((a, b) => b[0].length - a[0].length);
+    
+    for (const [key, value] of sortedMappings) {
+        const keyLower = key.toLowerCase();
+        
+        // Exact match
+        if (locationLower === keyLower) {
+            return value;
+        }
+        
+        // Check if location contains the key as a whole word/phrase
+        // This prevents "hyd" from matching inside "hyderabad" or other words
+        // Match patterns like: "key", "key ", " key", " key ", "(key)", "key)", etc.
+        const keyPattern = new RegExp(
+            '(^|\\s|\\()' + 
+            keyLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + // Escape special regex chars
+            '(\\s|\\)|$)', 
+            'i'
+        );
+        
+        if (keyPattern.test(locationLower)) {
+            return value;
+        }
+    }
+    
+    // Return as "Other" if no match
+    return 'Other';
+}
+
+// Normalize pickup locations in all registrations
+async function normalizePickupLocations() {
+    console.log('Normalizing pickup locations...\n');
+    
+    let updatedCount = 0;
+    let errorCount = 0;
+    
+    try {
+        const registrationsSnapshot = await db.collection('registrations').get();
+        console.log(`Processing ${registrationsSnapshot.size} registrations...`);
+        
+        let batch = db.batch();
+        let batchCount = 0;
+        const BATCH_SIZE = 500;
+        
+        for (const doc of registrationsSnapshot.docs) {
+            const data = doc.data();
+            const currentLocation = data.arrivalPlace || data['Place of Arrival'] || data.pickupLocation || '';
+            const normalizedLocation = normalizePickupLocation(currentLocation);
+            
+            if (currentLocation && normalizedLocation && currentLocation !== normalizedLocation) {
+                const docRef = db.collection('registrations').doc(doc.id);
+                const updates = {
+                    normalizedPickupLocation: normalizedLocation,
+                    normalizedAt: admin.firestore.FieldValue.serverTimestamp()
+                };
+                
+                // Also update the main field if it exists
+                if (data.arrivalPlace) {
+                    updates.arrivalPlace = normalizedLocation;
+                }
+                if (data['Place of Arrival']) {
+                    updates['Place of Arrival'] = normalizedLocation;
+                }
+                if (data.pickupLocation) {
+                    updates.pickupLocation = normalizedLocation;
+                }
+                
+                batch.update(docRef, updates);
+                batchCount++;
+                updatedCount++;
+                
+                if (batchCount >= BATCH_SIZE) {
+                    await batch.commit();
+                    console.log(`Updated ${updatedCount} registrations so far...`);
+                    batch = db.batch(); // Create new batch
+                    batchCount = 0;
+                }
+            }
+        }
+        
+        if (batchCount > 0) {
+            await batch.commit();
+        }
+        
+        console.log(`\n=== Pickup Location Normalization Summary ===`);
+        console.log(`Total registrations checked: ${registrationsSnapshot.size}`);
+        console.log(`Locations normalized: ${updatedCount}`);
+        console.log(`Errors: ${errorCount}`);
+        
+    } catch (error) {
+        console.error('Error normalizing pickup locations:', error);
+        throw error;
+    }
+}
+
+// Normalize post tour options
+async function normalizePostTourOptions() {
+    console.log('Normalizing post tour options...\n');
+    
+    let updatedCount = 0;
+    let errorCount = 0;
+    
+    const tourMapping = {
+        'kandakurti': 'None',
+        'yadadri': 'Yadadri and local tour',
+        'yadadri mandir': 'Yadadri and local tour',
+        'yadadri and local': 'Yadadri and local tour',
+        'bhagyanagar': 'Yadadri and local tour',
+        'srisailam': 'Srisailam',
+        'none': 'None',
+        'not selected': 'None',
+        'no': 'None'
+    };
+    
+    function normalizeTour(tour) {
+        if (!tour) return 'None';
+        
+        const tourLower = tour.toString().trim().toLowerCase();
+        
+        // Check exact matches
+        for (const [key, value] of Object.entries(tourMapping)) {
+            if (tourLower.includes(key)) {
+                return value;
+            }
+        }
+        
+        // Check if already one of the standard options
+        const standardOptions = ['Yadadri and local tour', 'Srisailam', 'None'];
+        if (standardOptions.includes(tour)) {
+            return tour;
+        }
+        
+        return 'None';
+    }
+    
+    try {
+        const registrationsSnapshot = await db.collection('registrations').get();
+        console.log(`Processing ${registrationsSnapshot.size} registrations...`);
+        
+        let batch = db.batch();
+        let batchCount = 0;
+        const BATCH_SIZE = 500;
+        
+        for (const doc of registrationsSnapshot.docs) {
+            const data = doc.data();
+            const currentTour = data.postShibirTour || data['Post Shibir Tour'] || data['Please select a post shibir tour option'] || '';
+            const normalizedTour = normalizeTour(currentTour);
+            
+            if (currentTour && normalizedTour && currentTour !== normalizedTour) {
+                const docRef = db.collection('registrations').doc(doc.id);
+                const updates = {
+                    postShibirTour: normalizedTour,
+                    normalizedAt: admin.firestore.FieldValue.serverTimestamp()
+                };
+                
+                // Also update other field names
+                if (data['Post Shibir Tour']) {
+                    updates['Post Shibir Tour'] = normalizedTour;
+                }
+                if (data['Please select a post shibir tour option']) {
+                    updates['Please select a post shibir tour option'] = normalizedTour;
+                }
+                
+                batch.update(docRef, updates);
+                batchCount++;
+                updatedCount++;
+                
+                if (batchCount >= BATCH_SIZE) {
+                    await batch.commit();
+                    console.log(`Updated ${updatedCount} registrations so far...`);
+                    batch = db.batch(); // Create new batch
+                    batchCount = 0;
+                }
+            }
+        }
+        
+        if (batchCount > 0) {
+            await batch.commit();
+        }
+        
+        console.log(`\n=== Post Tour Normalization Summary ===`);
+        console.log(`Total registrations checked: ${registrationsSnapshot.size}`);
+        console.log(`Tours normalized: ${updatedCount}`);
+        console.log(`Errors: ${errorCount}`);
+        
+    } catch (error) {
+        console.error('Error normalizing post tour options:', error);
+        throw error;
+    }
+}
+
+// ============================================================================
 // DUPLICATE DETECTION
 // ============================================================================
 
