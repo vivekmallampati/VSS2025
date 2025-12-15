@@ -2448,6 +2448,26 @@
                         measurementId: "G-FQ9MSQ4890"
                     };
 
+                    // Configure Firestore networking for restrictive networks
+                    function configureFirestore() {
+                        if (!firebase || !firebase.firestore || typeof firebase.firestore !== 'function') {
+                            return;
+                        }
+                        try {
+                            const db = firebase.firestore();
+                            if (db.settings) {
+                                db.settings({
+                                    experimentalAutoDetectLongPolling: true,
+                                    useFetchStreams: false,
+                                    ignoreUndefinedProperties: true
+                                });
+                            }
+                            window.firestoreConfigured = true;
+                        } catch (e) {
+                            console.warn('Could not configure Firestore networking', e);
+                        }
+                    }
+
                     // Initialize Firebase with retry logic
                     function initializeFirebase() {
                         if (typeof firebase === 'undefined') {
@@ -2457,6 +2477,9 @@
 
                         try {
                             if (firebase.apps && firebase.apps.length > 0) {
+                                if (!window.firestoreConfigured) {
+                                    configureFirestore();
+                                }
                                 if (typeof window !== 'undefined') {
                                     window.firebaseInitialized = true;
                                 }
@@ -2464,6 +2487,7 @@
                             }
 
                             firebase.initializeApp(window.firebaseConfigFallback);
+                            configureFirestore();
                             if (typeof window !== 'undefined') {
                                 window.firebaseInitialized = true;
                             }

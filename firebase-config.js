@@ -39,6 +39,31 @@ if (typeof firebaseConfig === 'undefined') {
     };
 }
 
+// Configure Firestore networking for environments with strict proxies
+// - experimentalAutoDetectLongPolling helps when HTTP/2 or WebSockets are blocked
+// - useFetchStreams: false falls back to XHR which is more widely compatible
+// - ignoreUndefinedProperties prevents client-side validation errors on sparse writes
+function configureFirestore() {
+    if (!firebase || !firebase.firestore || typeof firebase.firestore !== 'function') {
+        return;
+    }
+    try {
+        const db = firebase.firestore();
+        if (db.settings) {
+            db.settings({
+                experimentalAutoDetectLongPolling: true,
+                useFetchStreams: false,
+                ignoreUndefinedProperties: true
+            });
+        }
+        if (typeof window !== 'undefined') {
+            window.firestoreConfigured = true;
+        }
+    } catch (e) {
+        console.warn('Could not configure Firestore networking', e);
+    }
+}
+
 // Initialize Firebase with retry logic
 function initializeFirebase() {
     // Check if Firebase is available
@@ -51,15 +76,19 @@ function initializeFirebase() {
     try {
         // Check if Firebase is already initialized
         if (firebase.apps && firebase.apps.length > 0) {
-            // Set global flag if it exists
+            // Already initialized; ensure Firestore is configured once
+            if (!window.firestoreConfigured) {
+                configureFirestore();
+            }
             if (typeof window !== 'undefined') {
                 window.firebaseInitialized = true;
             }
             return;
         }
 
-        // Initialize Firebase
+        // Initialize Firebase and configure Firestore networking
         firebase.initializeApp(firebaseConfig);
+        configureFirestore();
         
         // Set auth persistence to LOCAL (default, but explicit for reliability)
         if (firebase.auth && firebase.auth().setPersistence) {
