@@ -4330,10 +4330,13 @@ async function loadAdminDashboard(user) {
         let registrations, users, stats;
         
         if (cachedData) {
-            // Use cached data
-            registrations = cachedData.registrations;
-            users = cachedData.users;
-            stats = cachedData.stats;
+            // Use cached data (convert ISO strings back to Date objects for compatibility)
+            registrations = cachedData.registrations || [];
+            users = cachedData.users || [];
+            stats = cachedData.stats || {};
+            
+            // Store registrations globally for export functions
+            window.dashboardRegistrations = registrations;
         } else {
             // Cache expired or missing - fetch fresh data
             // Fetch all registrations (only approved remain after migration)
@@ -4353,12 +4356,38 @@ async function loadAdminDashboard(user) {
             // Calculate statistics
             stats = calculateStatistics(registrations, users);
             
-            // Cache the results
-            setCachedData(CACHE_KEY, {
-                registrations: registrations,
-                users: users,
-                stats: stats
-            });
+            // Store registrations globally for export functions
+            window.dashboardRegistrations = registrations;
+            
+            // Cache the results (convert Firestore Timestamps to plain objects for JSON serialization)
+            try {
+                const cacheableData = {
+                    registrations: registrations.map(reg => {
+                        const clean = { ...reg };
+                        // Convert Firestore Timestamps to ISO strings
+                        Object.keys(clean).forEach(key => {
+                            if (clean[key] && typeof clean[key].toDate === 'function') {
+                                clean[key] = clean[key].toDate().toISOString();
+                            }
+                        });
+                        return clean;
+                    }),
+                    users: users.map(user => {
+                        const clean = { ...user };
+                        Object.keys(clean).forEach(key => {
+                            if (clean[key] && typeof clean[key].toDate === 'function') {
+                                clean[key] = clean[key].toDate().toISOString();
+                            }
+                        });
+                        return clean;
+                    }),
+                    stats: stats
+                };
+                setCachedData(CACHE_KEY, cacheableData);
+            } catch (cacheError) {
+                console.warn('Could not cache dashboard data (likely due to non-serializable values):', cacheError);
+                // Continue without caching - dashboard will still work
+            }
         }
         
         // Display statistics
@@ -4380,7 +4409,23 @@ async function loadAdminDashboard(user) {
         
     } catch (error) {
         console.error('Error loading admin dashboard:', error);
-        loadingDiv.innerHTML = '<p style="color: red;">Error loading dashboard data. Please try again.</p>';
+        
+        // Clear potentially corrupted cache
+        try {
+            localStorage.removeItem(CACHE_KEY);
+        } catch (e) {
+            console.warn('Could not clear cache:', e);
+        }
+        
+        loadingDiv.innerHTML = `
+            <p style="color: red;">Error loading dashboard data: ${error.message || error}</p>
+            <p style="margin-top: 1rem;">
+                <button onclick="localStorage.removeItem('adminDashboardStatsCache'); window.location.reload();" 
+                        class="btn btn-primary" style="padding: 0.5rem 1rem;">
+                    Clear Cache & Retry
+                </button>
+            </p>
+        `;
     }
 }
 

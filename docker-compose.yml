@@ -302,3 +302,50 @@ services:
     command: node firestore-utils.js normalize-all
     # Runs all normalization functions (zones, dates, pickup locations, post tour)
 
+  export-travel-team:
+    build: .
+    container_name: vss2025-export-travel-team
+    volumes:
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+      - ./exports:/app/exports
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - OUTPUT_PATH=/app/exports/travel_team_data.csv
+      - COMMAND=export-travel-team
+    command: node firestore-utils.js export-travel-team
+    # Exports transportation/travel team CSV to ./exports/travel_team_data.csv
+
+  export-post-tour-team:
+    build: .
+    container_name: vss2025-export-post-tour-team
+    volumes:
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+      - ./exports:/app/exports
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - OUTPUT_PATH=/app/exports/post_tour_team_data.csv
+      - COMMAND=export-post-tour-team
+    command: node firestore-utils.js export-post-tour-team
+    # Exports post-tour team CSV to ./exports/post_tour_team_data.csv
+
+  bulk-update:
+    build: .
+    container_name: vss2025-bulk-update
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+      # Mount the bulk update CSV/Excel file
+      - ./dataprocessing/bulk_update.csv:/app/dataprocessing/bulk_update.csv:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - UPDATE_CSV_PATH=/app/dataprocessing/bulk_update.csv
+      - COMMAND=bulk-update
+    command: node firestore-utils.js bulk-update
+    # Bulk updates registrations from CSV/XLSX
+    # CSV format: First column = Praveshika ID, remaining columns = field names
+    # Example: Praveshika ID, accommodation, ganaNumber, vahiniNumber
+    #          AFBA1237, Hostel A, 5, 12
+

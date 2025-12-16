@@ -1917,6 +1917,345 @@ async function findDuplicatesByNameAndEmail() {
     }
 }
 
+// ============================================================================
+// EXPORTS: TRAVEL TEAM & POST TOUR TEAM
+// ============================================================================
+
+function toCsvRow(values) {
+    return values.map(v => {
+        if (v === null || v === undefined) return '';
+        const s = v.toString();
+        if (s.includes('"') || s.includes(',') || s.includes('\n')) {
+            return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+    }).join(',');
+}
+
+async function exportTravelTeamData() {
+    console.log('Exporting Travel Team data...\n');
+
+    const headers = [
+        'Praveshika ID',
+        'Name',
+        'Email',
+        'Phone',
+        'Gender',
+        'Age',
+        'Country',
+        'Pickup Needed',
+        'Pickup Location',
+        'Arrival Date',
+        'Arrival Time',
+        'Flight/Train Number',
+        'Dropoff Location',
+        'Departure Date',
+        'Departure Time',
+        'Departure Flight/Train Number'
+    ];
+
+    const outputPath = process.env.OUTPUT_PATH || 'exports/travel_team_data.csv';
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Ensure directory exists
+    const dir = path.dirname(outputPath);
+    try {
+        fs.mkdirSync(dir, { recursive: true });
+    } catch (e) {
+        if (e.code !== 'EEXIST') {
+            console.error(`Warning: Could not create directory ${dir}:`, e.message);
+        }
+    }
+    
+    // Remove existing file if it exists (in case it's read-only or locked)
+    try {
+        if (fs.existsSync(outputPath)) {
+            fs.unlinkSync(outputPath);
+        }
+    } catch (e) {
+        console.warn(`Warning: Could not remove existing file ${outputPath}:`, e.message);
+        // Continue anyway - writeFileSync will overwrite if permissions allow
+    }
+
+    try {
+        const snapshot = await db.collection('registrations').get();
+        console.log(`Processing ${snapshot.size} registrations...`);
+
+        const lines = [];
+        lines.push(toCsvRow(headers));
+
+        snapshot.forEach(doc => {
+            const reg = doc.data();
+            const row = [
+                reg.uniqueId || doc.id || '',
+                reg.name || reg['Full Name'] || '',
+                reg.email || reg['Email address'] || '',
+                reg.phone || '',
+                reg.gender || reg.Gender || '',
+                reg.age || reg.Age || '',
+                reg.country || reg.Country || '',
+                reg.normalizedPickupLocation || reg.arrivalPlace || reg['Place of Arrival'] || '',
+                reg.pickupNeeded || reg['Do you need a pickup on arrival?'] || '',
+                reg.arrivalDate || reg['Date of Arrival'] || '',
+                reg.arrivalTime || reg['Time of Arrival'] || '',
+                reg.arrivalFlightTrain || reg['Arrival Flight/Train Number'] || '',
+                reg.departurePlace || reg['Place of Departure Train/Flight'] || '',
+                reg.departureDate || reg['Date of Departure Train/Flight'] || '',
+                reg.departureTime || reg['Time of Departure Train/Flight'] || '',
+                reg.departureFlightTrain || reg['Departure Flight/Train Number'] || ''
+            ];
+            lines.push(toCsvRow(row));
+        });
+
+        fs.writeFileSync(outputPath, lines.join('\n'), { encoding: 'utf8' });
+        console.log(`\nTravel team CSV written to ${outputPath} (${lines.length - 1} rows)`);
+    } catch (error) {
+        console.error('Error exporting travel team data:', error);
+        throw error;
+    }
+}
+
+async function exportPostTourTeamData() {
+    console.log('Exporting Post Tour Team data...\n');
+
+    const headers = [
+        'Praveshika ID',
+        'Name',
+        'Email',
+        'Phone',
+        'Gender',
+        'Age',
+        'Country',
+        'Post Tour Selection',
+        'Accommodation'
+    ];
+
+    const outputPath = process.env.OUTPUT_PATH || 'exports/post_tour_team_data.csv';
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Ensure directory exists
+    const dir = path.dirname(outputPath);
+    try {
+        fs.mkdirSync(dir, { recursive: true });
+    } catch (e) {
+        if (e.code !== 'EEXIST') {
+            console.error(`Warning: Could not create directory ${dir}:`, e.message);
+        }
+    }
+    
+    // Remove existing file if it exists (in case it's read-only or locked)
+    try {
+        if (fs.existsSync(outputPath)) {
+            fs.unlinkSync(outputPath);
+        }
+    } catch (e) {
+        console.warn(`Warning: Could not remove existing file ${outputPath}:`, e.message);
+        // Continue anyway - writeFileSync will overwrite if permissions allow
+    }
+
+    try {
+        const snapshot = await db.collection('registrations').get();
+        console.log(`Processing ${snapshot.size} registrations...`);
+
+        const lines = [];
+        lines.push(toCsvRow(headers));
+
+        snapshot.forEach(doc => {
+            const reg = doc.data();
+            const row = [
+                reg.uniqueId || doc.id || '',
+                reg.name || reg['Full Name'] || '',
+                reg.email || reg['Email address'] || '',
+                reg.phone || '',
+                reg.gender || reg.Gender || '',
+                reg.age || reg.Age || '',
+                reg.country || reg.Country || '',
+                reg.postShibirTour || reg['Post Shibir Tour'] || 'None',
+                reg.accommodation || ''
+            ];
+            lines.push(toCsvRow(row));
+        });
+
+        fs.writeFileSync(outputPath, lines.join('\n'), { encoding: 'utf8' });
+        console.log(`\nPost tour team CSV written to ${outputPath} (${lines.length - 1} rows)`);
+    } catch (error) {
+        console.error('Error exporting post tour team data:', error);
+        throw error;
+    }
+}
+
+// ============================================================================
+// BULK UPDATE FROM CSV
+// ============================================================================
+
+// Bulk update registrations from CSV/XLSX
+// CSV format: First column is Praveshika ID, remaining columns are field names
+// Example:
+//   Praveshika ID, accommodation, ganaNumber, vahiniNumber
+//   AFBA1237, Hostel A, 5, 12
+//   AFBA1238, Hostel B, 6, 13
+async function bulkUpdateFromCsv() {
+    console.log('Bulk updating registrations from CSV...\n');
+    
+    const csvPath = process.env.UPDATE_CSV_PATH || 'dataprocessing/bulk_update.csv';
+    let workbook;
+    try {
+        workbook = XLSX.readFile(csvPath);
+    } catch (e) {
+        console.error(`Error: Update CSV/Excel file not found at ${csvPath}`);
+        console.error('Set UPDATE_CSV_PATH environment variable to specify a different path.');
+        process.exit(1);
+    }
+    
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    if (rows.length < 2) {
+        console.error('Error: CSV must have at least a header row and one data row');
+        process.exit(1);
+    }
+    
+    const headers = rows[0];
+    if (!headers || headers.length < 2) {
+        console.error('Error: CSV must have at least 2 columns (Praveshika ID + at least one field)');
+        process.exit(1);
+    }
+    
+    const idColumnIndex = 0;
+    const idColumnName = headers[idColumnIndex];
+    const fieldColumns = headers.slice(1); // All columns after the first are field names
+    
+    console.log(`ID Column: ${idColumnName}`);
+    console.log(`Field columns to update: ${fieldColumns.join(', ')}`);
+    console.log(`Processing ${rows.length - 1} data rows...\n`);
+    
+    let successCount = 0;
+    let errorCount = 0;
+    let notFoundCount = 0;
+    const errors = [];
+    
+    // Process in batches for efficiency
+    const BATCH_SIZE = 500;
+    let batch = db.batch();
+    let batchCount = 0;
+    
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+        
+        const praveshikaId = String(row[idColumnIndex] || '').trim();
+        if (!praveshikaId) {
+            console.warn(`Row ${i + 1}: Skipping - missing Praveshika ID`);
+            errorCount++;
+            continue;
+        }
+        
+        try {
+            // Try to find the registration by uniqueId (normalized and direct)
+            const normalizedId = praveshikaId.toLowerCase().replace(/[/-]/g, '');
+            
+            // First try direct document ID lookup
+            let regDoc = await db.collection('registrations').doc(praveshikaId).get();
+            
+            // If not found, try searching by normalizedId
+            if (!regDoc.exists) {
+                const querySnapshot = await db.collection('registrations')
+                    .where('normalizedId', '==', normalizedId)
+                    .limit(1)
+                    .get();
+                
+                if (!querySnapshot.empty) {
+                    regDoc = querySnapshot.docs[0];
+                }
+            }
+            
+            if (!regDoc.exists) {
+                console.warn(`Row ${i + 1}: Registration not found for Praveshika ID: ${praveshikaId}`);
+                notFoundCount++;
+                continue;
+            }
+            
+            // Build update object with only non-empty values
+            const updateData = {};
+            let hasUpdates = false;
+            
+            for (let j = 0; j < fieldColumns.length; j++) {
+                const fieldName = fieldColumns[j];
+                if (!fieldName) continue;
+                
+                const fieldValue = row[j + 1]; // +1 because first column is ID
+                
+                // Skip empty values (null, undefined, empty string)
+                if (fieldValue !== null && fieldValue !== undefined && fieldValue !== '') {
+                    const trimmedValue = String(fieldValue).trim();
+                    if (trimmedValue !== '') {
+                        // Check if field name is valid for Firestore
+                        if (isValidFirestoreFieldName(fieldName)) {
+                            updateData[fieldName] = trimmedValue;
+                            hasUpdates = true;
+                        } else {
+                            console.warn(`Row ${i + 1}: Invalid field name "${fieldName}" - skipping`);
+                        }
+                    }
+                }
+            }
+            
+            if (!hasUpdates) {
+                console.warn(`Row ${i + 1}: No valid updates for Praveshika ID: ${praveshikaId}`);
+                continue;
+            }
+            
+            // Add updatedAt timestamp
+            updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+            
+            // Add to batch
+            const docRef = db.collection('registrations').doc(regDoc.id);
+            batch.update(docRef, updateData);
+            batchCount++;
+            successCount++;
+            
+            if (successCount % 100 === 0) {
+                console.log(`  Processed ${successCount} registrations so far...`);
+            }
+            
+            // Commit batch if it's full
+            if (batchCount >= BATCH_SIZE) {
+                await batch.commit();
+                console.log(`  Committed batch of ${batchCount} updates`);
+                batch = db.batch();
+                batchCount = 0;
+            }
+            
+        } catch (error) {
+            console.error(`Row ${i + 1}: Error processing Praveshika ID ${praveshikaId}:`, error.message);
+            errors.push({ row: i + 1, praveshikaId, error: error.message });
+            errorCount++;
+        }
+    }
+    
+    // Commit remaining batch
+    if (batchCount > 0) {
+        await batch.commit();
+        console.log(`  Committed final batch of ${batchCount} updates`);
+    }
+    
+    console.log(`\n=== Bulk Update Summary ===`);
+    console.log(`Total rows processed: ${rows.length - 1}`);
+    console.log(`Successfully updated: ${successCount}`);
+    console.log(`Not found: ${notFoundCount}`);
+    console.log(`Errors: ${errorCount}`);
+    
+    if (errors.length > 0) {
+        console.log(`\nErrors:`);
+        errors.forEach(e => {
+            console.log(`  Row ${e.row} (${e.praveshikaId}): ${e.error}`);
+        });
+    }
+}
+
 // Find duplicates by last 4 digits of PraveshikaID
 async function findDuplicatesByLast4Digits() {
     console.log('Finding duplicates by last 4 digits of PraveshikaID...\n');
@@ -2004,6 +2343,9 @@ async function main() {
             case 'import-volunteers':
                 await importVolunteersFromCsv();
                 break;
+            case 'bulk-update':
+                await bulkUpdateFromCsv();
+                break;
             case 'normalize':
                 await normalizeFieldNames();
                 break;
@@ -2058,10 +2400,18 @@ async function main() {
                 await normalizePickupLocations();
                 await normalizePostTourOptions();
                 break;
+            case 'export-travel-team':
+                await exportTravelTeamData();
+                break;
+            case 'export-post-tour-team':
+                await exportPostTourTeamData();
+                break;
             default:
                 console.log('Usage: node firestore-utils.js <command>');
                 console.log('Commands:');
                 console.log('  import              - Import Excel data to Firestore');
+                console.log('  import-volunteers   - Import volunteers from CSV/XLSX');
+                console.log('  bulk-update         - Bulk update registrations from CSV/XLSX (Praveshika ID + field values)');
                 console.log('  normalize           - Normalize field names to camelCase');
                 console.log('  cleanup             - Remove fields with invalid Firestore characters');
                 console.log('  find-negative-phones - Find phone numbers that are negative');
@@ -2079,6 +2429,8 @@ async function main() {
                 console.log('  normalize-pickup-locations - Normalize pickup locations to standard options');
                 console.log('  normalize-post-tour  - Normalize post tour options (Kandakurti->None, etc.)');
                 console.log('  normalize-all        - Run all normalization functions');
+                console.log('  export-travel-team   - Export travel team CSV (transportation data)');
+                console.log('  export-post-tour-team - Export post tour team CSV');
                 process.exit(1);
         }
         console.log('\nProcess finished');

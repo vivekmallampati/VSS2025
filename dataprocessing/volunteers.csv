@@ -1,0 +1,8 @@
+name,email,uniqueId,role,volunteerTeams
+John Doe,john.doe@example.com,VOL001,volunteer,transportation;registration
+Jane Smith,jane.smith@example.com,VOL002,volunteer,ganvesh_collected;cloak_room
+Bob Johnson,bob.johnson@example.com,VOL003,volunteer,post_tour
+Alice Williams,alice.williams@example.com,VOL004,volunteer,transportation;registration;ganvesh_collected
+Charlie Brown,charlie.brown@example.com,ADMIN001,admin,
+David Davis,david.davis@example.com,VOL005,volunteer,cloak_room;post_tour
+
