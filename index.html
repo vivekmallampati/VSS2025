@@ -2292,20 +2292,12 @@
                                         <input type="text" id="checkinPickupLocation" class="form-input" placeholder="Enter pickup location">
                                     </div>
                                     <div class="form-group" id="registrationOptionsGroup" style="display: none;">
-                                        <label>Actions:</label>
-                                        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
-                                            <label style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <input type="checkbox" id="registrationCheck" checked>
-                                                <span>Registration</span>
-                                            </label>
-                                            <label style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <input type="checkbox" id="shulkPaidCheck">
-                                                <span>Shulk Paid</span>
-                                            </label>
-                                            <label style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <input type="checkbox" id="kitCollectedCheck">
-                                                <span>Kit Collected</span>
-                                            </label>
+                                        <label>Registration Check-in:</label>
+                                        <div style="margin-top: 0.5rem; padding: 0.75rem; background-color: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px;">
+                                            <p style="margin: 0; font-size: 0.9rem; color: #1976D2;">
+                                                <strong>Note:</strong> Registration includes Shulk Paid and Kit Collected. 
+                                                Both must be completed to finalize registration.
+                                            </p>
                                         </div>
                                     </div>
                                     <div class="form-group" id="cloakRoomFields" style="display: none;">
@@ -2349,8 +2341,6 @@
                                             <option value="">All Types</option>
                                             <option value="pickup_location">Pickup Location</option>
                                             <option value="registration">Registration</option>
-                                            <option value="shulk_paid">Shulk Paid</option>
-                                            <option value="kit_collected">Kit Collected</option>
                                             <option value="ganvesh_collected">Ganvesh Collected</option>
                                             <option value="cloak_room">Cloak Room</option>
                                             <option value="post_tour">Post Tour</option>

@@ -80,11 +80,12 @@ service cloud.firestore {
     function volunteerHasAccess(checkinType) {
       let teams = getVolunteerTeams();
       // Map checkin types to team names
+      // Note: shulk_paid and kit_collected are part of registration, so they map to 'registration' team
       let teamMap = {
         'pickup_location': 'transportation',
         'registration': 'registration',
-        'shulk_paid': 'shulk_paid',
-        'kit_collected': 'kit_collected',
+        'shulk_paid': 'registration',
+        'kit_collected': 'registration',
         'ganvesh_collected': 'ganvesh_collected',
         'cloak_room': 'cloak_room',
         'post_tour': 'post_tour'
@@ -197,10 +198,16 @@ service cloud.firestore {
                normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(resource.data.uniqueId);
       }
       
+      // Helper function to check if user created this checkin
+      function isCreatorOfCheckin() {
+        return request.auth != null && resource.data.checkedInBy == request.auth.uid;
+      }
+      
       // Superadmins and admins can read all checkins
       allow read: if request.auth != null && isAdmin();
-      // Volunteers can read checkins for their assigned teams
-      allow read: if request.auth != null && isVolunteer() && volunteerHasAccess(resource.data.checkinType);
+      // Volunteers can read checkins for their assigned teams OR checkins they created
+      allow read: if request.auth != null && isVolunteer() && 
+                    (volunteerHasAccess(resource.data.checkinType) || isCreatorOfCheckin());
       // Participants can read their own checkins (by uniqueId match)
       allow read: if request.auth != null && 
                     exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&

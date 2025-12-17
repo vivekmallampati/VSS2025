@@ -135,6 +135,8 @@ async function hasAccessToCheckinType(user, checkinType) {
     const teamMap = {
         'pickup_location': 'transportation',
         'registration': 'registration',
+        'shulk_paid': 'registration',  // Shulk paid is part of registration
+        'kit_collected': 'registration',  // Kit collected is part of registration
         'ganvesh_collected': 'ganvesh_collected',
         'cloak_room': 'cloak_room',
         'post_tour': 'post_tour'
@@ -9840,20 +9842,11 @@ function updateCheckinFormForType() {
     }
 }
 
-// Get selected registration actions (registration, shulk, kit)
+// Get selected registration actions (registration automatically includes shulk_paid and kit_collected)
 function getSelectedRegistrationActions() {
-    const actions = [];
-    const regCheckbox = document.getElementById('registrationCheck');
-    const shulkCheckbox = document.getElementById('shulkPaidCheck');
-    const kitCheckbox = document.getElementById('kitCollectedCheck');
-    
-    if (!regCheckbox && !shulkCheckbox && !kitCheckbox) return actions;
-    
-    if (regCheckbox?.checked) actions.push('registration');
-    if (shulkCheckbox?.checked) actions.push('shulk_paid');
-    if (kitCheckbox?.checked) actions.push('kit_collected');
-    
-    return actions;
+    // Registration always includes shulk_paid and kit_collected
+    // No checkboxes needed - these are automatically processed together
+    return ['registration', 'shulk_paid', 'kit_collected'];
 }
 
 // Switch search mode
@@ -10337,27 +10330,16 @@ async function performCheckin() {
         }
         const regData = regDoc.data();
         
-        // Determine types to process (registration + optional shulk/kit)
+        // Determine types to process (registration automatically includes shulk_paid and kit_collected)
         let typesToProcess = [];
         if (currentCheckinType === 'registration') {
             typesToProcess = getSelectedRegistrationActions();
             if (!typesToProcess.length) {
-                showNotification('Select at least one action (Registration / Shulk / Kit)', 'error');
+                showNotification('Registration check-in is required', 'error');
                 return;
             }
-            
-            // If shulk/kit selected but registration not selected and no prior registration checkin, auto-add registration first
-            const requiresRegistration = typesToProcess.some(t => ['shulk_paid', 'kit_collected'].includes(t));
-            if (requiresRegistration && !typesToProcess.includes('registration')) {
-                const registrationCheckin = await db.collection('checkins')
-                    .where('uniqueId', '==', uniqueIdToCheckIn)
-                    .where('checkinType', '==', 'registration')
-                    .limit(1)
-                    .get();
-                if (registrationCheckin.empty) {
-                    typesToProcess.unshift('registration');
-                }
-            }
+            // Registration now automatically includes shulk_paid and kit_collected
+            // No need for separate checks
         } else {
             typesToProcess = [currentCheckinType];
         }
@@ -10386,7 +10368,8 @@ async function performCheckin() {
         
         for (const type of typesToProcess) {
             // Enforce registration prerequisite for downstream types
-            const typesRequiringRegistration = ['shulk_paid', 'kit_collected', 'ganvesh_collected', 'cloak_room'];
+            // Note: shulk_paid and kit_collected are now part of registration, so they don't need this check
+            const typesRequiringRegistration = ['ganvesh_collected', 'cloak_room'];
             if (type !== 'registration' && typesRequiringRegistration.includes(type)) {
                 const registrationCheckin = await db.collection('checkins')
                     .where('uniqueId', '==', uniqueIdToCheckIn)
@@ -10497,13 +10480,8 @@ function clearCheckinForm() {
     if (itemCount) itemCount.value = '';
     if (tagId) tagId.value = '';
     
-    // Reset registration combo checkboxes
-    const regCheckbox = document.getElementById('registrationCheck');
-    const shulkCheckbox = document.getElementById('shulkPaidCheck');
-    const kitCheckbox = document.getElementById('kitCollectedCheck');
-    if (regCheckbox) regCheckbox.checked = true;
-    if (shulkCheckbox) shulkCheckbox.checked = false;
-    if (kitCheckbox) kitCheckbox.checked = false;
+    // Registration now automatically includes shulk_paid and kit_collected
+    // No checkbox to reset - registration is always included
 }
 
 // Perform Cloak Room checkout
@@ -10694,19 +10672,43 @@ async function loadRecentCheckins(checkinType, limit = 5) {
         const user = firebase.auth().currentUser;
         if (!user) return;
         
-        let query = db.collection('checkins')
-            .where('checkinType', '==', checkinType)
-            .orderBy('timestamp', 'desc')
-            .limit(limit);
-        
-        // If volunteer, filter by their access
         const isAdminUser = await isAdmin(user);
-        if (!isAdminUser) {
-            // Volunteers can only see checkins they have access to
-            // This is handled by Firestore rules, but we can add additional filtering if needed
-        }
         
-        const snapshot = await query.get();
+        let snapshot;
+        
+        if (isAdminUser) {
+            // Admins: show all recent checkins
+            snapshot = await db.collection('checkins')
+                .where('checkinType', '==', checkinType)
+                .orderBy('timestamp', 'desc')
+                .limit(limit)
+                .get();
+        } else {
+            // Volunteers: only show checkins they created
+            // Query by checkedInBy, filter by checkinType client-side, then sort by timestamp
+            const allUserCheckins = await db.collection('checkins')
+                .where('checkedInBy', '==', user.uid)
+                .get();
+            
+            // Filter by checkinType, sort by timestamp, then limit
+            const filteredDocs = allUserCheckins.docs
+                .filter(doc => {
+                    const data = doc.data();
+                    return data.checkinType === checkinType;
+                })
+                .sort((a, b) => {
+                    const aTime = a.data().timestamp?.toMillis() || 0;
+                    const bTime = b.data().timestamp?.toMillis() || 0;
+                    return bTime - aTime; // Descending order
+                })
+                .slice(0, limit);
+            
+            // Create a mock snapshot-like object
+            snapshot = {
+                docs: filteredDocs,
+                empty: filteredDocs.length === 0
+            };
+        }
         
         if (snapshot.empty) {
             recentCheckinsList.innerHTML = '<p>No recent checkins</p>';
@@ -10754,7 +10756,13 @@ async function loadRecentCheckins(checkinType, limit = 5) {
         recentCheckinsList.innerHTML = html;
     } catch (error) {
         console.error('Error loading recent checkins:', error);
-        recentCheckinsList.innerHTML = '<p>Error loading recent checkins</p>';
+        let errorMessage = 'Error loading recent checkins';
+        if (error.code === 'failed-precondition') {
+            errorMessage = 'Database index required. Please contact administrator.';
+        } else if (error.message) {
+            errorMessage = `Error: ${error.message}`;
+        }
+        recentCheckinsList.innerHTML = `<p style="color: #dc3545;">${errorMessage}</p>`;
     }
 }
 
@@ -10996,7 +11004,8 @@ async function executeBatchCheckin(ids) {
             const regData = regDoc.data();
             
             // Check if Registration check-in is required for certain types
-            const typesRequiringRegistration = ['shulk_paid', 'kit_collected', 'ganvesh_collected', 'cloak_room'];
+            // Note: shulk_paid and kit_collected are now part of registration, so they don't need this check
+            const typesRequiringRegistration = ['ganvesh_collected', 'cloak_room'];
             if (typesRequiringRegistration.includes(currentCheckinType)) {
                 const registrationCheckin = await db.collection('checkins')
                     .where('uniqueId', '==', validatedUniqueId)
@@ -11118,33 +11127,74 @@ async function loadCheckinHistory(page = 1) {
         const user = firebase.auth().currentUser;
         if (!user) return;
         
+        const isAdminUser = await isAdmin(user);
+        
         // Get filters
         const filterType = document.getElementById('historyFilterType')?.value || '';
         const filterSearch = document.getElementById('historyFilterSearch')?.value.trim() || '';
         
-        let query = db.collection('checkins');
+        let snapshot;
+        let totalCount;
         
-        // Apply filters
-        if (filterType) {
-            query = query.where('checkinType', '==', filterType);
+        if (isAdminUser) {
+            // Admins: show all checkins
+            let query = db.collection('checkins');
+            
+            // Apply filters
+            if (filterType) {
+                query = query.where('checkinType', '==', filterType);
+            }
+            
+            // Order by timestamp
+            query = query.orderBy('timestamp', 'desc');
+            
+            // Get total count (for pagination)
+            const totalSnapshot = await query.get();
+            totalCount = totalSnapshot.size;
+            
+            // Apply pagination
+            const startAfter = (page - 1) * historyPageSize;
+            if (startAfter > 0) {
+                const startDoc = totalSnapshot.docs[startAfter - 1];
+                query = query.startAfter(startDoc);
+            }
+            query = query.limit(historyPageSize);
+            
+            snapshot = await query.get();
+        } else {
+            // Volunteers: only show checkins they created
+            // Query by checkedInBy, then filter client-side to avoid index requirements
+            const allUserCheckins = await db.collection('checkins')
+                .where('checkedInBy', '==', user.uid)
+                .get();
+            
+            // Filter by checkinType if provided, then sort by timestamp
+            let filteredDocs = Array.from(allUserCheckins.docs);
+            
+            if (filterType) {
+                filteredDocs = filteredDocs.filter(doc => doc.data().checkinType === filterType);
+            }
+            
+            // Sort by timestamp descending
+            filteredDocs.sort((a, b) => {
+                const aTime = a.data().timestamp?.toMillis() || 0;
+                const bTime = b.data().timestamp?.toMillis() || 0;
+                return bTime - aTime; // Descending order
+            });
+            
+            totalCount = filteredDocs.length;
+            
+            // Apply pagination
+            const startAfter = (page - 1) * historyPageSize;
+            const endAt = startAfter + historyPageSize;
+            filteredDocs = filteredDocs.slice(startAfter, endAt);
+            
+            // Create a mock snapshot-like object
+            snapshot = {
+                docs: filteredDocs,
+                empty: filteredDocs.length === 0
+            };
         }
-        
-        // Order by timestamp
-        query = query.orderBy('timestamp', 'desc');
-        
-        // Get total count (for pagination)
-        const totalSnapshot = await query.get();
-        const totalCount = totalSnapshot.size;
-        
-        // Apply pagination
-        const startAfter = (page - 1) * historyPageSize;
-        if (startAfter > 0) {
-            const startDoc = totalSnapshot.docs[startAfter - 1];
-            query = query.startAfter(startDoc);
-        }
-        query = query.limit(historyPageSize);
-        
-        const snapshot = await query.get();
         
         // Fetch participant data from registrations for all checkins
         const uniqueIds = snapshot.docs.map(doc => doc.data().uniqueId).filter(id => id);
@@ -11238,7 +11288,13 @@ async function loadCheckinHistory(page = 1) {
         
     } catch (error) {
         console.error('Error loading checkin history:', error);
-        historyList.innerHTML = '<p>Error loading checkin history</p>';
+        let errorMessage = 'Error loading checkin history';
+        if (error.code === 'failed-precondition') {
+            errorMessage = 'Database index required. Please contact administrator.';
+        } else if (error.message) {
+            errorMessage = `Error: ${error.message}`;
+        }
+        historyList.innerHTML = `<p style="color: #dc3545;">${errorMessage}</p>`;
     }
 }
 
@@ -11329,21 +11385,58 @@ async function exportCheckinHistory(format) {
     
     try {
         const db = firebase.firestore();
+        const user = firebase.auth().currentUser;
+        if (!user) {
+            showNotification('Please log in to export', 'error');
+            return;
+        }
+        
+        const isAdminUser = await isAdmin(user);
         
         // Get all filtered data (not paginated)
         const filterType = document.getElementById('historyFilterType')?.value || '';
         const filterSearch = document.getElementById('historyFilterSearch')?.value.trim() || '';
         
-        let query = db.collection('checkins');
+        let snapshot;
         
-        if (filterType) {
-            query = query.where('checkinType', '==', filterType);
+        if (isAdminUser) {
+            // Admins: export all checkins
+            let query = db.collection('checkins');
+            
+            if (filterType) {
+                query = query.where('checkinType', '==', filterType);
+            }
+            
+            // Order by timestamp
+            query = query.orderBy('timestamp', 'desc');
+            
+            snapshot = await query.get();
+        } else {
+            // Volunteers: only export checkins they created
+            const allUserCheckins = await db.collection('checkins')
+                .where('checkedInBy', '==', user.uid)
+                .get();
+            
+            // Filter by checkinType if provided, then sort by timestamp
+            let filteredDocs = Array.from(allUserCheckins.docs);
+            
+            if (filterType) {
+                filteredDocs = filteredDocs.filter(doc => doc.data().checkinType === filterType);
+            }
+            
+            // Sort by timestamp descending
+            filteredDocs.sort((a, b) => {
+                const aTime = a.data().timestamp?.toMillis() || 0;
+                const bTime = b.data().timestamp?.toMillis() || 0;
+                return bTime - aTime; // Descending order
+            });
+            
+            // Create a mock snapshot-like object
+            snapshot = {
+                docs: filteredDocs,
+                empty: filteredDocs.length === 0
+            };
         }
-        
-        // Order by timestamp
-        query = query.orderBy('timestamp', 'desc');
-        
-        const snapshot = await query.get();
         
         // Fetch participant data from registrations
         const uniqueIds = snapshot.docs.map(doc => doc.data().uniqueId).filter(id => id);
