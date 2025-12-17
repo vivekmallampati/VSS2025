@@ -9776,6 +9776,16 @@ async function filterCheckinTypeTabs(user) {
     // Ensure currentCheckinType is valid for this volunteer
     if (firstVisibleTabId) {
         currentCheckinType = firstVisibleTabId;
+        // For volunteers, automatically activate the first visible tab
+        // For registration volunteers, this will be 'registration'
+        // This ensures the tab is visually selected when the page loads
+        switchCheckinType(firstVisibleTabId);
+    }
+    
+    // Specifically ensure registration is selected if volunteer has registration access
+    if (!isAdminUser && teams.includes('registration')) {
+        currentCheckinType = 'registration';
+        switchCheckinType('registration');
     }
 }
 
@@ -10731,17 +10741,11 @@ async function loadRecentCheckins(checkinType, limit = 5) {
             const participantName = registrationsMap.get(data.uniqueId) || 'Unknown';
             
             html += `
-                <li class="recent-checkin-item" style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="flex: 1;">
+                <li class="recent-checkin-item">
                     <div class="checkin-item-name">${escapeHtml(participantName)}</div>
                     <div class="checkin-item-id">${escapeHtml(data.uniqueId)}</div>
                     <div class="checkin-item-time">${escapeHtml(timeStr)}</div>
                     <div class="checkin-item-by">By: ${escapeHtml(data.checkedInByName)}</div>
-                    </div>
-                    <button class="btn btn-small" style="background-color: #dc3545; color: white; padding: 0.25rem 0.5rem; font-size: 0.75rem;" 
-                            onclick="undoCheckin('${escapeHtml(docId)}', '${escapeHtml(data.uniqueId)}', '${escapeHtml(participantName)}')">
-                        Undo
-                    </button>
                 </li>
             `;
         });
