@@ -6081,6 +6081,10 @@ function displayAdminStatistics(stats, registrations, users = []) {
     // 3. Registrations by Shreni/Zone Matrix
     
     // Store data globally for table population
+    // Only store original full data if not already set (preserve original for filter resets)
+    if (!window.allDashboardRegistrations || registrations.length >= (window.allDashboardRegistrations?.length || 0)) {
+        window.allDashboardRegistrations = registrations;
+    }
     window.dashboardStats = stats;
     window.dashboardRegistrations = registrations;
     window.dashboardUsers = safeUsers;
@@ -6454,7 +6458,8 @@ function displayShreniZoneMatrix(registrations) {
 // Update dashboard based on status filter
 async function updateDashboardWithFilter() {
     const filterValue = document.getElementById('dashboardStatusFilter')?.value || 'registered';
-    const registrations = window.dashboardRegistrations || [];
+    // Use the original full registrations data for filtering, not the potentially filtered data
+    const registrations = window.allDashboardRegistrations || window.dashboardRegistrations || [];
     const users = window.dashboardUsers || [];
     
     // Get filtered registrations based on status
