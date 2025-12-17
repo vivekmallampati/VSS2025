@@ -160,8 +160,8 @@ service cloud.firestore {
       allow create, update: if request.auth != null && request.auth.uid == userId;
       // Admins can also create user documents (for new user creation)
       allow create: if request.auth != null && isAdmin();
-      // Users cannot delete their own data (admin only)
-      allow delete: if false;
+      // Only admins can delete user documents
+      allow delete: if request.auth != null && isAdmin();
     }
     
     // EmailToUids collection - maps emails to associated uniqueIds
@@ -239,6 +239,9 @@ service cloud.firestore {
                     (isOwnerOfRegistration(uniqueId) ||
                      (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
                       normalizeId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniqueId) == normalizeId(uniqueId)));
+      // Allow unauthenticated queries limited to 1 result for login purposes
+      // This allows checking if email exists during login flow before authentication
+      allow list: if request.query != null && request.query.limit <= 1;
       // Only admins can create/update/delete
       allow create, update, delete: if request.auth != null && isAdmin();
     }

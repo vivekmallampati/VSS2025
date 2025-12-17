@@ -2057,8 +2057,9 @@
                             <h3>Batch Upload Users (CSV)</h3>
                             <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
                                 Upload a CSV file to create multiple users at once.<br>
-                                <strong>Required columns:</strong> name, uniqueId, role<br>
-                                <strong>Optional columns:</strong> email, volunteerTeams (comma-separated: transportation, registration, ganvesh_collected, cloak_room, post_tour)
+                                <strong>All columns are required:</strong> name, uniqueId, email, role, volunteerTeams<br>
+                                <strong>Valid teams:</strong> transportation, registration, ganvesh_collected, cloak_room, post_tour (comma-separated)<br>
+                                <strong>Valid roles:</strong> volunteer, admin
                             </p>
                             
                             <div style="margin-bottom: 1rem;">
@@ -2101,15 +2102,20 @@
                                 <div id="batchUserMessage" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: 4px;"></div>
                             </div>
                             
-                            <div style="margin-top: 1rem; padding: 0.75rem; background: #fff3cd; border-radius: 4px; font-size: 0.85rem;">
-                                <strong>⚠️ Note:</strong> This creates Firestore user records. Users will use the default password <code>Vss@2025</code> to log in. 
-                                They should change their password after first login.
+                            <div style="margin-top: 1rem; padding: 0.75rem; background: #d4edda; border-radius: 4px; font-size: 0.85rem;">
+                                <strong>ℹ️ Info:</strong> This creates user records and Firebase Auth accounts. 
+                                Users can log in immediately using their email and password: <code>Vss@2025!</code>
                             </div>
                         </div>
 
                         <!-- Existing Users List -->
                         <div class="user-management-list">
-                            <h3>Existing Users (Volunteers & Admins)</h3>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h3 style="margin: 0;">Existing Users (Volunteers & Admins)</h3>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="migrateVolunteersToNonShibirarthi()" style="font-size: 0.85rem;">
+                                    🔄 Migrate Volunteers from Users Collection
+                                </button>
+                            </div>
                             <div id="userManagementList" class="data-table-container">
                                 <p>Loading users...</p>
                             </div>

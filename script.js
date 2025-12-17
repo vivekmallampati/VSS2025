@@ -940,16 +940,60 @@ document.addEventListener('DOMContentLoaded', function() {
                                                   error.code === 'auth/invalid-credential' || 
                                                   error.code === 'auth/invalid-login-credentials';
                             
-                            if (isUserNotFound && password === DEFAULT_PASSWORD) {
-                                // Check if email exists in registrations collection
-                                showNotification('Checking registration...', 'info');
-                                db.collection('registrations').where('email', '==', identifier).limit(1).get()
-                                    .then(querySnapshot => {
+                            // Check if user exists in nonShibirarthiUsers or registrations (for auto-creation)
+                            // Allow this check even if password doesn't match exactly (user might have typo)
+                            if (isUserNotFound) {
+                                // First check if email exists in nonShibirarthiUsers (volunteers/admins)
+                                showNotification('Checking account...', 'info');
+                                
+                                db.collection('nonShibirarthiUsers').where('email', '==', identifier).limit(1).get()
+                                    .then(volunteerSnapshot => {
+                                        if (!volunteerSnapshot.empty) {
+                                            // Found volunteer/admin - create Auth account for them
+                                            const volunteerDoc = volunteerSnapshot.docs[0];
+                                            const volunteerData = volunteerDoc.data();
+                                            
+                                            // If password matches default, create account
+                                            if (password === DEFAULT_PASSWORD) {
+                                                showNotification('Creating your volunteer account...', 'info');
+                                                return firebase.auth().createUserWithEmailAndPassword(identifier, DEFAULT_PASSWORD)
+                                                    .then((userCredential) => {
+                                                        const user = userCredential.user;
+                                                        showNotification('Account created! You are now logged in.', 'success');
+                                                        // Volunteer accounts don't need password reset prompt
+                                                        return 'volunteer_created';
+                                                    })
+                                                    .catch((createError) => {
+                                                        if (createError.code === 'auth/email-already-in-use') {
+                                                            showNotification('Incorrect password. Please check your credentials.', 'error');
+                                                        } else {
+                                                            console.error('Volunteer account creation error:', createError);
+                                                            showNotification('Error creating account: ' + createError.message, 'error');
+                                                        }
+                                                        return 'error';
+                                                    });
+                                            } else {
+                                                // Password doesn't match - account might already exist with different password
+                                                showNotification('Incorrect password. Please check your credentials or use "Forgot Password".', 'error');
+                                                return 'error';
+                                            }
+                                        }
+                                        
+                                        // Not found in nonShibirarthiUsers, check registrations
+                                        return db.collection('registrations').where('email', '==', identifier).limit(1).get();
+                                    })
+                                    .then(result => {
+                                        // If volunteer was created or error occurred, stop here
+                                        if (result === 'volunteer_created' || result === 'error') {
+                                            return null;
+                                        }
+                                        
+                                        const querySnapshot = result;
                                         let matchingDoc = null;
                                         
-                                        if (!querySnapshot.empty) {
+                                        if (querySnapshot && !querySnapshot.empty) {
                                             matchingDoc = querySnapshot.docs[0];
-                                        } else {
+                                        } else if (querySnapshot) {
                                             // Fallback: search through all documents
                                             return db.collection('registrations').get()
                                                 .then(allDocs => {
@@ -969,8 +1013,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                         return matchingDoc;
                                     })
                                     .then(matchingDoc => {
+                                        // If null, volunteer was already handled
+                                        if (matchingDoc === null) {
+                                            return;
+                                        }
+                                        
                                         if (!matchingDoc) {
-                                            showNotification('Email not found in registrations. Please contact your administrator.', 'error');
+                                            showNotification('Email not found. Please contact your administrator.', 'error');
                                             return;
                                         }
                                         
@@ -1020,7 +1069,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                     })
                                     .catch((dbError) => {
                                         console.error('Database error:', dbError);
-                                        showNotification('Error checking registration. Please try again.', 'error');
+                                        // If permission denied, user might need to contact admin
+                                        if (dbError.code === 'permission-denied') {
+                                            showNotification('Permission error. Please contact your administrator or try logging in with your exact password.', 'error');
+                                        } else {
+                                            showNotification('Error checking account. Please try again or contact your administrator.', 'error');
+                                        }
                                     });
                             } else if (error.code === 'auth/user-not-found') {
                                 showNotification('Email not found. Please contact your administrator.', 'error');
@@ -4795,8 +4849,8 @@ async function loadUserManagement() {
         
         const db = firebase.firestore();
         
-        // Fetch all users with role (volunteers and admins)
-        const usersSnapshot = await db.collection('users')
+        // Fetch all users from nonShibirarthiUsers collection (volunteers and admins)
+        const usersSnapshot = await db.collection('nonShibirarthiUsers')
             .where('role', 'in', ['volunteer', 'admin'])
             .get();
         
@@ -4804,7 +4858,7 @@ async function loadUserManagement() {
         usersSnapshot.forEach(doc => {
             const data = doc.data();
             users.push({
-                uid: doc.id,
+                docId: doc.id,
                 ...data
             });
         });
@@ -4884,6 +4938,7 @@ function displayUserManagementUI(users) {
                     <th>ID</th>
                     <th>Role</th>
                     <th>Created</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -4892,9 +4947,14 @@ function displayUserManagementUI(users) {
     users.forEach(user => {
         const createdDate = user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : 'N/A';
         const roleBadgeClass = user.role === 'admin' ? 'role-badge-admin' : 'role-badge-volunteer';
+        const userDataJson = escapeHtml(JSON.stringify({
+            uniqueId: user.uniqueId,
+            name: user.name,
+            email: user.email
+        }));
         
         html += `
-            <tr>
+            <tr id="userRow_${escapeHtml(user.uniqueId || user.docId)}">
                 <td>${escapeHtml(user.name || 'N/A')}</td>
                 <td>${escapeHtml(user.email || 'N/A')}</td>
                 <td>${escapeHtml(user.uniqueId || '-')}</td>
@@ -4905,6 +4965,11 @@ function displayUserManagementUI(users) {
                         : ''}
                 </td>
                 <td>${createdDate}</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" onclick="deleteUser('${escapeHtml(user.uniqueId)}', '${escapeHtml(user.name)}', '${escapeHtml(user.email || '')}')" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                        🗑️ Delete
+                    </button>
+                </td>
             </tr>
         `;
     });
@@ -4915,6 +4980,274 @@ function displayUserManagementUI(users) {
     `;
     
     userListContainer.innerHTML = html;
+}
+
+// Delete a user from nonShibirarthiUsers, users collection, and Firebase Auth
+async function deleteUser(uniqueId, name, email) {
+    if (!uniqueId) {
+        showNotification('Invalid user ID', 'error');
+        return;
+    }
+    
+    // Confirm deletion
+    const confirmDelete = confirm(`Are you sure you want to delete user "${name}" (${uniqueId})?\n\nThis will remove them from:\n- nonShibirarthiUsers collection\n- users collection\n- Firebase Authentication\n\nThis action cannot be undone.`);
+    if (!confirmDelete) return;
+    
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    const currentUser = firebase.auth().currentUser;
+    if (!currentUser) {
+        showNotification('Not authenticated', 'error');
+        return;
+    }
+    
+    const isAdminUser = await isAdmin(currentUser);
+    if (!isAdminUser) {
+        showNotification('Permission denied. Only admins can delete users.', 'error');
+        return;
+    }
+    
+    const db = firebase.firestore();
+    const row = document.getElementById(`userRow_${uniqueId}`);
+    
+    try {
+        // Update row to show deleting status
+        if (row) {
+            row.style.opacity = '0.5';
+            row.style.backgroundColor = '#fff3cd';
+        }
+        
+        showNotification(`Deleting user ${name}...`, 'info');
+        
+        // 1. Delete from nonShibirarthiUsers collection first
+        try {
+            await db.collection('nonShibirarthiUsers').doc(uniqueId).delete();
+            console.log(`Deleted ${uniqueId} from nonShibirarthiUsers`);
+        } catch (e) {
+            console.warn(`Could not delete from nonShibirarthiUsers:`, e);
+        }
+        
+        // 2. Delete from users collection (may have different doc ID)
+        let deletedFromUsers = false;
+        let deletedDocIds = [];
+        try {
+            // First try with uniqueId as doc ID
+            const userDoc = await db.collection('users').doc(uniqueId).get();
+            if (userDoc.exists) {
+                await db.collection('users').doc(uniqueId).delete();
+                // Verify deletion
+                const verifyDoc = await db.collection('users').doc(uniqueId).get();
+                if (!verifyDoc.exists) {
+                    console.log(`✓ Verified: Deleted ${uniqueId} from users collection (by doc ID)`);
+                    deletedFromUsers = true;
+                    deletedDocIds.push(uniqueId);
+                } else {
+                    console.error(`✗ Failed: Document ${uniqueId} still exists after delete attempt`);
+                }
+            }
+            
+            // Also search by uniqueId field (exact match)
+            if (!deletedFromUsers) {
+                const usersSnapshot = await db.collection('users')
+                    .where('uniqueId', '==', uniqueId)
+                    .get();
+                console.log(`Found ${usersSnapshot.size} users with uniqueId field = ${uniqueId}`);
+                for (const doc of usersSnapshot.docs) {
+                    if (!deletedDocIds.includes(doc.id)) {
+                        await db.collection('users').doc(doc.id).delete();
+                        // Verify deletion
+                        const verifyDoc = await db.collection('users').doc(doc.id).get();
+                        if (!verifyDoc.exists) {
+                            console.log(`✓ Verified: Deleted ${doc.id} from users collection (by uniqueId field)`);
+                            deletedFromUsers = true;
+                            deletedDocIds.push(doc.id);
+                        } else {
+                            console.error(`✗ Failed: Document ${doc.id} still exists after delete attempt`);
+                        }
+                    }
+                }
+            }
+            
+            // Try searching by email if still not found
+            if (!deletedFromUsers && email) {
+                const emailSnapshot = await db.collection('users')
+                    .where('email', '==', email)
+                    .get();
+                console.log(`Found ${emailSnapshot.size} users with email = ${email}`);
+                for (const doc of emailSnapshot.docs) {
+                    const data = doc.data();
+                    // Only delete if uniqueId matches or is close
+                    if ((data.uniqueId === uniqueId || data.uniqueId?.toUpperCase() === uniqueId?.toUpperCase()) &&
+                        !deletedDocIds.includes(doc.id)) {
+                        await db.collection('users').doc(doc.id).delete();
+                        // Verify deletion
+                        const verifyDoc = await db.collection('users').doc(doc.id).get();
+                        if (!verifyDoc.exists) {
+                            console.log(`✓ Verified: Deleted ${doc.id} from users collection (by email)`);
+                            deletedFromUsers = true;
+                            deletedDocIds.push(doc.id);
+                        } else {
+                            console.error(`✗ Failed: Document ${doc.id} still exists after delete attempt`);
+                        }
+                    }
+                }
+            }
+            
+            // Last resort: scan all users with role volunteer/admin and match uniqueId
+            if (!deletedFromUsers) {
+                console.log('Scanning all volunteer/admin users to find match...');
+                const allUsersSnapshot = await db.collection('users')
+                    .where('role', 'in', ['volunteer', 'admin'])
+                    .get();
+                for (const doc of allUsersSnapshot.docs) {
+                    const data = doc.data();
+                    if (data.uniqueId && data.uniqueId.toUpperCase() === uniqueId.toUpperCase() &&
+                        !deletedDocIds.includes(doc.id)) {
+                        await db.collection('users').doc(doc.id).delete();
+                        // Verify deletion
+                        const verifyDoc = await db.collection('users').doc(doc.id).get();
+                        if (!verifyDoc.exists) {
+                            console.log(`✓ Verified: Deleted ${doc.id} from users collection (by role scan, uniqueId: ${data.uniqueId})`);
+                            deletedFromUsers = true;
+                            deletedDocIds.push(doc.id);
+                        } else {
+                            console.error(`✗ Failed: Document ${doc.id} still exists after delete attempt`);
+                        }
+                    }
+                }
+            }
+            
+            // Ultimate fallback: scan ALL users in collection
+            if (!deletedFromUsers) {
+                console.log('Scanning ALL users in collection...');
+                const allUsersSnapshot = await db.collection('users').get();
+                console.log(`Total users in collection: ${allUsersSnapshot.size}`);
+                for (const doc of allUsersSnapshot.docs) {
+                    const data = doc.data();
+                    const docUniqueId = data.uniqueId || '';
+                    const docEmail = data.email || '';
+                    
+                    // Match by uniqueId (case-insensitive) or by email
+                    if (((docUniqueId && docUniqueId.toUpperCase() === uniqueId.toUpperCase()) ||
+                        (email && docEmail && docEmail.toLowerCase() === email.toLowerCase())) &&
+                        !deletedDocIds.includes(doc.id)) {
+                        console.log(`Found match: doc.id=${doc.id}, uniqueId=${docUniqueId}, email=${docEmail}`);
+                        await db.collection('users').doc(doc.id).delete();
+                        // Verify deletion
+                        const verifyDoc = await db.collection('users').doc(doc.id).get();
+                        if (!verifyDoc.exists) {
+                            console.log(`✓ Verified: Deleted ${doc.id} from users collection (by full collection scan)`);
+                            deletedFromUsers = true;
+                            deletedDocIds.push(doc.id);
+                        } else {
+                            console.error(`✗ Failed: Document ${doc.id} still exists after delete attempt - may be a permission issue`);
+                        }
+                    }
+                }
+            }
+            
+            if (!deletedFromUsers) {
+                console.warn(`No matching user found in users collection for uniqueId: ${uniqueId}, email: ${email}`);
+                // List all users for debugging
+                const debugSnapshot = await db.collection('users').get();
+                console.log('All users in collection:');
+                debugSnapshot.forEach(doc => {
+                    const d = doc.data();
+                    console.log(`  - ${doc.id}: uniqueId=${d.uniqueId}, email=${d.email}, role=${d.role}`);
+                });
+            }
+        } catch (e) {
+            console.error(`Error deleting from users collection:`, e);
+            showNotification(`Error deleting from users: ${e.message}`, 'error');
+        }
+        
+        // 3. Delete from Firebase Authentication (requires email)
+        let deletedFromAuth = false;
+        if (email) {
+            try {
+                showNotification('Deleting Auth account...', 'info');
+                const adminToken = await currentUser.getIdToken();
+                
+                const response = await fetch('/api/delete-auth-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        adminToken: adminToken
+                    })
+                });
+                
+                // Check if response is OK and is JSON
+                if (response.ok) {
+                    try {
+                        const result = await response.json();
+                        if (result.success) {
+                            deletedFromAuth = true;
+                            console.log(`✓ Deleted Auth account for ${email}`);
+                        } else {
+                            console.warn(`Could not delete Auth account: ${result.error || 'Unknown error'}`);
+                        }
+                    } catch (jsonError) {
+                        console.warn('API returned non-JSON response (API may not be deployed):', jsonError);
+                    }
+                } else {
+                    // API endpoint doesn't exist (local development) or server error
+                    if (response.status === 404 || response.status === 501) {
+                        console.warn('Auth deletion API not available (local development). Auth account must be deleted manually from Firebase Console.');
+                    } else {
+                        const errorText = await response.text();
+                        console.error(`Auth deletion API error (${response.status}):`, errorText);
+                    }
+                }
+            } catch (authError) {
+                // Network error or API not available
+                if (authError.message.includes('Failed to fetch') || authError.message.includes('501')) {
+                    console.warn('Auth deletion API not available (local development). Auth account must be deleted manually from Firebase Console.');
+                } else {
+                    console.error('Error deleting Auth account:', authError);
+                }
+            }
+        } else {
+            console.warn('No email provided, cannot delete Auth account');
+        }
+        
+        const usersStatus = deletedFromUsers ? 'deleted from users ✓' : 'not found in users';
+        const authStatus = deletedFromAuth ? 'deleted from Auth ✓' : (email ? 'Auth deletion failed' : 'no email');
+        const statusMessage = `User "${name}" deleted:\n- ${usersStatus}\n- ${authStatus}`;
+        
+        if (deletedFromUsers && deletedFromAuth) {
+            showNotification(statusMessage, 'success');
+        } else if (deletedFromUsers) {
+            showNotification(statusMessage, 'warning');
+        } else {
+            showNotification(statusMessage, 'error');
+        }
+        
+        // Remove row from UI
+        if (row) {
+            row.remove();
+        }
+        
+        // Reload user list
+        setTimeout(() => {
+            loadUserManagement();
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        showNotification(`Error deleting user: ${error.message}`, 'error');
+        
+        // Reset row style
+        if (row) {
+            row.style.opacity = '1';
+            row.style.backgroundColor = '';
+        }
+    }
 }
 
 
@@ -5002,6 +5335,126 @@ async function handleUserCreationSubmit(event) {
 }
 
 // ============================================
+// MIGRATE VOLUNTEERS FUNCTION
+// ============================================
+
+// Migrate volunteers from users collection to nonShibirarthiUsers collection
+async function migrateVolunteersToNonShibirarthi() {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    const currentUser = firebase.auth().currentUser;
+    if (!currentUser) {
+        showNotification('Not authenticated', 'error');
+        return;
+    }
+    
+    const isAdminUser = await isAdmin(currentUser);
+    if (!isAdminUser) {
+        showNotification('Permission denied. Only admins can migrate users.', 'error');
+        return;
+    }
+    
+    // Confirm migration
+    const confirmMigrate = confirm('This will migrate all users with shreni="Volunteer" from the users collection to the nonShibirarthiUsers collection.\n\nThis will:\n- Copy user data to nonShibirarthiUsers\n- Skip users that already exist in nonShibirarthiUsers\n\nContinue?');
+    if (!confirmMigrate) return;
+    
+    const db = firebase.firestore();
+    
+    try {
+        showNotification('Fetching volunteers from users collection...', 'info');
+        
+        // Get all users with shreni = "Volunteer"
+        const usersSnapshot = await db.collection('users')
+            .where('shreni', '==', 'Volunteer')
+            .get();
+        
+        if (usersSnapshot.empty) {
+            showNotification('No volunteers found in users collection with shreni="Volunteer"', 'info');
+            return;
+        }
+        
+        const volunteers = [];
+        usersSnapshot.forEach(doc => {
+            volunteers.push({
+                docId: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        console.log(`Found ${volunteers.length} volunteers to migrate`);
+        showNotification(`Found ${volunteers.length} volunteers. Starting migration...`, 'info');
+        
+        let migratedCount = 0;
+        let skippedCount = 0;
+        let errorCount = 0;
+        
+        for (const volunteer of volunteers) {
+            try {
+                // Use uniqueId as the doc ID in nonShibirarthiUsers
+                const uniqueId = volunteer.uniqueId;
+                if (!uniqueId) {
+                    console.warn('Skipping volunteer without uniqueId:', volunteer);
+                    skippedCount++;
+                    continue;
+                }
+                
+                // Check if already exists in nonShibirarthiUsers
+                const existingDoc = await db.collection('nonShibirarthiUsers').doc(uniqueId).get();
+                if (existingDoc.exists) {
+                    console.log(`Skipping ${uniqueId} - already exists in nonShibirarthiUsers`);
+                    skippedCount++;
+                    continue;
+                }
+                
+                // Create normalized ID
+                const normalizedId = uniqueId.toLowerCase().replace(/[/-]/g, '');
+                
+                // Migrate to nonShibirarthiUsers
+                await db.collection('nonShibirarthiUsers').doc(uniqueId).set({
+                    uniqueId: uniqueId,
+                    normalizedId: normalizedId,
+                    name: volunteer.name || '',
+                    email: volunteer.email || null,
+                    country: volunteer.country || 'Bharat',
+                    Country: volunteer.Country || volunteer.country || 'Bharat',
+                    shreni: 'Volunteer',
+                    Shreni: 'Volunteer',
+                    role: volunteer.role || 'volunteer',
+                    volunteerTeams: volunteer.volunteerTeams || [],
+                    createdAt: volunteer.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: volunteer.createdBy || currentUser.uid,
+                    migratedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    migratedFrom: 'users',
+                    originalDocId: volunteer.docId
+                });
+                
+                console.log(`Migrated ${uniqueId} to nonShibirarthiUsers`);
+                migratedCount++;
+                
+            } catch (e) {
+                console.error(`Error migrating volunteer:`, e);
+                errorCount++;
+            }
+        }
+        
+        // Show results
+        const message = `Migration complete!\n- Migrated: ${migratedCount}\n- Skipped (already exists): ${skippedCount}\n- Errors: ${errorCount}`;
+        showNotification(message.replace(/\n/g, ' | '), migratedCount > 0 ? 'success' : 'info');
+        alert(message);
+        
+        // Reload user list
+        await loadUserManagement();
+        
+    } catch (error) {
+        console.error('Error during migration:', error);
+        showNotification(`Migration error: ${error.message}`, 'error');
+    }
+}
+
+// ============================================
 // BATCH USER UPLOAD FUNCTIONS
 // ============================================
 
@@ -5061,6 +5514,9 @@ async function previewBatchUsers(event) {
         messageDiv.style.display = 'none';
     }
     
+    // Valid volunteer teams
+    const validTeams = ['transportation', 'registration', 'ganvesh_collected', 'cloak_room', 'post_tour'];
+    
     try {
         const text = await file.text();
         const rows = parseCSV(text);
@@ -5070,7 +5526,7 @@ async function previewBatchUsers(event) {
             return;
         }
         
-        // Parse headers (first row)
+        // Parse headers (first row) - ALL columns are required
         const headers = rows[0].map(h => h.toLowerCase().trim());
         const nameIdx = headers.findIndex(h => h === 'name' || h === 'full name');
         const idIdx = headers.findIndex(h => h === 'uniqueid' || h === 'id' || h === 'unique id');
@@ -5078,53 +5534,185 @@ async function previewBatchUsers(event) {
         const roleIdx = headers.findIndex(h => h === 'role');
         const teamsIdx = headers.findIndex(h => h === 'volunteerteams' || h === 'teams' || h === 'volunteer teams');
         
-        if (nameIdx === -1 || idIdx === -1) {
-            showNotification('CSV must have "name" and "uniqueId" (or "id") columns', 'error');
+        // Validate all required columns exist
+        const missingCols = [];
+        if (nameIdx === -1) missingCols.push('name');
+        if (idIdx === -1) missingCols.push('uniqueId');
+        if (emailIdx === -1) missingCols.push('email');
+        if (roleIdx === -1) missingCols.push('role');
+        if (teamsIdx === -1) missingCols.push('volunteerTeams');
+        
+        if (missingCols.length > 0) {
+            showNotification(`CSV missing required columns: ${missingCols.join(', ')}`, 'error');
             return;
         }
         
-        // Parse data rows
+        // Parse and validate data rows
         batchUserData = [];
+        const validationErrors = [];
+        
         for (let i = 1; i < rows.length; i++) {
             const row = rows[i];
             if (row.length === 0 || (row.length === 1 && !row[0])) continue; // Skip empty rows
             
+            const rowNum = i + 1;
             const name = (row[nameIdx] || '').trim();
             const uniqueId = (row[idIdx] || '').trim().toUpperCase();
-            const email = emailIdx !== -1 ? (row[emailIdx] || '').trim() : '';
-            const role = roleIdx !== -1 ? (row[roleIdx] || 'volunteer').trim().toLowerCase() : 'volunteer';
-            const teamsStr = teamsIdx !== -1 ? (row[teamsIdx] || '').trim() : '';
-            const teams = teamsStr ? teamsStr.split(/[,;]/).map(t => t.trim()).filter(Boolean) : [];
+            const email = (row[emailIdx] || '').trim();
+            const role = (row[roleIdx] || '').trim().toLowerCase();
+            const teamsStr = (row[teamsIdx] || '').trim();
+            const teams = teamsStr ? teamsStr.split(/[,;]/).map(t => t.trim().toLowerCase()).filter(Boolean) : [];
             
-            if (!name || !uniqueId) continue; // Skip rows without required fields
+            // Rigorous validation for each row
+            const rowErrors = [];
             
-            batchUserData.push({
-                name,
-                uniqueId,
-                email,
-                role: role === 'admin' ? 'admin' : 'volunteer',
-                volunteerTeams: teams,
-                status: 'pending'
-            });
+            // Name validation
+            if (!name) {
+                rowErrors.push('name is empty');
+            } else if (name.length < 2) {
+                rowErrors.push('name too short');
+            }
+            
+            // UniqueId validation
+            if (!uniqueId) {
+                rowErrors.push('uniqueId is empty');
+            } else if (uniqueId.length < 3) {
+                rowErrors.push('uniqueId too short');
+            } else if (!/^[A-Z0-9]+$/i.test(uniqueId)) {
+                rowErrors.push('uniqueId contains invalid characters');
+            }
+            
+            // Email validation
+            if (!email) {
+                rowErrors.push('email is empty');
+            } else {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    rowErrors.push('invalid email format');
+                }
+            }
+            
+            // Role validation
+            if (!role) {
+                rowErrors.push('role is empty');
+            } else if (role !== 'volunteer' && role !== 'admin') {
+                rowErrors.push('role must be "volunteer" or "admin"');
+            }
+            
+            // Teams validation (required for volunteers)
+            if (role === 'volunteer') {
+                if (teams.length === 0) {
+                    rowErrors.push('volunteerTeams required for volunteers');
+                } else {
+                    const invalidTeams = teams.filter(t => !validTeams.includes(t));
+                    if (invalidTeams.length > 0) {
+                        rowErrors.push(`invalid teams: ${invalidTeams.join(', ')}`);
+                    }
+                }
+            }
+            
+            if (rowErrors.length > 0) {
+                validationErrors.push({ row: rowNum, errors: rowErrors, name, uniqueId });
+                batchUserData.push({
+                    name: name || '(empty)',
+                    uniqueId: uniqueId || '(empty)',
+                    email: email || '(empty)',
+                    role: role || '(empty)',
+                    volunteerTeams: teams,
+                    status: 'invalid',
+                    errors: rowErrors
+                });
+            } else {
+                batchUserData.push({
+                    name,
+                    uniqueId,
+                    email,
+                    role: role === 'admin' ? 'admin' : 'volunteer',
+                    volunteerTeams: teams,
+                    status: 'pending',
+                    errors: []
+                });
+            }
         }
         
         if (batchUserData.length === 0) {
-            showNotification('No valid user data found in CSV', 'error');
+            showNotification('No data rows found in CSV', 'error');
             return;
         }
         
-        // Display preview
-        countSpan.textContent = batchUserData.length;
-        previewBody.innerHTML = batchUserData.map((user, idx) => `
-            <tr id="batchUserRow${idx}">
+        // Check for duplicate uniqueIds within the CSV itself
+        const uniqueIdsInCsv = new Set();
+        for (const user of batchUserData) {
+            if (user.uniqueId && user.uniqueId !== '(empty)') {
+                if (uniqueIdsInCsv.has(user.uniqueId)) {
+                    user.status = 'invalid';
+                    user.errors.push('duplicate uniqueId in CSV');
+                } else {
+                    uniqueIdsInCsv.add(user.uniqueId);
+                }
+            }
+        }
+        
+        // Check for existing uniqueIds in Firestore users collection
+        if (window.firebase && firebase.firestore) {
+            const db = firebase.firestore();
+            
+            // Collect all uniqueIds to check
+            const uniqueIdsToCheck = batchUserData
+                .filter(u => u.status === 'pending' && u.uniqueId && u.uniqueId !== '(empty)')
+                .map(u => u.uniqueId);
+            
+            if (uniqueIdsToCheck.length > 0) {
+                showNotification('Checking for existing users in database...', 'info');
+                
+                // Check users collection by querying the uniqueId field
+                const existingInUsers = new Set();
+                try {
+                    const usersSnapshot = await db.collection('users').get();
+                    usersSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data.uniqueId) {
+                            existingInUsers.add(data.uniqueId.toUpperCase());
+                        }
+                    });
+                    console.log('Existing uniqueIds in users collection:', Array.from(existingInUsers));
+                } catch (e) {
+                    console.error('Error fetching users collection:', e);
+                }
+                
+                // Mark existing users as invalid
+                for (const user of batchUserData) {
+                    if (user.status === 'pending' && user.uniqueId) {
+                        if (existingInUsers.has(user.uniqueId.toUpperCase())) {
+                            user.status = 'invalid';
+                            user.errors.push('uniqueId already exists in users collection');
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Display preview with validation status
+        const validCount = batchUserData.filter(u => u.status === 'pending').length;
+        const invalidCount = batchUserData.filter(u => u.status === 'invalid').length;
+        
+        countSpan.textContent = `${validCount} valid, ${invalidCount} invalid`;
+        previewBody.innerHTML = batchUserData.map((user, idx) => {
+            const isInvalid = user.status === 'invalid';
+            const rowStyle = isInvalid ? 'background-color: #f8d7da;' : '';
+            const statusText = isInvalid ? `❌ ${user.errors.join('; ')}` : '✓ Ready';
+            const statusColor = isInvalid ? '#dc3545' : '#28a745';
+            
+            return `
+            <tr id="batchUserRow${idx}" style="${rowStyle}">
                 <td>${escapeHtml(user.name)}</td>
                 <td>${escapeHtml(user.uniqueId)}</td>
-                <td>${escapeHtml(user.email || '-')}</td>
+                <td>${escapeHtml(user.email)}</td>
                 <td>${escapeHtml(user.role)}</td>
                 <td style="font-size: 0.8rem;">${escapeHtml(user.volunteerTeams.join(', ') || '-')}</td>
-                <td id="batchUserStatus${idx}" style="color: #666;">Pending</td>
+                <td id="batchUserStatus${idx}" style="color: ${statusColor}; font-size: 0.85rem;">${statusText}</td>
             </tr>
-        `).join('');
+        `}).join('');
         
         previewDiv.style.display = 'block';
         
@@ -5184,6 +5772,13 @@ async function executeBatchUserCreation() {
         return;
     }
     
+    // Filter out invalid entries
+    const validUsers = batchUserData.filter(u => u.status === 'pending');
+    if (validUsers.length === 0) {
+        showNotification('No valid users to create. Please fix validation errors first.', 'error');
+        return;
+    }
+    
     if (!window.firebase || !firebase.auth || !firebase.firestore) {
         showNotification('Firebase not initialized', 'error');
         return;
@@ -5205,18 +5800,22 @@ async function executeBatchUserCreation() {
     if (messageDiv) {
         messageDiv.style.display = 'block';
         messageDiv.style.backgroundColor = '#cce5ff';
-        messageDiv.innerHTML = 'Creating users... Please wait.';
+        messageDiv.innerHTML = `Creating ${validUsers.length} users... Please wait.`;
     }
     
     const db = firebase.firestore();
     let successCount = 0;
     let errorCount = 0;
-    const defaultPassword = 'Vss@2025';
     
     for (let i = 0; i < batchUserData.length; i++) {
         const user = batchUserData[i];
         const statusCell = document.getElementById(`batchUserStatus${i}`);
         const row = document.getElementById(`batchUserRow${i}`);
+        
+        // Skip invalid users
+        if (user.status === 'invalid') {
+            continue;
+        }
         
         try {
             // Update status to processing
@@ -5225,11 +5824,8 @@ async function executeBatchUserCreation() {
                 statusCell.style.color = '#007bff';
             }
             
-            // Generate placeholder email if not provided
-            const userEmail = user.email || `${user.uniqueId.toLowerCase()}@placeholder.local`;
-            
-            // Check if user already exists
-            const existingUser = await db.collection('users').doc(user.uniqueId).get();
+            // Check if user already exists in nonShibirarthiUsers
+            const existingUser = await db.collection('nonShibirarthiUsers').doc(user.uniqueId).get();
             if (existingUser.exists) {
                 if (statusCell) {
                     statusCell.textContent = 'Already exists';
@@ -5240,16 +5836,16 @@ async function executeBatchUserCreation() {
                 continue;
             }
             
-            // Create Firebase Auth account
+            // Create user in Firestore collections (NO Firebase Auth - stays logged in as admin)
             try {
-                const userCredential = await firebase.auth().createUserWithEmailAndPassword(userEmail, defaultPassword);
-                const newUser = userCredential.user;
+                const normalizedId = user.uniqueId.toLowerCase().replace(/[/-]/g, '');
                 
-                // Create user document in Firestore
-                await db.collection('users').doc(newUser.uid).set({
-                    email: user.email || null,
+                // 1. First create in users collection (using uniqueId as doc ID)
+                await db.collection('users').doc(user.uniqueId).set({
+                    email: user.email,
                     name: user.name,
                     uniqueId: user.uniqueId,
+                    normalizedId: normalizedId,
                     role: user.role,
                     volunteerTeams: user.role === 'volunteer' ? user.volunteerTeams : [],
                     country: 'Bharat',
@@ -5259,13 +5855,12 @@ async function executeBatchUserCreation() {
                     batchCreated: true
                 });
                 
-                // Create nonShibirarthiUsers document
-                const normalizedId = user.uniqueId.toLowerCase().replace(/[/-]/g, '');
+                // 2. Then create in nonShibirarthiUsers collection
                 await db.collection('nonShibirarthiUsers').doc(user.uniqueId).set({
                     uniqueId: user.uniqueId,
                     normalizedId: normalizedId,
                     name: user.name,
-                    email: user.email || null,
+                    email: user.email,
                     country: 'Bharat',
                     Country: 'Bharat',
                     shreni: 'Volunteer',
@@ -5277,9 +5872,6 @@ async function executeBatchUserCreation() {
                     batchCreated: true
                 });
                 
-                // Sign out the newly created user
-                await firebase.auth().signOut();
-                
                 // Update status
                 if (statusCell) {
                     statusCell.textContent = 'Created ✓';
@@ -5289,17 +5881,13 @@ async function executeBatchUserCreation() {
                 
                 successCount++;
                 
-            } catch (authError) {
-                // If auth creation fails, try creating just Firestore docs
-                if (authError.code === 'auth/email-already-in-use') {
-                    if (statusCell) {
-                        statusCell.textContent = 'Email in use';
-                        statusCell.style.color = '#dc3545';
-                    }
-                    if (row) row.style.backgroundColor = '#f8d7da';
-                } else {
-                    throw authError;
+            } catch (createError) {
+                console.error(`Error creating user ${user.uniqueId}:`, createError);
+                if (statusCell) {
+                    statusCell.textContent = 'Error: ' + createError.message;
+                    statusCell.style.color = '#dc3545';
                 }
+                if (row) row.style.backgroundColor = '#f8d7da';
                 errorCount++;
             }
             
@@ -5314,11 +5902,84 @@ async function executeBatchUserCreation() {
         }
     }
     
+    // Now create Firebase Auth accounts via API
+    if (successCount > 0) {
+        if (messageDiv) {
+            messageDiv.innerHTML = `Created ${successCount} Firestore records. Creating Auth accounts...`;
+        }
+        
+        try {
+            // Get users that were successfully created in Firestore
+            const usersForAuth = batchUserData
+                .filter((u, idx) => {
+                    const statusCell = document.getElementById(`batchUserStatus${idx}`);
+                    return statusCell && statusCell.textContent === 'Created ✓';
+                })
+                .map(u => ({
+                    email: u.email,
+                    name: u.name,
+                    uniqueId: u.uniqueId
+                }));
+            
+            if (usersForAuth.length > 0) {
+                // Get admin token for API verification
+                const adminToken = await currentUser.getIdToken();
+                
+                // Call the API to create Auth accounts
+                const response = await fetch('/api/create-auth-users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        users: usersForAuth,
+                        adminToken: adminToken
+                    })
+                });
+                
+                const authResult = await response.json();
+                console.log('Auth creation result:', authResult);
+                
+                if (authResult.success) {
+                    // Update status cells with auth results
+                    for (const result of authResult.results) {
+                        const userIndex = batchUserData.findIndex(u => u.uniqueId === result.uniqueId);
+                        if (userIndex !== -1) {
+                            const statusCell = document.getElementById(`batchUserStatus${userIndex}`);
+                            const row = document.getElementById(`batchUserRow${userIndex}`);
+                            
+                            if (result.success) {
+                                if (statusCell) {
+                                    statusCell.textContent = 'Created + Auth ✓';
+                                    statusCell.style.color = '#28a745';
+                                }
+                            } else {
+                                if (statusCell) {
+                                    statusCell.textContent = `Firestore ✓, Auth: ${result.error}`;
+                                    statusCell.style.color = '#ffc107';
+                                }
+                                if (row) row.style.backgroundColor = '#fff3cd';
+                            }
+                        }
+                    }
+                    
+                    const authSuccessCount = authResult.results.filter(r => r.success).length;
+                    showNotification(`Created ${successCount} users. ${authSuccessCount} can now log in.`, 'success');
+                } else {
+                    showNotification(`Firestore: ${successCount} created. Auth API error: ${authResult.error}`, 'warning');
+                }
+            }
+        } catch (authError) {
+            console.error('Error creating auth accounts:', authError);
+            showNotification(`Firestore: ${successCount} created. Auth error: ${authError.message}`, 'warning');
+        }
+    }
+    
     // Show final message
     if (messageDiv) {
         if (successCount > 0 && errorCount === 0) {
             messageDiv.style.backgroundColor = '#d4edda';
-            messageDiv.innerHTML = `<strong>Success!</strong> Created ${successCount} user(s).`;
+            messageDiv.innerHTML = `<strong>Success!</strong> Created ${successCount} user(s) with login access.`;
         } else if (successCount > 0) {
             messageDiv.style.backgroundColor = '#fff3cd';
             messageDiv.innerHTML = `<strong>Partial success:</strong> Created ${successCount} user(s), ${errorCount} failed/skipped.`;
@@ -5328,14 +5989,11 @@ async function executeBatchUserCreation() {
         }
     }
     
-    // Show notification about re-authentication
+    // Reload user list
     if (successCount > 0) {
-        showNotification(`Created ${successCount} user(s). You may need to log in again.`, 'info');
-        
-        // Reload user list
         setTimeout(() => {
-            loadUserManagementList();
-        }, 1000);
+            loadUserManagement();
+        }, 500);
     }
 }
 
