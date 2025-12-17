@@ -4320,6 +4320,24 @@ async function loadAdminDashboard(user) {
         return;
     }
     
+    // Set a timeout to prevent infinite loading (30 seconds)
+    const loadingTimeout = setTimeout(() => {
+        if (loadingDiv.style.display !== 'none') {
+            console.error('Dashboard loading timeout - showing partial data');
+            loadingDiv.innerHTML = `
+                <p style="color: orange;">Dashboard is taking longer than expected to load.</p>
+                <p>Some data may still be loading in the background.</p>
+                <button onclick="window.location.reload();" class="btn btn-primary" style="padding: 0.5rem 1rem; margin-top: 1rem;">
+                    Reload Page
+                </button>
+            `;
+            // Try to show whatever data we have
+            if (dataDiv) {
+                dataDiv.style.display = 'block';
+            }
+        }
+    }, 30000);
+    
     try {
         const db = firebase.firestore();
         const CACHE_KEY = 'adminDashboardStatsCache';
@@ -4393,24 +4411,47 @@ async function loadAdminDashboard(user) {
         // Display statistics
         displayAdminStatistics(stats, registrations, users);
         
-        // Load transportation analytics
-        loadTransportationAnalytics(registrations);
+        // Clear timeout since we loaded successfully
+        clearTimeout(loadingTimeout);
         
-        // Load transportation changes (default to "all")
-        // This will also load the summary counts
-        loadTransportationChanges('all');
-        
-        // Load checkin analytics
-        await loadCheckinAnalytics();
-        
-        // Show data div, hide loading
+        // Show data div, hide loading - show dashboard immediately
         loadingDiv.style.display = 'none';
         dataDiv.style.display = 'block';
         
+        // Load additional analytics in background (non-blocking)
+        // Wrap each in try-catch to prevent one failure from breaking the dashboard
+        try {
+            loadTransportationAnalytics(registrations);
+        } catch (error) {
+            console.error('Error loading transportation analytics:', error);
+        }
+        
+        try {
+            // Load transportation changes (default to "all") - non-blocking
+            loadTransportationChanges('all').catch(error => {
+                console.error('Error loading transportation changes:', error);
+            });
+        } catch (error) {
+            console.error('Error initiating transportation changes load:', error);
+        }
+        
+        try {
+            // Load checkin analytics - non-blocking
+            loadCheckinAnalytics().catch(error => {
+                console.error('Error loading checkin analytics:', error);
+            });
+        } catch (error) {
+            console.error('Error initiating checkin analytics load:', error);
+        }
+        
     } catch (error) {
+        // Clear timeout
+        clearTimeout(loadingTimeout);
+        
         console.error('Error loading admin dashboard:', error);
         
         // Clear potentially corrupted cache
+        const CACHE_KEY = 'adminDashboardStatsCache';
         try {
             localStorage.removeItem(CACHE_KEY);
         } catch (e) {
@@ -6034,96 +6075,20 @@ function displayAdminStatistics(stats, registrations, users = []) {
         totalShrenisEl.textContent = stats.totalShrenis;
     }
     
-    // Display zone breakdown with clickable rows
-    displayZoneBreakdownTable(stats.zoneBreakdown, stats.zoneCountryMap, stats.totalRegistrations);
+    // Display three main tables:
+    // 1. Registrations by Zone (with Registered, Web Logged In, Venue Check In)
+    // 2. Registrations by Shreni (with Male, Female, Total, Percentage + Volunteers, Others, Grand Total)
+    // 3. Registrations by Shreni/Zone Matrix
     
-    // Display country breakdown
-    displayBreakdownTable('countryTableBody', stats.countryBreakdown, stats.totalRegistrations);
+    // Store data globally for table population
+    window.dashboardStats = stats;
+    window.dashboardRegistrations = registrations;
+    window.dashboardUsers = safeUsers;
     
-    // Display shreni breakdown
-    displayBreakdownTable('shreniTableBody', stats.shreniBreakdown, stats.totalRegistrations);
-    
-    // Display tour breakdown
-    displayBreakdownTable('tourTableBody', stats.tourBreakdown, stats.totalRegistrations);
-    
-    // Display pickup breakdown
-    displayBreakdownTable('pickupTableBody', stats.pickupBreakdown, stats.totalRegistrations);
-    
-    // Display dropoff breakdown
-    displayBreakdownTable('dropoffTableBody', stats.dropoffBreakdown, stats.totalRegistrations);
-    
-    // Display gender breakdown
-    displayBreakdownTable('genderTableBody', stats.genderBreakdown, stats.totalRegistrations);
-    
-    // Display country overall breakdown
-    displayBreakdownTable('countryOverallTableBody', stats.countryOverallBreakdown, stats.totalRegistrations);
-    
-    // Display zone by shreni breakdown (multi-column)
-    displayMultiColumnBreakdownTable('zoneShreniTableBody', stats.zoneShreniBreakdown, stats.totalRegistrations, ' | ');
-    
-    // Display age breakdown
-    displayBreakdownTable('ageTableBody', stats.ageBreakdown, stats.totalRegistrations);
-    
-    // Display shiksha varg breakdown
-    displayBreakdownTable('shikshaVargTableBody', stats.shikshaVargBreakdown, stats.totalRegistrations);
-    
-    // Display shiksha varg by shreni breakdown (multi-column)
-    displayMultiColumnBreakdownTable('shikshaVargShreniTableBody', stats.shikshaVargShreniBreakdown, stats.totalRegistrations, ' | ');
-    
-    // Display shreni by gender breakdown (multi-column)
-    displayMultiColumnBreakdownTable('shreniGenderTableBody', stats.shreniGenderBreakdown, stats.totalRegistrations, ' | ');
-    
-    // Display arrival date breakdown
-    displayBreakdownTable('arrivalDateTableBody', stats.arrivalDateBreakdown, stats.totalRegistrations);
-    
-    // Display arrival time buckets breakdown
-    displayBreakdownTable('arrivalTimeBucketsTableBody', stats.arrivalTimeBucketsBreakdown, stats.totalRegistrations);
-    
-    // Display pickup needed breakdown
-    displayBreakdownTable('pickupNeededTableBody', stats.pickupNeededBreakdown, stats.totalRegistrations);
-    
-    // Display dropoff needed breakdown
-    displayBreakdownTable('dropoffNeededTableBody', stats.dropoffNeededBreakdown, stats.totalRegistrations);
-    
-    // Display place of arrival breakdown
-    displayBreakdownTable('placeOfArrivalTableBody', stats.placeOfArrivalBreakdown, stats.totalRegistrations);
-    
-    // Display place of arrival by date breakdown (multi-column)
-    displayMultiColumnBreakdownTable('placeArrivalDateTableBody', stats.placeArrivalDateBreakdown, stats.totalRegistrations, ' | ');
-    
-    // Display place of arrival by date and time bucket breakdown (multi-column)
-    displayMultiColumnBreakdownTable('placeArrivalDateTimeTableBody', stats.placeArrivalDateTimeBreakdown, stats.totalRegistrations, ' | ');
-    
-    // Display place of departure breakdown
-    displayBreakdownTable('placeOfDepartureTableBody', stats.placeOfDepartureBreakdown, stats.totalRegistrations);
-    
-    // Display place of departure by date breakdown (multi-column)
-    displayMultiColumnBreakdownTable('placeDepartureDateTableBody', stats.placeDepartureDateBreakdown, stats.totalRegistrations, ' | ');
-    
-    // Display ganavesh size breakdown
-    displayBreakdownTable('ganaveshSizeTableBody', stats.ganaveshSizeBreakdown, stats.totalRegistrations);
-    
-    // Display medical conditions breakdown
-    displayBreakdownTable('medicalConditionsTableBody', stats.medicalConditionsBreakdown, stats.totalRegistrations);
-    
-    // Display dietary restrictions breakdown
-    displayBreakdownTable('dietaryRestrictionsTableBody', stats.dietaryRestrictionsBreakdown, stats.totalRegistrations);
-    
-    // Display travel update statistics
-    const totalTravelUpdatesEl = document.getElementById('totalTravelUpdates');
-    if (totalTravelUpdatesEl) {
-        totalTravelUpdatesEl.textContent = stats.travelUpdateStats.totalUpdated;
-    }
-    
-    const totalNotUpdatedTravelEl = document.getElementById('totalNotUpdatedTravel');
-    if (totalNotUpdatedTravelEl) {
-        totalNotUpdatedTravelEl.textContent = stats.travelUpdateStats.totalNotUpdated;
-    }
-    
-    const travelUpdatePercentageEl = document.getElementById('travelUpdatePercentage');
-    if (travelUpdatePercentageEl) {
-        travelUpdatePercentageEl.textContent = stats.travelUpdateStats.updatePercentage + '%';
-    }
+    // Populate the three main tables
+    displayZoneWithStatusTable(registrations, safeUsers);
+    displayShreniWithGenderTable(registrations);
+    displayShreniZoneMatrix(registrations);
     
     // Display total Praveshika IDs with accounts
     const totalPraveshikaIdsWithAccountsEl = document.getElementById('totalPraveshikaIdsWithAccounts');
@@ -6131,16 +6096,359 @@ function displayAdminStatistics(stats, registrations, users = []) {
         totalPraveshikaIdsWithAccountsEl.textContent = stats.totalPraveshikaIdsWithAccounts || 0;
     }
     
-    // Display email corrections
-    displayEmailCorrections(stats.emailCorrections);
+    // Initialize dashboard tables with filters (commented out - not using filter dropdown anymore)
+    // updateDashboardWithFilter();
+}
+
+// Display Registrations by Zone with Registered, Web Logged In, Venue Check In columns
+async function displayZoneWithStatusTable(registrations, users) {
+    const tableBody = document.getElementById('zoneTableBody');
+    if (!tableBody) return;
     
-    // Store stats globally for gender slicing
-    window.dashboardStats = stats;
-    window.dashboardRegistrations = registrations;
-    window.dashboardUsers = safeUsers;
+    // Define the zones we want to display
+    const zoneOrder = ['AM', 'EU', 'AR', 'AF', 'AS', 'AU'];
+    const zoneLabels = {
+        'AM': 'Americas',
+        'EU': 'Europe',
+        'AR': 'AR',
+        'AF': 'Africa',
+        'AS': 'SE Asia',
+        'AU': 'Australasia'
+    };
     
-    // Initialize dashboard tables with filters
-    updateDashboardWithFilter();
+    // Get user uniqueIds (for Web Logged In)
+    const userUniqueIds = new Set();
+    users.forEach(user => {
+        if (user.uniqueId) userUniqueIds.add(user.uniqueId);
+        if (user.associatedRegistrations) {
+            user.associatedRegistrations.forEach(reg => {
+                if (reg.uniqueId) userUniqueIds.add(reg.uniqueId);
+            });
+        }
+    });
+    
+    // Get checked-in uniqueIds (for Venue Check In)
+    const checkedInIds = new Set();
+    try {
+        if (window.firebase && firebase.firestore) {
+            const db = firebase.firestore();
+            const checkinSnapshot = await db.collection('checkins')
+                .where('checkinType', '==', 'registration')
+                .get();
+            checkinSnapshot.forEach(doc => {
+                const data = doc.data();
+                if (data.uniqueId) checkedInIds.add(data.uniqueId);
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching checkin data:', error);
+    }
+    
+    // Count by zone and build country breakdown
+    const zoneCounts = {};
+    const zoneCountryMap = {};
+    zoneOrder.forEach(zone => {
+        zoneCounts[zone] = { registered: 0, loggedIn: 0, checkedIn: 0 };
+        zoneCountryMap[zone] = {};
+    });
+    zoneCounts['Others'] = { registered: 0, loggedIn: 0, checkedIn: 0 };
+    zoneCountryMap['Others'] = {};
+    
+    registrations.forEach(reg => {
+        const zone = reg.Zone || reg.zone || 'Unknown';
+        const normalizedZone = zoneOrder.find(z => zone.toUpperCase().startsWith(z)) || 'Others';
+        const country = reg.Country || reg.country || reg['Country of Current Residence'] || 'Unknown';
+        
+        zoneCounts[normalizedZone].registered++;
+        if (userUniqueIds.has(reg.uniqueId)) {
+            zoneCounts[normalizedZone].loggedIn++;
+        }
+        if (checkedInIds.has(reg.uniqueId)) {
+            zoneCounts[normalizedZone].checkedIn++;
+        }
+        
+        // Build country breakdown for each zone
+        zoneCountryMap[normalizedZone][country] = (zoneCountryMap[normalizedZone][country] || 0) + 1;
+    });
+    
+    // Build table HTML
+    let html = '';
+    let totalRegistered = 0, totalLoggedIn = 0, totalCheckedIn = 0;
+    
+    zoneOrder.forEach(zone => {
+        const label = zoneLabels[zone] || zone;
+        const counts = zoneCounts[zone];
+        totalRegistered += counts.registered;
+        totalLoggedIn += counts.loggedIn;
+        totalCheckedIn += counts.checkedIn;
+        
+        // Escape the country breakdown for onclick
+        const countryBreakdownJson = JSON.stringify(zoneCountryMap[zone]).replace(/"/g, '&quot;');
+        
+        html += `
+            <tr>
+                <td>${escapeHtml(label)}</td>
+                <td>${counts.registered}</td>
+                <td>${counts.loggedIn}</td>
+                <td>${counts.checkedIn}</td>
+                <td>
+                    <button class="btn btn-small btn-secondary" 
+                            onclick="showZoneCountryDetails('${escapeHtml(label)}', '${countryBreakdownJson}', ${counts.registered})">
+                        View Countries
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    // Add Others row
+    const others = zoneCounts['Others'];
+    totalRegistered += others.registered;
+    totalLoggedIn += others.loggedIn;
+    totalCheckedIn += others.checkedIn;
+    
+    const othersCountryBreakdownJson = JSON.stringify(zoneCountryMap['Others']).replace(/"/g, '&quot;');
+    html += `
+        <tr>
+            <td>Others</td>
+            <td>${others.registered}</td>
+            <td>${others.loggedIn}</td>
+            <td>${others.checkedIn}</td>
+            <td>
+                <button class="btn btn-small btn-secondary" 
+                        onclick="showZoneCountryDetails('Others', '${othersCountryBreakdownJson}', ${others.registered})">
+                    View Countries
+                </button>
+            </td>
+        </tr>
+    `;
+    
+    // Add Total row
+    html += `
+        <tr style="font-weight: bold; background-color: #f0f0f0;">
+            <td>Total</td>
+            <td>${totalRegistered}</td>
+            <td>${totalLoggedIn}</td>
+            <td>${totalCheckedIn}</td>
+            <td></td>
+        </tr>
+    `;
+    
+    tableBody.innerHTML = html;
+}
+
+// Display Registrations by Shreni with Male, Female, Total, Percentage columns
+// Plus Volunteers, Others, Grand Total rows
+async function displayShreniWithGenderTable(registrations) {
+    const tableBody = document.getElementById('shreniTableBody');
+    if (!tableBody) return;
+    
+    // Define shreni order
+    const shreniOrder = ['Karyakarta', 'Swakeeya', 'Yuva', 'Kishor', 'Baal'];
+    
+    // Normalize shreni names
+    const normalizeShreni = (shreni) => {
+        if (!shreni) return 'Unknown';
+        const s = shreni.toLowerCase().trim();
+        if (s.includes('karyakarta') || s === 'kk') return 'Karyakarta';
+        if (s.includes('swakeeya') || s === 'sw') return 'Swakeeya';
+        if (s.includes('yuva') || s === 'yv') return 'Yuva';
+        if (s.includes('kishor') || s === 'ks') return 'Kishor';
+        if (s.includes('baal') || s === 'bl') return 'Baal';
+        return shreni;
+    };
+    
+    // Count by shreni and gender
+    const shreniCounts = {};
+    shreniOrder.forEach(shreni => {
+        shreniCounts[shreni] = { male: 0, female: 0, total: 0 };
+    });
+    shreniCounts['Others'] = { male: 0, female: 0, total: 0 };
+    
+    let totalMale = 0, totalFemale = 0, totalCount = 0;
+    
+    registrations.forEach(reg => {
+        const rawShreni = reg.Shreni || reg.shreni || reg['Corrected Shreni'] || reg['Default Shreni'] || 'Unknown';
+        const shreni = normalizeShreni(rawShreni);
+        const gender = (reg.gender || reg.Gender || '').toLowerCase();
+        
+        const bucket = shreniOrder.includes(shreni) ? shreni : 'Others';
+        
+        if (gender === 'male' || gender === 'm') {
+            shreniCounts[bucket].male++;
+            totalMale++;
+        } else if (gender === 'female' || gender === 'f') {
+            shreniCounts[bucket].female++;
+            totalFemale++;
+        } else {
+            // Count as other/unknown - add to total but not male/female
+        }
+        shreniCounts[bucket].total++;
+        totalCount++;
+    });
+    
+    // Build table HTML
+    let html = '';
+    let subtotalMale = 0, subtotalFemale = 0, subtotalCount = 0;
+    
+    // Shibirarthi rows (main shrenis)
+    shreniOrder.forEach(shreni => {
+        const counts = shreniCounts[shreni];
+        const percentage = totalCount > 0 ? ((counts.total / totalCount) * 100).toFixed(1) : '0.0';
+        subtotalMale += counts.male;
+        subtotalFemale += counts.female;
+        subtotalCount += counts.total;
+        
+        html += `
+            <tr>
+                <td>${escapeHtml(shreni)}</td>
+                <td>${counts.male}</td>
+                <td>${counts.female}</td>
+                <td>${counts.total}</td>
+                <td>${percentage}%</td>
+            </tr>
+        `;
+    });
+    
+    // Shibirarthi Total row
+    const subtotalPercentage = totalCount > 0 ? ((subtotalCount / totalCount) * 100).toFixed(1) : '0.0';
+    html += `
+        <tr style="font-weight: bold; background-color: #e8e8e8;">
+            <td>Shibirarthi Total</td>
+            <td>${subtotalMale}</td>
+            <td>${subtotalFemale}</td>
+            <td>${subtotalCount}</td>
+            <td>${subtotalPercentage}%</td>
+        </tr>
+    `;
+    
+    // Volunteers row (from nonShibirarthiUsers collection or role='volunteer')
+    // For now, we count from "Others" as placeholder - actual volunteers should come from different collection
+    const volunteersCount = { male: 0, female: 0, total: 0 };
+    // Note: Actual volunteer counts would come from nonShibirarthiUsers collection
+    // This is a placeholder - volunteers aren't in registrations collection
+    html += `
+        <tr>
+            <td>Volunteers</td>
+            <td>${volunteersCount.male}</td>
+            <td>${volunteersCount.female}</td>
+            <td>${volunteersCount.total}</td>
+            <td>-</td>
+        </tr>
+    `;
+    
+    // Others row
+    const others = shreniCounts['Others'];
+    const othersPercentage = totalCount > 0 ? ((others.total / totalCount) * 100).toFixed(1) : '0.0';
+    html += `
+        <tr>
+            <td>Others</td>
+            <td>${others.male}</td>
+            <td>${others.female}</td>
+            <td>${others.total}</td>
+            <td>${othersPercentage}%</td>
+        </tr>
+    `;
+    
+    // Grand Total row
+    html += `
+        <tr style="font-weight: bold; background-color: #d0d0d0;">
+            <td>Grand Total</td>
+            <td>${totalMale}</td>
+            <td>${totalFemale}</td>
+            <td>${totalCount}</td>
+            <td>100%</td>
+        </tr>
+    `;
+    
+    tableBody.innerHTML = html;
+}
+
+// Display Registrations by Shreni/Zone Matrix
+// Rows: Americas, Europe, AR, Africa, SE Asia, Australasia, Others, Total
+// Columns: Karyakarta, Swakeeya, Yuva, Kishor, Baal, Total
+function displayShreniZoneMatrix(registrations) {
+    const tableBody = document.getElementById('shreniZoneMatrixTableBody');
+    if (!tableBody) return;
+    
+    // Define zones and shrenis
+    const zoneOrder = ['AM', 'EU', 'AR', 'AF', 'AS', 'AU'];
+    const zoneLabels = {
+        'AM': 'Americas',
+        'EU': 'Europe',
+        'AR': 'AR',
+        'AF': 'Africa',
+        'AS': 'SE Asia',
+        'AU': 'Australasia'
+    };
+    const shreniOrder = ['Karyakarta', 'Swakeeya', 'Yuva', 'Kishor', 'Baal'];
+    
+    // Normalize shreni names
+    const normalizeShreni = (shreni) => {
+        if (!shreni) return 'Unknown';
+        const s = shreni.toLowerCase().trim();
+        if (s.includes('karyakarta') || s === 'kk') return 'Karyakarta';
+        if (s.includes('swakeeya') || s === 'sw') return 'Swakeeya';
+        if (s.includes('yuva') || s === 'yv') return 'Yuva';
+        if (s.includes('kishor') || s === 'ks') return 'Kishor';
+        if (s.includes('baal') || s === 'bl') return 'Baal';
+        return 'Other';
+    };
+    
+    // Initialize matrix
+    const matrix = {};
+    [...zoneOrder, 'Others'].forEach(zone => {
+        matrix[zone] = {};
+        shreniOrder.forEach(shreni => {
+            matrix[zone][shreni] = 0;
+        });
+        matrix[zone]['Total'] = 0;
+    });
+    
+    // Count registrations
+    registrations.forEach(reg => {
+        const zone = reg.Zone || reg.zone || 'Unknown';
+        const normalizedZone = zoneOrder.find(z => zone.toUpperCase().startsWith(z)) || 'Others';
+        
+        const rawShreni = reg.Shreni || reg.shreni || reg['Corrected Shreni'] || reg['Default Shreni'] || 'Unknown';
+        const shreni = normalizeShreni(rawShreni);
+        
+        if (shreniOrder.includes(shreni)) {
+            matrix[normalizedZone][shreni]++;
+        }
+        matrix[normalizedZone]['Total']++;
+    });
+    
+    // Build table HTML
+    let html = '';
+    const totals = {};
+    shreniOrder.forEach(shreni => totals[shreni] = 0);
+    totals['Total'] = 0;
+    
+    // Zone rows
+    [...zoneOrder, 'Others'].forEach(zone => {
+        const label = zoneLabels[zone] || zone;
+        html += `<tr><td>${escapeHtml(label)}</td>`;
+        
+        shreniOrder.forEach(shreni => {
+            const count = matrix[zone][shreni];
+            totals[shreni] += count;
+            html += `<td>${count}</td>`;
+        });
+        
+        const zoneTotal = matrix[zone]['Total'];
+        totals['Total'] += zoneTotal;
+        html += `<td>${zoneTotal}</td></tr>`;
+    });
+    
+    // Total row
+    html += `<tr style="font-weight: bold; background-color: #f0f0f0;"><td>Total</td>`;
+    shreniOrder.forEach(shreni => {
+        html += `<td>${totals[shreni]}</td>`;
+    });
+    html += `<td>${totals['Total']}</td></tr>`;
+    
+    tableBody.innerHTML = html;
 }
 
 // Update dashboard based on status filter

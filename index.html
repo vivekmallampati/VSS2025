@@ -1113,7 +1113,7 @@
                             </div>
                         </div>
 
-                        <!-- Zone Breakdown -->
+                        <!-- Registrations by Zone - with Registered, Web Logged In, Venue Check In columns -->
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Registrations by Zone</h3>
@@ -1126,8 +1126,9 @@
                                     <thead>
                                         <tr>
                                             <th>Zone</th>
-                                            <th>Count</th>
-                                            <th>Percentage</th>
+                                            <th>Registered</th>
+                                            <th>Web Logged In</th>
+                                            <th>Venue Check In</th>
                                             <th>Action</th>
                                         </tr>
                                     </thead>
@@ -1144,9 +1145,7 @@
                             </div>
                         </div>
 
-                        
-
-                        <!-- Shreni Breakdown -->
+                        <!-- Registrations by Shreni - with Male, Female, Total, Percentage columns -->
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Registrations by Shreni</h3>
@@ -1158,7 +1157,9 @@
                                     <thead>
                                         <tr>
                                             <th>Shreni</th>
-                                            <th>Count</th>
+                                            <th>Male</th>
+                                            <th>Female</th>
+                                            <th>Total</th>
                                             <th>Percentage</th>
                                         </tr>
                                     </thead>
@@ -1169,7 +1170,35 @@
                             </div>
                         </div>
 
-                        <!-- Tour Selections -->
+                        <!-- Registrations by Shreni/Zone Matrix -->
+                        <div class="analytics-section">
+                            <div class="analytics-section-header" onclick="toggleSection(this)">
+                                <h3>Registrations by Shreni/Zone</h3>
+                                <span class="analytics-section-toggle">▼</span>
+                            </div>
+                            <div class="analytics-section-content">
+                                <div id="shreniZoneMatrixBreakdown" class="data-table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Zone</th>
+                                                <th>Karyakarta</th>
+                                                <th>Swakeeya</th>
+                                                <th>Yuva</th>
+                                                <th>Kishor</th>
+                                                <th>Baal</th>
+                                                <th>Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="shreniZoneMatrixTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- COMMENTED OUT SECTIONS START -->
+                        <!--
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Post-Shibir Tour Selections</h3>
@@ -1192,7 +1221,6 @@
                             </div>
                         </div>
 
-                        <!-- Pickup Locations -->
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Pickup Locations</h3>
@@ -1215,7 +1243,6 @@
                             </div>
                         </div>
 
-                        <!-- Dropoff Locations -->
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Dropoff Locations</h3>
@@ -1238,7 +1265,6 @@
                             </div>
                         </div>
 
-                        <!-- Gender Breakdown -->
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Gender Distribution</h3>
@@ -1261,7 +1287,6 @@
                             </div>
                         </div>
 
-                        <!-- Gender Slicing with Range Details -->
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Gender Slicing with Range Details</h3>
@@ -1292,7 +1317,6 @@
                             </div>
                         </div>
 
-                        <!-- Country Breakdown Overall -->
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Registrations by Country (Overall)</h3>
@@ -1315,7 +1339,6 @@
                             </div>
                         </div>
 
-                        <!-- Zone by Shreni Breakdown -->
                         <div class="analytics-section">
                             <h3>Registrations by Zone and Shreni</h3>
                             <div id="zoneShreniBreakdown" class="data-table-container">
@@ -1334,7 +1357,6 @@
                             </div>
                         </div>
 
-                        <!-- Shreni by Gender Breakdown -->
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Registrations by Shreni and Gender</h3>
@@ -1367,7 +1389,6 @@
                             </div>
                         </div>
                         
-                        <!-- Zone Statistics Table -->
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Zone Statistics</h3>
@@ -1399,7 +1420,6 @@
                             </div>
                         </div>
                         
-                        <!-- Registrations by Zone and Shreni -->
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Registrations by Zone and Shreni</h3>
@@ -1433,7 +1453,6 @@
                             </div>
                         </div>
                         
-                        <!-- Export Buttons -->
                         <div class="analytics-section">
                             <div class="analytics-section-header">
                                 <h3>Data Exports</h3>
@@ -1446,8 +1465,11 @@
                                 </div>
                             </div>
                         </div>
+                        -->
+                        <!-- COMMENTED OUT SECTIONS END -->
 
-                        <!-- Age Distribution -->
+                        <!-- MORE COMMENTED OUT SECTIONS START -->
+                        <!--
                         <div class="analytics-section">
                             <h3>Age Distribution</h3>
                             <div id="ageBreakdown" class="data-table-container">
@@ -1465,7 +1487,6 @@
                             </div>
                         </div>
 
-                        <!-- Shiksha Varg Breakdown -->
                         <div class="analytics-section">
                             <h3>Which Sangh Shiksha Varg have you completed</h3>
                             <div id="shikshaVargBreakdown" class="data-table-container">
@@ -1483,7 +1504,6 @@
                             </div>
                         </div>
 
-                        <!-- Shiksha Varg by Shreni -->
                         <div class="analytics-section">
                             <h3>Shiksha Varg by Shreni</h3>
                             <div id="shikshaVargShreniBreakdown" class="data-table-container">
@@ -1502,7 +1522,6 @@
                             </div>
                         </div>
 
-                        <!-- Date of Arrival Breakdown -->
                         <div class="analytics-section">
                             <h3>Registrations by Date of Arrival</h3>
                             <div id="arrivalDateBreakdown" class="data-table-container">
@@ -1520,7 +1539,6 @@
                             </div>
                         </div>
 
-                        <!-- Arrival Time Buckets -->
                         <div class="analytics-section">
                             <h3>Arrivals by Time Buckets (2/4 hour sections)</h3>
                             <div id="arrivalTimeBucketsBreakdown" class="data-table-container">
@@ -1538,7 +1556,6 @@
                             </div>
                         </div>
 
-                        <!-- Pickup Needed Breakdown -->
                         <div class="analytics-section">
                             <h3>Do you need a pickup on arrival?</h3>
                             <div id="pickupNeededBreakdown" class="data-table-container">
@@ -1556,7 +1573,6 @@
                             </div>
                         </div>
 
-                        <!-- Dropoff Needed Breakdown -->
                         <div class="analytics-section">
                             <h3>Do you need a drop off for departure?</h3>
                             <div id="dropoffNeededBreakdown" class="data-table-container">
@@ -1574,7 +1590,6 @@
                             </div>
                         </div>
 
-                        <!-- Place of Arrival Breakdown -->
                         <div class="analytics-section">
                             <h3>Place of Arrival</h3>
                             <div id="placeOfArrivalBreakdown" class="data-table-container">
@@ -1592,7 +1607,6 @@
                             </div>
                         </div>
 
-                        <!-- Place of Arrival by Date -->
                         <div class="analytics-section">
                             <h3>Place of Arrival by Date of Arrival</h3>
                             <div id="placeArrivalDateBreakdown" class="data-table-container">
@@ -1611,7 +1625,6 @@
                             </div>
                         </div>
 
-                        <!-- Place of Arrival by Date and Time Bucket -->
                         <div class="analytics-section">
                             <h3>Place of Arrival by Date and Time Bucket</h3>
                             <div id="placeArrivalDateTimeBreakdown" class="data-table-container">
@@ -1631,7 +1644,6 @@
                             </div>
                         </div>
 
-                        <!-- Place of Departure Breakdown -->
                         <div class="analytics-section">
                             <h3>Place of Departure</h3>
                             <div id="placeOfDepartureBreakdown" class="data-table-container">
@@ -1649,7 +1661,6 @@
                             </div>
                         </div>
 
-                        <!-- Place of Departure by Date -->
                         <div class="analytics-section">
                             <h3>Place of Departure by Date of Departure</h3>
                             <div id="placeDepartureDateBreakdown" class="data-table-container">
@@ -1668,7 +1679,6 @@
                             </div>
                         </div>
 
-                        <!-- Ganavesh Size Breakdown -->
                         <div class="analytics-section">
                             <h3>Ganavesh Size Distribution</h3>
                             <div id="ganaveshSizeBreakdown" class="data-table-container">
@@ -1686,7 +1696,6 @@
                             </div>
                         </div>
 
-                        <!-- Medical Conditions -->
                         <div class="analytics-section">
                             <h3>Medical Conditions</h3>
                             <div id="medicalConditionsBreakdown" class="data-table-container">
@@ -1704,7 +1713,6 @@
                             </div>
                         </div>
 
-                        <!-- Dietary Restrictions -->
                         <div class="analytics-section">
                             <h3>Dietary Restrictions</h3>
                             <div id="dietaryRestrictionsBreakdown" class="data-table-container">
@@ -1722,7 +1730,6 @@
                             </div>
                         </div>
 
-                        <!-- Travel Update Statistics -->
                         <div class="analytics-section">
                             <h3>Travel Information Updates</h3>
                             <div class="metrics-cards" style="margin-bottom: 1.5rem;">
@@ -1743,6 +1750,8 @@
                                 </div>
                             </div>
                         </div>
+                        -->
+                        <!-- MORE COMMENTED OUT SECTIONS END -->
 
                         <!-- Email Correction Tracking Section -->
                         <div class="analytics-section" style="border-top: 2px solid #e0e0e0; margin-top: 3rem; padding-top: 2rem;">
