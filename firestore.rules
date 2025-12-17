@@ -216,8 +216,10 @@ service cloud.firestore {
       // Volunteers can update checkins for their assigned teams
       allow update: if request.auth != null && isVolunteer() && volunteerHasAccess(resource.data.checkinType);
       
-      // Only superadmins and admins can delete checkins
+      // Superadmins and admins can delete all checkins
       allow delete: if request.auth != null && isAdmin();
+      // Volunteers can delete checkins for their assigned teams
+      allow delete: if request.auth != null && isVolunteer() && volunteerHasAccess(resource.data.checkinType);
       
       // Allow list queries for authenticated users
       // Note: Firestore will still enforce document-level read rules, so users will only see their own checkins

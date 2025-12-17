@@ -4422,7 +4422,7 @@ async function loadAdminDashboard(user) {
         // Wrap each in try-catch to prevent one failure from breaking the dashboard
         try {
             loadTransportationAnalytics(registrations);
-        } catch (error) {
+    } catch (error) {
             console.error('Error loading transportation analytics:', error);
         }
         
@@ -7102,6 +7102,8 @@ async function searchParticipantByLoginId() {
     
     try {
         const db = firebase.firestore();
+        // Normalize: uppercase the ID
+        const uppercasedId = loginId.toUpperCase().trim();
         const normalizedId = normalizePraveshikaId(loginId);
         
         // First, find the registration with this ID
@@ -7111,8 +7113,12 @@ async function searchParticipantByLoginId() {
             .get();
         
         if (regQuery.empty) {
-            // Try direct document ID lookup
-            const regDoc = await db.collection('registrations').doc(loginId).get();
+            // Try direct document ID lookup with uppercased ID first
+            let regDoc = await db.collection('registrations').doc(uppercasedId).get();
+            // Fallback to original ID if not found
+            if (!regDoc.exists) {
+                regDoc = await db.collection('registrations').doc(loginId).get();
+            }
             if (regDoc.exists) {
                 const regData = regDoc.data();
                 // Only show if status is "Approved"
@@ -8903,25 +8909,34 @@ async function searchByPraveshikaIdDirect(uniqueId) {
     
     try {
         const db = firebase.firestore();
+        // Normalize: uppercase and trim the ID
+        const uppercasedId = uniqueId.toUpperCase().trim();
         const normalizedId = normalizePraveshikaId(uniqueId);
         
-        // Search in registrations collection
+        // Search in registrations collection by normalized ID
         const registrationsQuery = await db.collection('registrations')
             .where('normalizedId', '==', normalizedId)
             .limit(1)
             .get();
         
         if (registrationsQuery.empty) {
-            // Try direct document ID lookup
-            const regDoc = await db.collection('registrations').doc(uniqueId).get();
+            // Try direct document ID lookup with uppercased ID
+            let regDoc = await db.collection('registrations').doc(uppercasedId).get();
+            
+            // If not found, try original ID as fallback
+            if (!regDoc.exists) {
+                regDoc = await db.collection('registrations').doc(uniqueId).get();
+            }
+            
             if (regDoc.exists) {
-                displayParticipantInfo(regDoc.data(), uniqueId);
+                displayParticipantInfo(regDoc.data(), regDoc.id);
             } else {
-                showNotification('Participant not found', 'error');
+                showNotification(`Participant with Praveshika ID "${uppercasedId}" not found`, 'error');
             }
         } else {
-            const regData = registrationsQuery.docs[0].data();
-            displayParticipantInfo(regData, uniqueId);
+            const regDoc = registrationsQuery.docs[0];
+            const regData = regDoc.data();
+            displayParticipantInfo(regData, regDoc.id);
         }
     } catch (error) {
         console.error('Error searching participant:', error);
@@ -9582,10 +9597,15 @@ async function checkCheckinStatus(uniqueId) {
         const submitButton = checkinFormElement?.querySelector('button[type="submit"]');
         
         if (!checkinsQuery.empty) {
-            const checkinData = checkinsQuery.docs[0].data();
+            const checkinDoc = checkinsQuery.docs[0];
+            const checkinDocId = checkinDoc.id;
+            const checkinData = checkinDoc.data();
             const timestamp = checkinData.timestamp?.toDate();
             const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
             const typeLabel = CHECKIN_TYPE_LABELS[currentCheckinType] || currentCheckinType;
+            
+            // Get participant name for the undo function
+            const participantName = document.getElementById('participantDetails')?.querySelector('.checkin-item-name')?.textContent || uniqueId;
             
             // Show status in the form
             const participantDetails = document.getElementById('participantDetails');
@@ -9601,6 +9621,16 @@ async function checkCheckinStatus(uniqueId) {
                     <p style="margin: 0.5rem 0 0 0; color: #721c24; font-size: 0.85em;">
                         Duplicate check-ins are not allowed for the same check-in type.
                     </p>
+                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn" style="background-color: #dc3545; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer;" 
+                                onclick="undoCheckinFromStatus('${escapeHtml(checkinDocId)}', '${escapeHtml(uniqueId)}', '${escapeHtml(participantName.replace(/'/g, "\\'"))}')">
+                            Undo Check-in
+                        </button>
+                        <button type="button" class="btn btn-secondary" style="padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;" 
+                                onclick="clearParticipantInfo()">
+                            Clear
+                        </button>
+                    </div>
                 `;
                 
                 // Remove existing status if any
@@ -9694,16 +9724,23 @@ async function loadRecentCheckins(checkinType, limit = 5) {
         let html = '<ul class="recent-checkins-list">';
         snapshot.docs.forEach(doc => {
             const data = doc.data();
+            const docId = doc.id;
             const timestamp = data.timestamp?.toDate();
             const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
             const participantName = registrationsMap.get(data.uniqueId) || 'Unknown';
             
             html += `
-                <li class="recent-checkin-item">
+                <li class="recent-checkin-item" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="flex: 1;">
                     <div class="checkin-item-name">${escapeHtml(participantName)}</div>
                     <div class="checkin-item-id">${escapeHtml(data.uniqueId)}</div>
                     <div class="checkin-item-time">${escapeHtml(timeStr)}</div>
                     <div class="checkin-item-by">By: ${escapeHtml(data.checkedInByName)}</div>
+                    </div>
+                    <button class="btn btn-small" style="background-color: #dc3545; color: white; padding: 0.25rem 0.5rem; font-size: 0.75rem;" 
+                            onclick="undoCheckin('${escapeHtml(docId)}', '${escapeHtml(data.uniqueId)}', '${escapeHtml(participantName)}')">
+                        Undo
+                    </button>
                 </li>
             `;
         });
@@ -9713,6 +9750,92 @@ async function loadRecentCheckins(checkinType, limit = 5) {
     } catch (error) {
         console.error('Error loading recent checkins:', error);
         recentCheckinsList.innerHTML = '<p>Error loading recent checkins</p>';
+    }
+}
+
+// Undo/Cancel a checkin (from recent checkins list)
+async function undoCheckin(checkinDocId, uniqueId, participantName) {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        showNotification('Please log in to undo checkin', 'error');
+        return;
+    }
+    
+    // Confirm with user
+    const confirmed = confirm(`Are you sure you want to undo the check-in for ${participantName} (${uniqueId})?\n\nThis action cannot be undone.`);
+    if (!confirmed) {
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Delete the checkin document
+        await db.collection('checkins').doc(checkinDocId).delete();
+        
+        showNotification(`Check-in undone for ${participantName} (${uniqueId})`, 'success');
+        
+        // Use the same reload mechanism as after check-in
+        clearCheckinForm();
+        clearParticipantInfo();
+        await loadRecentCheckins(currentCheckinType);
+        await loadCheckinHistory();
+        
+    } catch (error) {
+        console.error('Error undoing checkin:', error);
+        if (error.code === 'permission-denied') {
+            showNotification('You do not have permission to undo this check-in', 'error');
+        } else {
+            showNotification('Error undoing check-in: ' + error.message, 'error');
+        }
+    }
+}
+
+// Undo/Cancel a checkin (from participant status view)
+async function undoCheckinFromStatus(checkinDocId, uniqueId, participantName) {
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        showNotification('Please log in to undo checkin', 'error');
+        return;
+    }
+    
+    // Confirm with user
+    const confirmed = confirm(`Are you sure you want to undo the check-in for ${participantName} (${uniqueId})?\n\nThis action cannot be undone.`);
+    if (!confirmed) {
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Delete the checkin document
+        await db.collection('checkins').doc(checkinDocId).delete();
+        
+        showNotification(`Check-in undone for ${participantName} (${uniqueId})`, 'success');
+        
+        // Use the same reload mechanism as after check-in
+        clearCheckinForm();
+        clearParticipantInfo();
+        await loadRecentCheckins(currentCheckinType);
+        await loadCheckinHistory();
+        
+    } catch (error) {
+        console.error('Error undoing checkin:', error);
+        if (error.code === 'permission-denied') {
+            showNotification('You do not have permission to undo this check-in', 'error');
+        } else {
+            showNotification('Error undoing check-in: ' + error.message, 'error');
+        }
     }
 }
 
