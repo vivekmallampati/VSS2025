@@ -5002,6 +5002,344 @@ async function handleUserCreationSubmit(event) {
 }
 
 // ============================================
+// BATCH USER UPLOAD FUNCTIONS
+// ============================================
+
+// Store parsed batch user data
+let batchUserData = [];
+
+// Download template CSV for batch user upload
+function downloadUserTemplate() {
+    const headers = ['name', 'uniqueId', 'email', 'role', 'volunteerTeams'];
+    const exampleRows = [
+        ['Volunteer One', 'VOL001', 'volunteer1@example.com', 'volunteer', 'registration,transportation'],
+        ['Volunteer Two', 'VOL002', 'volunteer2@example.com', 'volunteer', 'ganvesh_collected,cloak_room,post_tour'],
+        ['Admin User', 'ADM001', 'admin@example.com', 'admin', '']
+    ];
+    
+    // Build CSV content
+    let csvContent = headers.join(',') + '\n';
+    exampleRows.forEach(row => {
+        csvContent += row.map(cell => {
+            // Quote cells that contain commas
+            if (cell.includes(',')) {
+                return `"${cell}"`;
+            }
+            return cell;
+        }).join(',') + '\n';
+    });
+    
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'user_upload_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    showNotification('Template CSV downloaded!', 'success');
+}
+
+// Preview batch users from CSV file
+async function previewBatchUsers(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const previewDiv = document.getElementById('batchUserPreview');
+    const previewBody = document.getElementById('batchUserPreviewBody');
+    const countSpan = document.getElementById('batchUserCount');
+    const messageDiv = document.getElementById('batchUserMessage');
+    
+    if (!previewDiv || !previewBody) return;
+    
+    // Reset message
+    if (messageDiv) {
+        messageDiv.style.display = 'none';
+    }
+    
+    try {
+        const text = await file.text();
+        const rows = parseCSV(text);
+        
+        if (rows.length === 0) {
+            showNotification('No data found in CSV file', 'error');
+            return;
+        }
+        
+        // Parse headers (first row)
+        const headers = rows[0].map(h => h.toLowerCase().trim());
+        const nameIdx = headers.findIndex(h => h === 'name' || h === 'full name');
+        const idIdx = headers.findIndex(h => h === 'uniqueid' || h === 'id' || h === 'unique id');
+        const emailIdx = headers.findIndex(h => h === 'email');
+        const roleIdx = headers.findIndex(h => h === 'role');
+        const teamsIdx = headers.findIndex(h => h === 'volunteerteams' || h === 'teams' || h === 'volunteer teams');
+        
+        if (nameIdx === -1 || idIdx === -1) {
+            showNotification('CSV must have "name" and "uniqueId" (or "id") columns', 'error');
+            return;
+        }
+        
+        // Parse data rows
+        batchUserData = [];
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (row.length === 0 || (row.length === 1 && !row[0])) continue; // Skip empty rows
+            
+            const name = (row[nameIdx] || '').trim();
+            const uniqueId = (row[idIdx] || '').trim().toUpperCase();
+            const email = emailIdx !== -1 ? (row[emailIdx] || '').trim() : '';
+            const role = roleIdx !== -1 ? (row[roleIdx] || 'volunteer').trim().toLowerCase() : 'volunteer';
+            const teamsStr = teamsIdx !== -1 ? (row[teamsIdx] || '').trim() : '';
+            const teams = teamsStr ? teamsStr.split(/[,;]/).map(t => t.trim()).filter(Boolean) : [];
+            
+            if (!name || !uniqueId) continue; // Skip rows without required fields
+            
+            batchUserData.push({
+                name,
+                uniqueId,
+                email,
+                role: role === 'admin' ? 'admin' : 'volunteer',
+                volunteerTeams: teams,
+                status: 'pending'
+            });
+        }
+        
+        if (batchUserData.length === 0) {
+            showNotification('No valid user data found in CSV', 'error');
+            return;
+        }
+        
+        // Display preview
+        countSpan.textContent = batchUserData.length;
+        previewBody.innerHTML = batchUserData.map((user, idx) => `
+            <tr id="batchUserRow${idx}">
+                <td>${escapeHtml(user.name)}</td>
+                <td>${escapeHtml(user.uniqueId)}</td>
+                <td>${escapeHtml(user.email || '-')}</td>
+                <td>${escapeHtml(user.role)}</td>
+                <td style="font-size: 0.8rem;">${escapeHtml(user.volunteerTeams.join(', ') || '-')}</td>
+                <td id="batchUserStatus${idx}" style="color: #666;">Pending</td>
+            </tr>
+        `).join('');
+        
+        previewDiv.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error parsing CSV:', error);
+        showNotification('Error parsing CSV file: ' + error.message, 'error');
+    }
+}
+
+// Parse CSV text into rows
+function parseCSV(text) {
+    const rows = [];
+    const lines = text.split(/\r?\n/);
+    
+    for (const line of lines) {
+        // Simple CSV parsing (handles quoted fields)
+        const row = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                row.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        row.push(current.trim());
+        rows.push(row);
+    }
+    
+    return rows;
+}
+
+// Clear batch user preview
+function clearBatchUserPreview() {
+    const previewDiv = document.getElementById('batchUserPreview');
+    const fileInput = document.getElementById('batchUserCsv');
+    const messageDiv = document.getElementById('batchUserMessage');
+    
+    if (previewDiv) previewDiv.style.display = 'none';
+    if (fileInput) fileInput.value = '';
+    if (messageDiv) messageDiv.style.display = 'none';
+    
+    batchUserData = [];
+}
+
+// Execute batch user creation
+async function executeBatchUserCreation() {
+    if (!batchUserData || batchUserData.length === 0) {
+        showNotification('No users to create', 'error');
+        return;
+    }
+    
+    if (!window.firebase || !firebase.auth || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    const currentUser = firebase.auth().currentUser;
+    if (!currentUser) {
+        showNotification('Not authenticated', 'error');
+        return;
+    }
+    
+    const isAdminUser = await isAdmin(currentUser);
+    if (!isAdminUser) {
+        showNotification('Permission denied. Only admins can create users.', 'error');
+        return;
+    }
+    
+    const messageDiv = document.getElementById('batchUserMessage');
+    if (messageDiv) {
+        messageDiv.style.display = 'block';
+        messageDiv.style.backgroundColor = '#cce5ff';
+        messageDiv.innerHTML = 'Creating users... Please wait.';
+    }
+    
+    const db = firebase.firestore();
+    let successCount = 0;
+    let errorCount = 0;
+    const defaultPassword = 'Vss@2025';
+    
+    for (let i = 0; i < batchUserData.length; i++) {
+        const user = batchUserData[i];
+        const statusCell = document.getElementById(`batchUserStatus${i}`);
+        const row = document.getElementById(`batchUserRow${i}`);
+        
+        try {
+            // Update status to processing
+            if (statusCell) {
+                statusCell.textContent = 'Creating...';
+                statusCell.style.color = '#007bff';
+            }
+            
+            // Generate placeholder email if not provided
+            const userEmail = user.email || `${user.uniqueId.toLowerCase()}@placeholder.local`;
+            
+            // Check if user already exists
+            const existingUser = await db.collection('users').doc(user.uniqueId).get();
+            if (existingUser.exists) {
+                if (statusCell) {
+                    statusCell.textContent = 'Already exists';
+                    statusCell.style.color = '#ffc107';
+                }
+                if (row) row.style.backgroundColor = '#fff3cd';
+                errorCount++;
+                continue;
+            }
+            
+            // Create Firebase Auth account
+            try {
+                const userCredential = await firebase.auth().createUserWithEmailAndPassword(userEmail, defaultPassword);
+                const newUser = userCredential.user;
+                
+                // Create user document in Firestore
+                await db.collection('users').doc(newUser.uid).set({
+                    email: user.email || null,
+                    name: user.name,
+                    uniqueId: user.uniqueId,
+                    role: user.role,
+                    volunteerTeams: user.role === 'volunteer' ? user.volunteerTeams : [],
+                    country: 'Bharat',
+                    shreni: 'Volunteer',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: currentUser.uid,
+                    batchCreated: true
+                });
+                
+                // Create nonShibirarthiUsers document
+                const normalizedId = user.uniqueId.toLowerCase().replace(/[/-]/g, '');
+                await db.collection('nonShibirarthiUsers').doc(user.uniqueId).set({
+                    uniqueId: user.uniqueId,
+                    normalizedId: normalizedId,
+                    name: user.name,
+                    email: user.email || null,
+                    country: 'Bharat',
+                    Country: 'Bharat',
+                    shreni: 'Volunteer',
+                    Shreni: 'Volunteer',
+                    role: user.role,
+                    volunteerTeams: user.role === 'volunteer' ? user.volunteerTeams : [],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: currentUser.uid,
+                    batchCreated: true
+                });
+                
+                // Sign out the newly created user
+                await firebase.auth().signOut();
+                
+                // Update status
+                if (statusCell) {
+                    statusCell.textContent = 'Created ✓';
+                    statusCell.style.color = '#28a745';
+                }
+                if (row) row.style.backgroundColor = '#d4edda';
+                
+                successCount++;
+                
+            } catch (authError) {
+                // If auth creation fails, try creating just Firestore docs
+                if (authError.code === 'auth/email-already-in-use') {
+                    if (statusCell) {
+                        statusCell.textContent = 'Email in use';
+                        statusCell.style.color = '#dc3545';
+                    }
+                    if (row) row.style.backgroundColor = '#f8d7da';
+                } else {
+                    throw authError;
+                }
+                errorCount++;
+            }
+            
+        } catch (error) {
+            console.error(`Error creating user ${user.uniqueId}:`, error);
+            if (statusCell) {
+                statusCell.textContent = 'Error: ' + error.message;
+                statusCell.style.color = '#dc3545';
+            }
+            if (row) row.style.backgroundColor = '#f8d7da';
+            errorCount++;
+        }
+    }
+    
+    // Show final message
+    if (messageDiv) {
+        if (successCount > 0 && errorCount === 0) {
+            messageDiv.style.backgroundColor = '#d4edda';
+            messageDiv.innerHTML = `<strong>Success!</strong> Created ${successCount} user(s).`;
+        } else if (successCount > 0) {
+            messageDiv.style.backgroundColor = '#fff3cd';
+            messageDiv.innerHTML = `<strong>Partial success:</strong> Created ${successCount} user(s), ${errorCount} failed/skipped.`;
+        } else {
+            messageDiv.style.backgroundColor = '#f8d7da';
+            messageDiv.innerHTML = `<strong>Error:</strong> Failed to create users. ${errorCount} error(s).`;
+        }
+    }
+    
+    // Show notification about re-authentication
+    if (successCount > 0) {
+        showNotification(`Created ${successCount} user(s). You may need to log in again.`, 'info');
+        
+        // Reload user list
+        setTimeout(() => {
+            loadUserManagementList();
+        }, 1000);
+    }
+}
+
+// ============================================
 // PARTICIPANT LOOKUP FUNCTIONS
 // ============================================
 

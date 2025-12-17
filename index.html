@@ -2052,6 +2052,61 @@
                             <div id="userCreationMessage" class="user-creation-message" style="display: none; margin-top: 1rem;"></div>
                         </div>
 
+                        <!-- Batch User Upload -->
+                        <div class="batch-user-upload" style="background: #e8f4e8; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #28a745;">
+                            <h3>Batch Upload Users (CSV)</h3>
+                            <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
+                                Upload a CSV file to create multiple users at once.<br>
+                                <strong>Required columns:</strong> name, uniqueId, role<br>
+                                <strong>Optional columns:</strong> email, volunteerTeams (comma-separated: transportation, registration, ganvesh_collected, cloak_room, post_tour)
+                            </p>
+                            
+                            <div style="margin-bottom: 1rem;">
+                                <button type="button" class="btn btn-secondary" onclick="downloadUserTemplate()" style="margin-bottom: 0.5rem;">
+                                    📥 Download Template CSV
+                                </button>
+                            </div>
+                            
+                            <div style="margin-bottom: 1rem;">
+                                <label for="batchUserCsv" style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Select CSV File:</label>
+                                <input type="file" id="batchUserCsv" accept=".csv,.xlsx,.xls" class="form-input" style="padding: 0.5rem;" onchange="previewBatchUsers(event)">
+                            </div>
+                            
+                            <div id="batchUserPreview" style="display: none; margin-top: 1rem;">
+                                <h4>Preview (<span id="batchUserCount">0</span> users)</h4>
+                                <div style="max-height: 300px; overflow-y: auto; margin-bottom: 1rem;">
+                                    <table class="data-table" style="font-size: 0.85rem;">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>ID</th>
+                                                <th>Email</th>
+                                                <th>Role</th>
+                                                <th>Teams</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="batchUserPreviewBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div style="display: flex; gap: 1rem;">
+                                    <button type="button" class="btn btn-primary" onclick="executeBatchUserCreation()">
+                                        Create All Users
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="clearBatchUserPreview()">
+                                        Clear
+                                    </button>
+                                </div>
+                                <div id="batchUserMessage" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: 4px;"></div>
+                            </div>
+                            
+                            <div style="margin-top: 1rem; padding: 0.75rem; background: #fff3cd; border-radius: 4px; font-size: 0.85rem;">
+                                <strong>⚠️ Note:</strong> This creates Firestore user records. Users will use the default password <code>Vss@2025</code> to log in. 
+                                They should change their password after first login.
+                            </div>
+                        </div>
+
                         <!-- Existing Users List -->
                         <div class="user-management-list">
                             <h3>Existing Users (Volunteers & Admins)</h3>
