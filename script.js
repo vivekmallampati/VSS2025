@@ -7631,6 +7631,19 @@ async function showCountryShibirarthis(zone, country) {
         tbody.innerHTML = '<p style="text-align: center; padding: 2rem;">Loading Shibirarthis...</p>';
     }
     
+    // Map zone labels back to zone codes for comparison
+    const zoneLabelToCode = {
+        'Americas': 'AM',
+        'Europe': 'EU',
+        'AR': 'AR',
+        'Africa': 'AF',
+        'SE Asia': 'AS',
+        'Australasia': 'AU',
+        'Others': 'Others'
+    };
+    const zoneOrder = ['AM', 'EU', 'AR', 'AF', 'AS', 'AU'];
+    const targetZoneCode = zoneLabelToCode[zone] || zone;
+    
     try {
         const db = firebase.firestore();
         
@@ -7643,7 +7656,15 @@ async function showCountryShibirarthis(zone, country) {
             const regCountry = data.Country || data.country || data['Country of Current Residence'] || '';
             const regZone = data.Zone || data.zone || data['Zone/Shreni'] || '';
             
-            if (regCountry === country && (zone === 'Unknown' || regZone === zone)) {
+            // Normalize the registration's zone to match how we count
+            const normalizedRegZone = zoneOrder.find(z => regZone.toUpperCase().startsWith(z)) || 'Others';
+            
+            // Match country and zone (using normalized zone code)
+            const zoneMatches = targetZoneCode === 'Others' 
+                ? normalizedRegZone === 'Others'
+                : normalizedRegZone === targetZoneCode;
+            
+            if (regCountry === country && zoneMatches) {
                 countryRegistrations.push({
                     uniqueId: data.uniqueId || doc.id,
                     name: data.name || data['Full Name'] || 'Unknown',
