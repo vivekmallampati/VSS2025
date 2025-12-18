@@ -10679,8 +10679,8 @@ async function loadRecentCheckins(checkinType, limit = 5) {
         if (isAdminUser) {
             // Admins: show all recent checkins
             snapshot = await db.collection('checkins')
-                .where('checkinType', '==', checkinType)
-                .orderBy('timestamp', 'desc')
+            .where('checkinType', '==', checkinType)
+            .orderBy('timestamp', 'desc')
                 .limit(limit)
                 .get();
         } else {
@@ -11138,28 +11138,28 @@ async function loadCheckinHistory(page = 1) {
         
         if (isAdminUser) {
             // Admins: show all checkins
-            let query = db.collection('checkins');
-            
-            // Apply filters
-            if (filterType) {
-                query = query.where('checkinType', '==', filterType);
-            }
-            
-            // Order by timestamp
-            query = query.orderBy('timestamp', 'desc');
-            
-            // Get total count (for pagination)
-            const totalSnapshot = await query.get();
+        let query = db.collection('checkins');
+        
+        // Apply filters
+        if (filterType) {
+            query = query.where('checkinType', '==', filterType);
+        }
+        
+        // Order by timestamp
+        query = query.orderBy('timestamp', 'desc');
+        
+        // Get total count (for pagination)
+        const totalSnapshot = await query.get();
             totalCount = totalSnapshot.size;
-            
-            // Apply pagination
-            const startAfter = (page - 1) * historyPageSize;
-            if (startAfter > 0) {
-                const startDoc = totalSnapshot.docs[startAfter - 1];
-                query = query.startAfter(startDoc);
-            }
-            query = query.limit(historyPageSize);
-            
+        
+        // Apply pagination
+        const startAfter = (page - 1) * historyPageSize;
+        if (startAfter > 0) {
+            const startDoc = totalSnapshot.docs[startAfter - 1];
+            query = query.startAfter(startDoc);
+        }
+        query = query.limit(historyPageSize);
+        
             snapshot = await query.get();
         } else {
             // Volunteers: only show checkins they created
@@ -11401,15 +11401,15 @@ async function exportCheckinHistory(format) {
         
         if (isAdminUser) {
             // Admins: export all checkins
-            let query = db.collection('checkins');
-            
-            if (filterType) {
-                query = query.where('checkinType', '==', filterType);
-            }
-            
-            // Order by timestamp
-            query = query.orderBy('timestamp', 'desc');
-            
+        let query = db.collection('checkins');
+        
+        if (filterType) {
+            query = query.where('checkinType', '==', filterType);
+        }
+        
+        // Order by timestamp
+        query = query.orderBy('timestamp', 'desc');
+        
             snapshot = await query.get();
         } else {
             // Volunteers: only export checkins they created
@@ -11930,7 +11930,7 @@ async function loadCheckinAnalytics() {
         
         // Check cache first
         const cachedData = getCachedData(CACHE_KEY, CACHE_MAX_AGE);
-        let totalCheckins, uniqueParticipants, typeBreakdown, recentCheckins;
+        let totalCheckins, uniqueParticipants, typeBreakdown, recentCheckins, checkinsByUser;
         
         // Get today's checkins count using query (always fresh)
         const today = new Date();
@@ -11948,6 +11948,7 @@ async function loadCheckinAnalytics() {
             uniqueParticipants = cachedData.uniqueParticipants;
             typeBreakdown = cachedData.typeBreakdown;
             recentCheckins = cachedData.recentCheckins;
+            checkinsByUser = cachedData.checkinsByUser || {};
         } else {
             // Cache expired or missing - fetch fresh data
             // Get all checkins for totals and breakdowns
@@ -11963,9 +11964,22 @@ async function loadCheckinAnalytics() {
             
             // Breakdown by type
             typeBreakdown = {};
+            checkinsByUser = {};
             allCheckins.forEach(checkin => {
                 const type = checkin.checkinType || 'unknown';
                 typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
+
+                const userId = checkin.checkedInBy || 'unknown';
+                const userName = checkin.checkedInByName || 'Unknown';
+                if (!checkinsByUser[userId]) {
+                    checkinsByUser[userId] = {
+                        name: userName,
+                        total: 0,
+                        byType: {}
+                    };
+                }
+                checkinsByUser[userId].total += 1;
+                checkinsByUser[userId].byType[type] = (checkinsByUser[userId].byType[type] || 0) + 1;
             });
             
             // Recent checkins timeline (last 50)
@@ -11982,7 +11996,8 @@ async function loadCheckinAnalytics() {
                 totalCheckins: totalCheckins,
                 uniqueParticipants: uniqueParticipants,
                 typeBreakdown: typeBreakdown,
-                recentCheckins: recentCheckins
+                recentCheckins: recentCheckins,
+                checkinsByUser: checkinsByUser
             });
         }
         
@@ -12011,6 +12026,45 @@ async function loadCheckinAnalytics() {
                 `;
             });
             checkinTypeTableBody.innerHTML = html;
+        }
+        
+        // Display checkins by user
+        const checkinsByUserContainer = document.getElementById('checkinsByUser');
+        if (checkinsByUserContainer) {
+            const entries = Object.entries(checkinsByUser || {});
+            if (!entries.length) {
+                checkinsByUserContainer.innerHTML = '<p>No checkins yet</p>';
+            } else {
+                // Sort by total checkins descending
+                entries.sort((a, b) => (b[1].total || 0) - (a[1].total || 0));
+                let html = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Total Checkins</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                entries.forEach(([userId, info]) => {
+                    const name = info.name || 'Unknown';
+                    const total = info.total || 0;
+                    html += `
+                        <tr>
+                            <td>${escapeHtml(name)}</td>
+                            <td>${total}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                        </tbody>
+                    </table>
+                `;
+                checkinsByUserContainer.innerHTML = html;
+            }
         }
         
         // Display recent checkins timeline

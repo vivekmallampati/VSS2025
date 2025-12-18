@@ -1948,6 +1948,14 @@
                                 </div>
                             </div>
 
+                            <!-- Checkins by User -->
+                            <div class="analytics-section">
+                                <h3>Checkins by User</h3>
+                                <div id="checkinsByUser" class="data-table-container">
+                                    <p>Loading checkins by user...</p>
+                                </div>
+                            </div>
+
                             <!-- Recent Checkins Timeline -->
                             <div class="analytics-section" style="margin-top: 2rem;">
                                 <h3>Recent Checkins Timeline</h3>
@@ -2636,8 +2644,21 @@ function openSubTab(tabName, event) {
 // Toggle collapsible section
 function toggleSection(header) {
     const section = header.closest('.analytics-section');
-    if (section) {
-        section.classList.toggle('expanded');
+    if (!section) return;
+    
+    const content = section.querySelector('.analytics-section-content');
+    const toggleIcon = header.querySelector('.analytics-section-toggle');
+    
+    const isExpanded = !section.classList.contains('expanded');
+    
+    if (isExpanded) {
+        section.classList.add('expanded');
+        if (content) content.style.display = 'block';
+        if (toggleIcon) toggleIcon.textContent = '▲';
+    } else {
+        section.classList.remove('expanded');
+        if (content) content.style.display = 'none';
+        if (toggleIcon) toggleIcon.textContent = '▼';
     }
 }
 
@@ -2676,6 +2697,10 @@ function initializeCollapsibleSections() {
         }
         // Ensure all sections start collapsed
         section.classList.remove('expanded');
+        const content = section.querySelector('.analytics-section-content');
+        const toggleIcon = section.querySelector('.analytics-section-toggle');
+        if (content) content.style.display = 'none';
+        if (toggleIcon) toggleIcon.textContent = '▼';
     });
 }
 
