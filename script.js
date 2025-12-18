@@ -6807,6 +6807,9 @@ function calculateStatistics(registrations, users) {
         }
     };
     
+    // Collect all registration uniqueIds (for linking to user accounts)
+    const registrationUniqueIds = new Set();
+    
     // Count unique email addresses
     const uniqueEmails = new Set();
     users.forEach(user => {
@@ -6818,6 +6821,12 @@ function calculateStatistics(registrations, users) {
     
     // Process each registration
     registrations.forEach(reg => {
+        // Track registration uniqueId for account linking
+        const regId = reg.uniqueId || reg.UniqueId || reg['Praveshika ID'] || reg['Unique ID'] || reg['Praveshika_ID'];
+        if (regId) {
+            registrationUniqueIds.add(regId.toString().trim());
+        }
+        
         // Country breakdown
         const country = reg.Country || reg.country || reg['Country of Current Residence'] || 'Unknown';
         stats.countryBreakdown[country] = (stats.countryBreakdown[country] || 0) + 1;
@@ -6977,33 +6986,50 @@ function calculateStatistics(registrations, users) {
     stats.totalCountries = Object.keys(stats.countryBreakdown).length;
     stats.totalShrenis = Object.keys(stats.shreniBreakdown).length;
     
-    // Calculate total Praveshika IDs associated with accounts created
-    // Go through users collection and sum the number of associatedRegistrations
-    let totalPraveshikaIdsWithAccounts = 0;
+    // Calculate total distinct Praveshika IDs that have user accounts (for the current registration set)
+    // This ensures no double-counting across multiple user docs and respects the current filter
+    const praveshikaIdsWithAccounts = new Set();
     users.forEach(user => {
-        // Check for associatedRegistrations array
-        if (user.associatedRegistrations) {
-            if (Array.isArray(user.associatedRegistrations)) {
-                totalPraveshikaIdsWithAccounts += user.associatedRegistrations.length;
-            } else if (typeof user.associatedRegistrations === 'object') {
-                // If it's an object, try to get length from keys or values
-                const regs = Object.values(user.associatedRegistrations);
-                if (Array.isArray(regs)) {
-                    totalPraveshikaIdsWithAccounts += regs.length;
-                }
+        // Direct uniqueId on user (often primary ID)
+        if (user.uniqueId) {
+            const id = user.uniqueId.toString().trim();
+            if (registrationUniqueIds.has(id)) {
+                praveshikaIdsWithAccounts.add(id);
             }
         }
-        // Fallback: check emailToUids if associatedRegistrations doesn't exist
-        else if (user.emailToUids) {
-            if (user.emailToUids.uniqueIds && Array.isArray(user.emailToUids.uniqueIds)) {
-                totalPraveshikaIdsWithAccounts += user.emailToUids.uniqueIds.length;
-            } else if (Array.isArray(user.emailToUids)) {
-                totalPraveshikaIdsWithAccounts += user.emailToUids.length;
-            }
+        
+        // associatedRegistrations on user
+        if (Array.isArray(user.associatedRegistrations)) {
+            user.associatedRegistrations.forEach(reg => {
+                const id = (reg.uniqueId || reg.id || '').toString().trim();
+                if (id && registrationUniqueIds.has(id)) {
+                    praveshikaIdsWithAccounts.add(id);
+                }
+            });
+        } else if (user.associatedRegistrations && typeof user.associatedRegistrations === 'object') {
+            Object.values(user.associatedRegistrations).forEach(reg => {
+                const id = (reg.uniqueId || reg.id || '').toString().trim();
+                if (id && registrationUniqueIds.has(id)) {
+                    praveshikaIdsWithAccounts.add(id);
+                }
+            });
+        }
+        
+        // Fallback: emailToUids-style structure on user (if present)
+        if (user.emailToUids) {
+            const idsArray = Array.isArray(user.emailToUids.uniqueIds)
+                ? user.emailToUids.uniqueIds
+                : (Array.isArray(user.emailToUids) ? user.emailToUids : []);
+            idsArray.forEach(rawId => {
+                const id = rawId && rawId.toString().trim();
+                if (id && registrationUniqueIds.has(id)) {
+                    praveshikaIdsWithAccounts.add(id);
+                }
+            });
         }
     });
     
-    stats.totalPraveshikaIdsWithAccounts = totalPraveshikaIdsWithAccounts;
+    stats.totalPraveshikaIdsWithAccounts = praveshikaIdsWithAccounts.size;
     
     // Track email corrections and late/updated registrations
     registrations.forEach(reg => {
