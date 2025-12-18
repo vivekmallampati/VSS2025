@@ -10916,15 +10916,42 @@ async function processBatchCheckin() {
                 <ul class="batch-preview-list">
                     ${ids.map(id => `<li>${escapeHtml(id)}</li>`).join('')}
                 </ul>
-                <button class="btn btn-primary" onclick="executeBatchCheckinFromPreview()">Confirm Batch Checkin</button>
+                <div style="margin: 1rem 0; padding: 0.75rem; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                    <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #856404;">
+                        Please confirm the following for this batch:
+                    </p>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.9rem;">
+                        <input type="checkbox" id="batchShulkPaidConfirm" onchange="updateBatchConfirmState()">
+                        <span>All shulk paid</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                        <input type="checkbox" id="batchKitCollectedConfirm" onchange="updateBatchConfirmState()">
+                        <span>All kits collected</span>
+                    </label>
+                </div>
+                <button id="batchConfirmButton" class="btn btn-primary" onclick="executeBatchCheckinFromPreview()" disabled style="opacity: 0.6; cursor: not-allowed;">
+                    Confirm Batch Checkin
+                </button>
                 <button class="btn btn-secondary" onclick="cancelBatchCheckin()">Cancel</button>
             </div>
         `;
+        // Initialize confirm button state
+        setTimeout(updateBatchConfirmState, 0);
     }
 }
 
 // Execute batch checkin from preview
 async function executeBatchCheckinFromPreview() {
+    // Ensure confirmation checkboxes are checked
+    const shulkCheckbox = document.getElementById('batchShulkPaidConfirm');
+    const kitCheckbox = document.getElementById('batchKitCollectedConfirm');
+    if (shulkCheckbox && kitCheckbox) {
+        if (!shulkCheckbox.checked || !kitCheckbox.checked) {
+            showNotification('Please confirm that all shulk are paid and all kits are collected before proceeding.', 'error');
+            return;
+        }
+    }
+    
     const ids = window.batchCheckinIds;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
         showNotification('No participants to check in', 'error');
@@ -11119,6 +11146,20 @@ async function executeBatchCheckin(ids) {
     
     showNotification(`Batch checkin complete: ${successCount} successful, ${failCount} failed`, 
         failCount === 0 ? 'success' : 'info');
+}
+
+// Update state of batch confirm button based on shulk/kit confirmation checkboxes
+function updateBatchConfirmState() {
+    const shulkCheckbox = document.getElementById('batchShulkPaidConfirm');
+    const kitCheckbox = document.getElementById('batchKitCollectedConfirm');
+    const confirmButton = document.getElementById('batchConfirmButton');
+    
+    if (!confirmButton || !shulkCheckbox || !kitCheckbox) return;
+    
+    const enabled = shulkCheckbox.checked && kitCheckbox.checked;
+    confirmButton.disabled = !enabled;
+    confirmButton.style.opacity = enabled ? '1' : '0.6';
+    confirmButton.style.cursor = enabled ? 'pointer' : 'not-allowed';
 }
 
 // Cancel batch checkin
