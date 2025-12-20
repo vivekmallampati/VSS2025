@@ -6,11 +6,11 @@ services:
       # Mount the service account key from your local machine
       - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
       # Mount the latest Registrations_11_29.xlsx file
-      - ./dataprocessing/Registrations_11_29.xlsx:/app/dataprocessing/Registrations_11_29.xlsx:ro
+      - ./dataprocessing/Registrations_12_19.xlsx:/app/dataprocessing/Registrations_12_19.xlsx:ro
     environment:
       - NODE_ENV=production
       # Default Excel file path (can be overridden)
-      - EXCEL_FILE_PATH=/app/dataprocessing/Registrations_11_29.xlsx
+      - EXCEL_FILE_PATH=/app/dataprocessing/Registrations_12_19.xlsx
       # Service account path (defaults to /app/secrets/serviceAccountKey.json)
       - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
       - COMMAND=import
@@ -181,6 +181,19 @@ services:
       - COMMAND=migrate-cancelled
     command: node firestore-utils.js migrate-cancelled
     # Migrates cancelled/rejected registrations to cancelledRegistrations collection
+
+  migrate-specific-ids-to-cancelled:
+    build: .
+    container_name: vss2025-migrate-specific-ids-to-cancelled
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=migrate-specific-ids-to-cancelled
+    command: node firestore-utils.js migrate-specific-ids-to-cancelled
+    # Migrates specific participant IDs to cancelledRegistrations collection
 
   import-volunteers:
     build: .

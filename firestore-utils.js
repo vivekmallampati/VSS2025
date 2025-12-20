@@ -1168,6 +1168,84 @@ async function migrateCancelledRegistrations() {
     }
 }
 
+// Migrate specific participant IDs to cancelledRegistrations collection
+async function migrateSpecificIdsToCancelled() {
+    const participantIds = ['AMKK1136','AMKK1786'];
+
+    console.log(`Migrating ${participantIds.length} specific participant IDs to cancelledRegistrations...\n`);
+    
+    let migratedCount = 0;
+    let errorCount = 0;
+    let notFoundCount = 0;
+    const batchSize = 500;
+    
+    try {
+        
+        let batch = db.batch();
+        let batchCount = 0;
+        
+        for (let i = 0; i < participantIds.length; i++) {
+            const participantId = participantIds[i].trim();
+            
+            try {
+                // Check if document exists in registrations
+                const regDocRef = db.collection('registrations').doc(participantId);
+                const regDoc = await regDocRef.get();
+                
+                if (!regDoc.exists) {
+                    console.log(`⚠ Not found in registrations: ${participantId}`);
+                    notFoundCount++;
+                    continue;
+                }
+                
+                const data = regDoc.data();
+                const status = data.status || '';
+                
+                // Copy to cancelledRegistrations collection
+                const cancelledDocRef = db.collection('cancelledRegistrations').doc(participantId);
+                batch.set(cancelledDocRef, {
+                    ...data,
+                    migratedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    originalCollection: 'registrations',
+                    originalStatus: status,
+                    manuallyMigrated: true
+                });
+                
+                // Delete from registrations
+                batch.delete(regDocRef);
+                
+                batchCount++;
+                migratedCount++;
+                
+                if (batchCount >= batchSize) {
+                    await batch.commit();
+                    console.log(`Migrated ${migratedCount} participants so far...`);
+                    batch = db.batch();
+                    batchCount = 0;
+                }
+            } catch (error) {
+                console.error(`✗ Error migrating ${participantId}:`, error.message);
+                errorCount++;
+            }
+        }
+        
+        // Commit remaining batch
+        if (batchCount > 0) {
+            await batch.commit();
+        }
+        
+        console.log(`\n=== Migration Summary ===`);
+        console.log(`Total participant IDs to migrate: ${participantIds.length}`);
+        console.log(`Successfully migrated: ${migratedCount}`);
+        console.log(`Not found in registrations: ${notFoundCount}`);
+        console.log(`Errors: ${errorCount}`);
+        
+    } catch (error) {
+        console.error('Fatal error during migration:', error);
+        throw error;
+    }
+}
+
 // ============================================================================
 // DATA NORMALIZATION
 // ============================================================================
@@ -1448,8 +1526,10 @@ function normalizeDate(dateStr) {
 }
 
 // Normalize dates in all registrations
+// This uses normalizeDate() to convert various date formats to DD-MMM-YYYY.
+// It attempts to be conservative with ambiguous numeric dates.
 async function normalizeDates() {
-    console.log('Normalizing dates...\n');
+    console.log('Normalizing dates to DD-MMM-YYYY format...\n');
     
     let updatedCount = 0;
     let errorCount = 0;
@@ -1467,49 +1547,40 @@ async function normalizeDates() {
             const data = doc.data();
             const updates = {};
             let hasUpdates = false;
-            let hasFailures = false;
             const praveshikaId = data.praveshikaId || data.PraveshikaID || data.uniqueId || doc.id;
             
-            // Normalize arrival date
+            // Normalize arrivalDate using normalizeDate()
             const arrivalDate = data.arrivalDate || data['Date of Arrival'] || '';
-            if (arrivalDate) {
+            if (arrivalDate && typeof arrivalDate === "string") {
                 const result = normalizeDate(arrivalDate);
-                if (result.success) {
-                    if (result.normalized && result.normalized !== arrivalDate) {
-                        updates.arrivalDate = result.normalized;
-                        // Only update camelCase field - skip old field names with invalid characters
-                        hasUpdates = true;
-                    }
-                } else {
-                    hasFailures = true;
-                    console.log(`  Warning: Could not normalize arrival date "${arrivalDate}" for PraveshikaID: ${praveshikaId}`);
+                if (result.success && result.normalized !== arrivalDate) {
+                    updates.arrivalDate = result.normalized;
+                    hasUpdates = true;
+                } else if (!result.success) {
+                    failedPraveshikaIds.push({
+                        praveshikaId: praveshikaId,
+                        arrivalDate: arrivalDate || 'N/A',
+                        departureDate: data.departureDate || data['Date of Departure Train/Flight'] || 'N/A'
+                    });
+                    errorCount++;
                 }
             }
             
-            // Normalize departure date
+            // Normalize departureDate using normalizeDate()
             const departureDate = data.departureDate || data['Date of Departure Train/Flight'] || '';
-            if (departureDate) {
+            if (departureDate && typeof departureDate === "string") {
                 const result = normalizeDate(departureDate);
-                if (result.success) {
-                    if (result.normalized && result.normalized !== departureDate) {
-                        updates.departureDate = result.normalized;
-                        // Only update camelCase field - skip old field names with invalid characters (like "/")
-                        hasUpdates = true;
-                    }
-                } else {
-                    hasFailures = true;
-                    console.log(`  Warning: Could not normalize departure date "${departureDate}" for PraveshikaID: ${praveshikaId}`);
+                if (result.success && result.normalized !== departureDate) {
+                    updates.departureDate = result.normalized;
+                    hasUpdates = true;
+                } else if (!result.success) {
+                    failedPraveshikaIds.push({
+                        praveshikaId: praveshikaId,
+                        arrivalDate: arrivalDate || 'N/A',
+                        departureDate: departureDate || 'N/A'
+                    });
+                    errorCount++;
                 }
-            }
-            
-            // Track PraveshikaIDs that failed to normalize
-            if (hasFailures) {
-                failedPraveshikaIds.push({
-                    praveshikaId: praveshikaId,
-                    arrivalDate: arrivalDate || 'N/A',
-                    departureDate: departureDate || 'N/A'
-                });
-                errorCount++;
             }
             
             if (hasUpdates) {
@@ -1546,11 +1617,11 @@ async function normalizeDates() {
         
         console.log(`\n=== Date Normalization Summary ===`);
         console.log(`Total registrations checked: ${registrationsSnapshot.size}`);
-        console.log(`Dates normalized: ${updatedCount}`);
-        console.log(`Failed to normalize: ${errorCount}`);
+        console.log(`Dates rewritten: ${updatedCount}`);
+        console.log(`Skipped or ambiguous: ${errorCount}`);
         
         if (failedPraveshikaIds.length > 0) {
-            console.log(`\n=== PraveshikaIDs with Failed Date Normalization ===`);
+            console.log(`\n=== PraveshikaIDs with Potentially Ambiguous/Bogus Dates (not changed) ===`);
             console.log(`Total: ${failedPraveshikaIds.length}`);
             console.log('\nPraveshikaID | Arrival Date | Departure Date');
             console.log('-----------------------------------------------');
@@ -1560,7 +1631,7 @@ async function normalizeDates() {
         }
         
     } catch (error) {
-        console.error('Error normalizing dates:', error);
+        console.error('Error rewriting dd/mm/yyyy dates:', error);
         throw error;
     }
 }
@@ -1943,8 +2014,8 @@ async function exportTravelTeamData() {
         'Gender',
         'Age',
         'Country',
-        'Pickup Needed',
         'Pickup Location',
+        'Pickup Needed',
         'Arrival Date',
         'Arrival Time',
         'Flight/Train Number',
@@ -2096,6 +2167,25 @@ async function exportPostTourTeamData() {
 //   Praveshika ID, accommodation, ganaNumber, vahiniNumber
 //   AFBA1237, Hostel A, 5, 12
 //   AFBA1238, Hostel B, 6, 13
+//
+// Helper: convert Excel serial date (e.g. 46015) to mm/dd/yyyy string
+function excelSerialToMMDDYYYY(serial) {
+    if (typeof serial !== 'number' || !isFinite(serial)) return null;
+    
+    // Excel epoch is 1900-01-01 with an off-by-one/leap-year bug; 1899-12-30 works well
+    const excelEpoch = new Date(1899, 11, 30).getTime();
+    const ms = excelEpoch + (serial - 1) * 86400000;
+    const date = new Date(ms);
+    
+    if (isNaN(date.getTime())) return null;
+    
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    
+    return `${mm}/${dd}/${yyyy}`;
+}
+
 async function bulkUpdateFromCsv() {
     console.log('Bulk updating registrations from CSV...\n');
     
@@ -2186,7 +2276,21 @@ async function bulkUpdateFromCsv() {
                 const fieldName = fieldColumns[j];
                 if (!fieldName) continue;
                 
-                const fieldValue = row[j + 1]; // +1 because first column is ID
+                const rawFieldValue = row[j + 1]; // +1 because first column is ID
+                let fieldValue = rawFieldValue;
+
+                // Special handling for date-like fields that might be stored as Excel serials
+                if (
+                    (fieldName === 'arrivalDate' || fieldName === 'departureDate') &&
+                    (typeof rawFieldValue === 'number' ||
+                     (typeof rawFieldValue === 'string' && rawFieldValue.trim() !== '' && !isNaN(rawFieldValue)))
+                ) {
+                    const numeric = Number(rawFieldValue);
+                    const converted = excelSerialToMMDDYYYY(numeric);
+                    if (converted) {
+                        fieldValue = converted;
+                    }
+                }
                 
                 // Skip empty values (null, undefined, empty string)
                 if (fieldValue !== null && fieldValue !== undefined && fieldValue !== '') {
@@ -2373,6 +2477,9 @@ async function main() {
             case 'migrate-cancelled':
                 await migrateCancelledRegistrations();
                 break;
+            case 'migrate-specific-ids-to-cancelled':
+                await migrateSpecificIdsToCancelled();
+                break;
             case 'find-duplicates':
                 await findAllDuplicates();
                 break;
@@ -2421,6 +2528,7 @@ async function main() {
                 console.log('  approve-status      - Update status to "Approved" for specific participant IDs');
                 console.log('  migrate-non-shibirarthi - Migrate volunteers/admins to nonShibirarthiUsers collection');
                 console.log('  migrate-cancelled   - Migrate cancelled/rejected to cancelledRegistrations collection');
+                console.log('  migrate-specific-ids-to-cancelled - Migrate specific participant IDs to cancelledRegistrations');
                 console.log('  find-duplicates     - Find all duplicates (by name+email and last 4 digits)');
                 console.log('  find-duplicates-name-email - Find duplicates by name and email');
                 console.log('  find-duplicates-last4 - Find duplicates by last 4 digits of PraveshikaID');

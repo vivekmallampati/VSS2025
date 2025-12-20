@@ -9868,11 +9868,25 @@ function updateCheckinFormForType() {
     }
 }
 
-// Get selected registration actions (registration automatically includes shulk_paid and kit_collected)
+// Get selected registration actions from checkboxes
 function getSelectedRegistrationActions() {
-    // Registration always includes shulk_paid and kit_collected
-    // No checkboxes needed - these are automatically processed together
-    return ['registration', 'shulk_paid', 'kit_collected'];
+    const types = [];
+    
+    const registrationCheckbox = document.getElementById('registrationCheckbox');
+    const shulkPaidCheckbox = document.getElementById('shulkPaidCheckbox');
+    const kitCollectedCheckbox = document.getElementById('kitCollectedCheckbox');
+    
+    if (registrationCheckbox && registrationCheckbox.checked) {
+        types.push('registration');
+    }
+    if (shulkPaidCheckbox && shulkPaidCheckbox.checked) {
+        types.push('shulk_paid');
+    }
+    if (kitCollectedCheckbox && kitCollectedCheckbox.checked) {
+        types.push('kit_collected');
+    }
+    
+    return types;
 }
 
 // Switch search mode
@@ -10506,8 +10520,13 @@ function clearCheckinForm() {
     if (itemCount) itemCount.value = '';
     if (tagId) tagId.value = '';
     
-    // Registration now automatically includes shulk_paid and kit_collected
-    // No checkbox to reset - registration is always included
+    // Reset registration checkboxes
+    const registrationCheckbox = document.getElementById('registrationCheckbox');
+    const shulkPaidCheckbox = document.getElementById('shulkPaidCheckbox');
+    const kitCollectedCheckbox = document.getElementById('kitCollectedCheckbox');
+    if (registrationCheckbox) registrationCheckbox.checked = false;
+    if (shulkPaidCheckbox) shulkPaidCheckbox.checked = false;
+    if (kitCollectedCheckbox) kitCollectedCheckbox.checked = false;
 }
 
 // Perform Cloak Room checkout
@@ -10903,40 +10922,254 @@ async function processBatchCheckin() {
         return;
     }
     
-    // Show preview
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
     const batchPreview = document.getElementById('batchPreview');
     if (batchPreview) {
         batchPreview.style.display = 'block';
-        // Store IDs globally for the confirm button
-        window.batchCheckinIds = ids;
-        batchPreview.innerHTML = `
+        batchPreview.innerHTML = '<p>Loading participant profiles...</p>';
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const participantData = [];
+        const alreadyCheckedIn = [];
+        const notFound = [];
+        
+        // Fetch all participant data and check checkin status
+        for (const uniqueId of ids) {
+            try {
+                // Get registration data
+                const regDoc = await db.collection('registrations').doc(uniqueId).get();
+                if (!regDoc.exists) {
+                    notFound.push(uniqueId);
+                    continue;
+                }
+                
+                const regData = regDoc.data();
+                const name = regData.name || regData['Full Name'] || 'Unknown';
+                const email = regData.email || regData['Email address'] || 'N/A';
+                const country = regData.country || regData.Country || 'N/A';
+                const shreni = regData.shreni || regData.Shreni || 'N/A';
+                
+                // Check if already checked in for current checkin type
+                let isAlreadyCheckedIn = false;
+                let checkinTimestamp = null;
+                let checkedInTypes = [];
+                
+                if (currentCheckinType === 'registration') {
+                    // For registration, check all three types
+                    const typesToCheck = ['registration', 'shulk_paid', 'kit_collected'];
+                    for (const type of typesToCheck) {
+                        const existingCheckinQuery = await db.collection('checkins')
+                            .where('uniqueId', '==', uniqueId)
+                            .where('checkinType', '==', type)
+                            .limit(1)
+                            .get();
+                        
+                        if (!existingCheckinQuery.empty) {
+                            isAlreadyCheckedIn = true;
+                            checkedInTypes.push(type);
+                            const existingCheckin = existingCheckinQuery.docs[0].data();
+                            if (!checkinTimestamp) {
+                                checkinTimestamp = existingCheckin.timestamp?.toDate();
+                            }
+                        }
+                    }
+                } else if (currentCheckinType === 'cloak_room') {
+                    const existingCheckinQuery = await db.collection('checkins')
+                        .where('uniqueId', '==', uniqueId)
+                        .where('checkinType', '==', 'cloak_room')
+                        .orderBy('timestamp', 'desc')
+                        .limit(1)
+                        .get();
+                    
+                    if (!existingCheckinQuery.empty) {
+                        const existingCheckin = existingCheckinQuery.docs[0].data();
+                        if (!existingCheckin.checkedOutAt) {
+                            isAlreadyCheckedIn = true;
+                            checkinTimestamp = existingCheckin.timestamp?.toDate();
+                            checkedInTypes.push('cloak_room');
+                        }
+                    }
+                } else {
+                    const existingCheckinQuery = await db.collection('checkins')
+                        .where('uniqueId', '==', uniqueId)
+                        .where('checkinType', '==', currentCheckinType)
+                        .limit(1)
+                        .get();
+                    
+                    if (!existingCheckinQuery.empty) {
+                        isAlreadyCheckedIn = true;
+                        const existingCheckin = existingCheckinQuery.docs[0].data();
+                        checkinTimestamp = existingCheckin.timestamp?.toDate();
+                        checkedInTypes.push(currentCheckinType);
+                    }
+                }
+                
+                if (isAlreadyCheckedIn) {
+                    alreadyCheckedIn.push({
+                        uniqueId,
+                        name,
+                        email,
+                        country,
+                        shreni,
+                        timestamp: checkinTimestamp,
+                        checkedInTypes: checkedInTypes
+                    });
+                } else {
+                    participantData.push({
+                        uniqueId,
+                        name,
+                        email,
+                        country,
+                        shreni
+                    });
+                }
+            } catch (error) {
+                console.error(`Error processing ${uniqueId}:`, error);
+                notFound.push(uniqueId);
+            }
+        }
+        
+        // Store valid IDs globally
+        window.batchCheckinIds = participantData.map(p => p.uniqueId);
+        
+        // Build preview HTML
+        let html = `
             <div class="batch-preview">
                 <h4>Batch Checkin Preview</h4>
-                <p>Found ${ids.length} participant(s) to check in</p>
-                <ul class="batch-preview-list">
-                    ${ids.map(id => `<li>${escapeHtml(id)}</li>`).join('')}
-                </ul>
-                <div style="margin: 1rem 0; padding: 0.75rem; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
-                    <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #856404;">
-                        Please confirm the following for this batch:
+                <p>Found ${ids.length} participant(s) | Valid: ${participantData.length} | Already Checked In: ${alreadyCheckedIn.length} | Not Found: ${notFound.length}</p>
+        `;
+        
+        // Show error for already checked-in participants
+        if (alreadyCheckedIn.length > 0) {
+            html += `
+                <div style="margin: 1rem 0; padding: 1rem; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;">
+                    <p style="margin: 0 0 0.5rem 0; font-weight: bold; color: #721c24;">
+                        ⚠️ The following participants are already checked in. Please remove them before proceeding:
                     </p>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.9rem;">
-                        <input type="checkbox" id="batchShulkPaidConfirm" onchange="updateBatchConfirmState()">
-                        <span>All shulk paid</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
-                        <input type="checkbox" id="batchKitCollectedConfirm" onchange="updateBatchConfirmState()">
-                        <span>All kits collected</span>
-                    </label>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0.75rem; margin-top: 0.5rem;">
+            `;
+            
+            alreadyCheckedIn.forEach(participant => {
+                const timeStr = participant.timestamp ? participant.timestamp.toLocaleString() : 'Unknown';
+                const typesStr = participant.checkedInTypes && participant.checkedInTypes.length > 0 
+                    ? participant.checkedInTypes.map(t => CHECKIN_TYPE_LABELS[t] || t).join(', ')
+                    : CHECKIN_TYPE_LABELS[currentCheckinType] || currentCheckinType;
+                html += `
+                    <div style="background: white; padding: 0.75rem; border-radius: 4px; border: 2px solid #dc3545;">
+                        <p style="margin: 0 0 0.25rem 0; font-weight: bold; color: #dc3545;">${escapeHtml(participant.uniqueId)}</p>
+                        <p style="margin: 0 0 0.25rem 0; font-size: 0.9rem;">${escapeHtml(participant.name)}</p>
+                        <p style="margin: 0 0 0.25rem 0; font-size: 0.8rem; color: #666;">Types: ${escapeHtml(typesStr)}</p>
+                        <p style="margin: 0; font-size: 0.8rem; color: #666;">Checked in: ${escapeHtml(timeStr)}</p>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
                 </div>
-                <button id="batchConfirmButton" class="btn btn-primary" onclick="executeBatchCheckinFromPreview()" disabled style="opacity: 0.6; cursor: not-allowed;">
-                    Confirm Batch Checkin
-                </button>
-                <button class="btn btn-secondary" onclick="cancelBatchCheckin()">Cancel</button>
+            `;
+        }
+        
+        // Show not found participants
+        if (notFound.length > 0) {
+            html += `
+                <div style="margin: 1rem 0; padding: 0.75rem; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                    <p style="margin: 0 0 0.5rem 0; font-weight: bold; color: #856404;">
+                        ⚠️ The following Praveshika IDs were not found:
+                    </p>
+                    <p style="margin: 0; font-size: 0.9rem;">${notFound.map(id => escapeHtml(id)).join(', ')}</p>
+                </div>
+            `;
+        }
+        
+        // Show valid participants with profiles
+        if (participantData.length > 0) {
+            html += `
+                <div style="margin: 1rem 0;">
+                    <h5 style="margin-bottom: 0.75rem;">Participants to Check In (${participantData.length}):</h5>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0.75rem;">
+            `;
+            
+            participantData.forEach(participant => {
+                html += `
+                    <div style="background: #e8f4f8; padding: 0.75rem; border-radius: 4px; border-left: 4px solid #007bff;">
+                        <p style="margin: 0 0 0.25rem 0; font-weight: bold; color: #007bff;">${escapeHtml(participant.uniqueId)}</p>
+                        <p style="margin: 0 0 0.25rem 0; font-size: 0.9rem;"><strong>Name:</strong> ${escapeHtml(participant.name)}</p>
+                        <p style="margin: 0 0 0.25rem 0; font-size: 0.85rem;"><strong>Email:</strong> ${escapeHtml(participant.email)}</p>
+                        <p style="margin: 0 0 0.25rem 0; font-size: 0.85rem;"><strong>Country:</strong> ${escapeHtml(participant.country)}</p>
+                        <p style="margin: 0; font-size: 0.85rem;"><strong>Shreni:</strong> ${escapeHtml(participant.shreni)}</p>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            // Only show confirmation checkboxes and button if there are valid participants and no already checked-in
+            if (alreadyCheckedIn.length === 0) {
+                html += `
+                    <div style="margin: 1rem 0; padding: 0.75rem; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                        <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #856404;">
+                            Please confirm the following for this batch:
+                        </p>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.9rem;">
+                            <input type="checkbox" id="batchShulkPaidConfirm" onchange="updateBatchConfirmState()">
+                            <span>All shulk paid</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                            <input type="checkbox" id="batchKitCollectedConfirm" onchange="updateBatchConfirmState()">
+                            <span>All kits collected</span>
+                        </label>
+                    </div>
+                    <button id="batchConfirmButton" class="btn btn-primary" onclick="executeBatchCheckinFromPreview()" disabled style="opacity: 0.6; cursor: not-allowed;">
+                        Confirm Batch Checkin
+                    </button>
+                `;
+            } else {
+                html += `
+                    <div style="margin: 1rem 0; padding: 0.75rem; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;">
+                        <p style="margin: 0; font-weight: bold; color: #721c24;">
+                            Cannot proceed: Please remove already checked-in participants from the list above.
+                        </p>
+                    </div>
+                `;
+            }
+        } else {
+            html += `
+                <div style="margin: 1rem 0; padding: 0.75rem; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;">
+                    <p style="margin: 0; font-weight: bold; color: #721c24;">
+                        No valid participants to check in. Please fix the errors above and try again.
+                    </p>
+                </div>
+            `;
+        }
+        
+        html += `
+                <button class="btn btn-secondary" onclick="cancelBatchCheckin()" style="margin-top: 1rem;">Cancel</button>
             </div>
         `;
-        // Initialize confirm button state
-        setTimeout(updateBatchConfirmState, 0);
+        
+        if (batchPreview) {
+            batchPreview.innerHTML = html;
+            // Initialize confirm button state if applicable
+            if (participantData.length > 0 && alreadyCheckedIn.length === 0) {
+                setTimeout(updateBatchConfirmState, 0);
+            }
+        }
+    } catch (error) {
+        console.error('Error processing batch checkin:', error);
+        showNotification('Error processing batch checkin: ' + error.message, 'error');
+        if (batchPreview) {
+            batchPreview.innerHTML = '<p style="color: #dc3545;">Error loading participant data. Please try again.</p>';
+        }
     }
 }
 
@@ -11013,51 +11246,73 @@ async function executeBatchCheckin(ids) {
                 continue;
             }
             
-            // Check if already checked in for this check-in type
-            // For cloak_room, allow new check-in if previous one has been checked out
-            if (currentCheckinType === 'cloak_room') {
-                // Get the most recent cloak room check-in
-                const existingCheckinQuery = await db.collection('checkins')
-                    .where('uniqueId', '==', validatedUniqueId)
-                    .where('checkinType', '==', 'cloak_room')
-                    .orderBy('timestamp', 'desc')
-                    .limit(1)
-                    .get();
-                
-                if (!existingCheckinQuery.empty) {
-                    const existingCheckin = existingCheckinQuery.docs[0].data();
-                    // If not checked out, prevent duplicate check-in
-                    if (!existingCheckin.checkedOutAt) {
+            // For registration type, we'll check duplicates per type later
+            // For other types, check if already checked in
+            if (currentCheckinType !== 'registration') {
+                if (currentCheckinType === 'cloak_room') {
+                    // Get the most recent cloak room check-in
+                    const existingCheckinQuery = await db.collection('checkins')
+                        .where('uniqueId', '==', validatedUniqueId)
+                        .where('checkinType', '==', 'cloak_room')
+                        .orderBy('timestamp', 'desc')
+                        .limit(1)
+                        .get();
+                    
+                    if (!existingCheckinQuery.empty) {
+                        const existingCheckin = existingCheckinQuery.docs[0].data();
+                        // If not checked out, prevent duplicate check-in
+                        if (!existingCheckin.checkedOutAt) {
+                            const timestamp = existingCheckin.timestamp?.toDate();
+                            const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+                            results.push({ uniqueId: validatedUniqueId, status: 'skipped', error: `Already checked in at ${timeStr}. Checkout required first.` });
+                            failCount++;
+                            continue;
+                        }
+                        // If checked out, allow new check-in (continue below)
+                    }
+                } else {
+                    // For other check-in types, prevent duplicates
+                    const existingCheckinQuery = await db.collection('checkins')
+                        .where('uniqueId', '==', validatedUniqueId)
+                        .where('checkinType', '==', currentCheckinType)
+                        .limit(1)
+                        .get();
+                    
+                    if (!existingCheckinQuery.empty) {
+                        const existingCheckin = existingCheckinQuery.docs[0].data();
                         const timestamp = existingCheckin.timestamp?.toDate();
                         const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
-                        results.push({ uniqueId: validatedUniqueId, status: 'skipped', error: `Already checked in at ${timeStr}. Checkout required first.` });
+                        results.push({ uniqueId: validatedUniqueId, status: 'skipped', error: `Already checked in at ${timeStr}` });
                         failCount++;
                         continue;
                     }
-                    // If checked out, allow new check-in (continue below)
-                }
-            } else {
-                // For other check-in types, prevent duplicates
-                const existingCheckinQuery = await db.collection('checkins')
-                    .where('uniqueId', '==', validatedUniqueId)
-                    .where('checkinType', '==', currentCheckinType)
-                    .limit(1)
-                    .get();
-                
-                if (!existingCheckinQuery.empty) {
-                    const existingCheckin = existingCheckinQuery.docs[0].data();
-                    const timestamp = existingCheckin.timestamp?.toDate();
-                    const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
-                    results.push({ uniqueId: validatedUniqueId, status: 'skipped', error: `Already checked in at ${timeStr}` });
-                    failCount++;
-                    continue;
                 }
             }
             
             const regData = regDoc.data();
             
+            // Determine types to process (for registration, use confirmation checkboxes)
+            let typesToProcess = [];
+            if (currentCheckinType === 'registration') {
+                // Get confirmation checkboxes from batch preview
+                const shulkCheckbox = document.getElementById('batchShulkPaidConfirm');
+                const kitCheckbox = document.getElementById('batchKitCollectedConfirm');
+                
+                // Always include registration if we're on registration tab
+                typesToProcess.push('registration');
+                
+                // Include shulk_paid and kit_collected if checkboxes are checked
+                if (shulkCheckbox && shulkCheckbox.checked) {
+                    typesToProcess.push('shulk_paid');
+                }
+                if (kitCheckbox && kitCheckbox.checked) {
+                    typesToProcess.push('kit_collected');
+                }
+            } else {
+                typesToProcess = [currentCheckinType];
+            }
+            
             // Check if Registration check-in is required for certain types
-            // Note: shulk_paid and kit_collected are now part of registration, so they don't need this check
             const typesRequiringRegistration = ['ganvesh_collected', 'cloak_room'];
             if (typesRequiringRegistration.includes(currentCheckinType)) {
                 const registrationCheckin = await db.collection('checkins')
@@ -11073,27 +11328,64 @@ async function executeBatchCheckin(ids) {
                 }
             }
             
-            // Build checkin data - store only Praveshika ID (explicitly use validated ID)
-            const checkinData = {
-                uniqueId: validatedUniqueId, // Explicitly use the validated and trimmed ID
-                checkinType: currentCheckinType,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                checkedInBy: user.uid,
-                checkedInByName: checkedInByName,
-                notes: null
-            };
-            
-            // Add type-specific fields
-            if (currentCheckinType === 'pickup_location') {
-                checkinData.pickupLocation = regData.pickupLocation || regData['Pickup Location'] || null;
+            // Process each type
+            const successTypes = [];
+            for (const type of typesToProcess) {
+                // Check for duplicates for each type
+                if (type === 'cloak_room') {
+                    const existingCheckinQuery = await db.collection('checkins')
+                        .where('uniqueId', '==', validatedUniqueId)
+                        .where('checkinType', '==', 'cloak_room')
+                        .orderBy('timestamp', 'desc')
+                        .limit(1)
+                        .get();
+                    
+                    if (!existingCheckinQuery.empty) {
+                        const existingCheckin = existingCheckinQuery.docs[0].data();
+                        if (!existingCheckin.checkedOutAt) {
+                            continue; // Skip this type
+                        }
+                    }
+                } else {
+                    const existingCheckinQuery = await db.collection('checkins')
+                        .where('uniqueId', '==', validatedUniqueId)
+                        .where('checkinType', '==', type)
+                        .limit(1)
+                        .get();
+                    
+                    if (!existingCheckinQuery.empty) {
+                        continue; // Skip this type (already checked in)
+                    }
+                }
+                
+                // Build checkin data
+                const checkinData = {
+                    uniqueId: validatedUniqueId,
+                    checkinType: type,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    checkedInBy: user.uid,
+                    checkedInByName: checkedInByName,
+                    notes: null
+                };
+                
+                // Add type-specific fields
+                if (type === 'pickup_location') {
+                    checkinData.pickupLocation = regData.pickupLocation || regData['Pickup Location'] || null;
+                }
+                
+                // Create checkin document
+                const checkinId = `${validatedUniqueId}_${type}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                await db.collection('checkins').doc(checkinId).set(checkinData);
+                successTypes.push(type);
             }
             
-            // Create checkin document with explicit uniqueId in document ID
-            const checkinId = `${validatedUniqueId}_${currentCheckinType}_${Date.now()}`;
-            await db.collection('checkins').doc(checkinId).set(checkinData);
-            
-            results.push({ uniqueId: validatedUniqueId, status: 'success' });
-            successCount++;
+            if (successTypes.length > 0) {
+                results.push({ uniqueId: validatedUniqueId, status: 'success', types: successTypes });
+                successCount++;
+            } else {
+                results.push({ uniqueId: validatedUniqueId, status: 'skipped', error: 'All types already checked in' });
+                failCount++;
+            }
         } catch (error) {
             console.error(`Error checking in ${uniqueId}:`, error);
             results.push({ uniqueId, status: 'failed', error: error.message });
