@@ -2037,13 +2037,14 @@
                                     </div>
                                     <div class="form-group">
                                         <label for="newUserRole">Role: <span style="color: red;">*</span></label>
-                                        <select id="newUserRole" class="form-input" required>
+                                        <select id="newUserRole" class="form-input" required onchange="handleRoleChange()">
                                             <option value="volunteer">Volunteer</option>
                                             <option value="admin">Admin</option>
+                                            <option value="shibirarthi">Shibirarthi</option>
                                         </select>
                                     </div>
                                 </div>
-                                <div class="form-group" style="margin-bottom: 1rem;">
+                                <div class="form-group" id="volunteerTeamsGroup" style="margin-bottom: 1rem;">
                                     <label>Volunteer Teams (for volunteers):</label>
                                     <p style="font-size: 0.85rem; color: #666; margin-bottom: 0.5rem;">
                                         Select one or more teams this volunteer can perform check-ins for.
@@ -2083,7 +2084,7 @@
                                 Upload a CSV file to create multiple users at once.<br>
                                 <strong>All columns are required:</strong> name, uniqueId, email, role, volunteerTeams<br>
                                 <strong>Valid teams:</strong> transportation, registration, ganvesh_collected, cloak_room, post_tour (comma-separated)<br>
-                                <strong>Valid roles:</strong> volunteer, admin
+                                <strong>Valid roles:</strong> volunteer, admin, shibirarthi
                             </p>
                             
                             <div style="margin-bottom: 1rem;">
@@ -2316,16 +2317,16 @@
                                     </div>
                                     <div class="form-group" id="registrationOptionsGroup" style="display: none;">
                                         <label>Registration Check-in Options:</label>
-                                        <div style="margin-top: 0.5rem;">
-                                            <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; cursor: pointer;">
+                                        <div class="registration-checkbox-container">
+                                            <label class="registration-checkbox-label">
                                                 <input type="checkbox" id="registrationCheckbox" value="registration">
                                                 <span>Registration</span>
                                             </label>
-                                            <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; cursor: pointer;">
+                                            <label class="registration-checkbox-label">
                                                 <input type="checkbox" id="shulkPaidCheckbox" value="shulk_paid">
                                                 <span>Shulk Paid</span>
                                             </label>
-                                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                            <label class="registration-checkbox-label">
                                                 <input type="checkbox" id="kitCollectedCheckbox" value="kit_collected">
                                                 <span>Kit Collected</span>
                                             </label>
@@ -2341,7 +2342,7 @@
                                         <label for="checkinNotes">Notes (optional):</label>
                                         <textarea id="checkinNotes" class="form-input" rows="1" placeholder="Add any notes..." style="min-height: 40px; max-height: 60px;"></textarea>
                                     </div>
-                                    <div style="display: flex; gap: 1rem;">
+                                    <div class="checkin-form-buttons">
                                         <button type="submit" class="btn btn-primary">Check In</button>
                                         <button type="button" id="cloakRoomCheckoutBtn" class="btn btn-warning" style="display: none;" onclick="performCloakRoomCheckout()">Checkout</button>
                                         <button type="button" class="btn btn-secondary" onclick="clearCheckinForm()">Clear</button>

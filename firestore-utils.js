@@ -1170,7 +1170,27 @@ async function migrateCancelledRegistrations() {
 
 // Migrate specific participant IDs to cancelledRegistrations collection
 async function migrateSpecificIdsToCancelled() {
-    const participantIds = ['AMKK1136','AMKK1786'];
+    const participantIds = ['ARBA1175',
+        'ARBA1502',
+        'ARKI1174',
+        'ARKK1124',
+        'ARKK1185',
+        'ARKK1259',
+        'ARKK2585',
+        'ARKK2607',
+        'ARKK2653',
+        'ARSK1173',
+        'ARSK1286',
+        'ARSK1501',
+        'ARSK2352',
+        'ARSK2556',
+        'ARSK2566',
+        'ASSK2309',
+        'ASYV2784',
+        'AUKK2001',
+        'EUKK1746',
+        'EUSK1777',
+        'EUSK2111'];
 
     console.log(`Migrating ${participantIds.length} specific participant IDs to cancelledRegistrations...\n`);
     

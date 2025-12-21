@@ -4766,8 +4766,8 @@ async function createNewUser(name, email, uniqueId, role, volunteerTeams = []) {
     if (!uniqueId || !uniqueId.trim()) {
         throw new Error('ID is required');
     }
-    if (!role || (role !== 'volunteer' && role !== 'admin')) {
-        throw new Error('Role must be either "volunteer" or "admin"');
+    if (!role || (role !== 'volunteer' && role !== 'admin' && role !== 'shibirarthi')) {
+        throw new Error('Role must be either "volunteer", "admin", or "shibirarthi"');
     }
     
     // Validate email format if provided
@@ -4807,28 +4807,75 @@ async function createNewUser(name, email, uniqueId, role, volunteerTeams = []) {
             role: role,
             volunteerTeams: role === 'volunteer' ? volunteerTeams : [],
             country: 'Bharat',
-            shreni: 'Volunteer',
+            shreni: role === 'shibirarthi' ? 'Shibirarthi' : 'Volunteer',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             createdBy: currentUser.uid
         });
         
-        // Create a record in nonShibirarthiUsers collection for volunteers/admins
-        // This allows them to have profile information like shibirarthi
+        // Handle different collections based on role
         const normalizedId = trimmedUniqueId.toLowerCase().replace(/[/-]/g, '');
-        await db.collection('nonShibirarthiUsers').doc(trimmedUniqueId).set({
-            uniqueId: trimmedUniqueId,
-            normalizedId: normalizedId,
-            name: trimmedName,
-            email: trimmedEmail || null,
-            country: 'Bharat',
-            Country: 'Bharat',
-            shreni: 'Volunteer',
-            Shreni: 'Volunteer',
-            role: role,
-            volunteerTeams: role === 'volunteer' ? volunteerTeams : [],
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: currentUser.uid
-        });
+        
+        if (role === 'shibirarthi') {
+            // For Shibirarthi, save to registrations collection
+            const registrationData = {
+                uniqueId: trimmedUniqueId,
+                normalizedId: normalizedId,
+                name: trimmedName,
+                'Full Name': trimmedName,
+                email: trimmedEmail || null,
+                'Email address': trimmedEmail || null,
+                country: 'Bharat',
+                Country: 'Bharat',
+                shreni: 'Shibirarthi',
+                Shreni: 'Shibirarthi',
+                role: 'shibirarthi',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdBy: currentUser.uid,
+                createdViaUserManagement: true
+            };
+            
+            await db.collection('registrations').doc(trimmedUniqueId).set(registrationData);
+            
+            // Also update emailToUids if email is provided
+            if (trimmedEmail) {
+                const emailLower = trimmedEmail.toLowerCase().trim();
+                const emailToUidsRef = db.collection('emailToUids').doc(emailLower);
+                const emailToUidsDoc = await emailToUidsRef.get();
+                
+                if (emailToUidsDoc.exists) {
+                    const existingData = emailToUidsDoc.data();
+                    const existingUids = existingData.uids || [];
+                    if (!existingUids.includes(trimmedUniqueId)) {
+                        await emailToUidsRef.update({
+                            uids: firebase.firestore.FieldValue.arrayUnion(trimmedUniqueId),
+                            email: emailLower
+                        });
+                    }
+                } else {
+                    await emailToUidsRef.set({
+                        uids: [trimmedUniqueId],
+                        email: emailLower
+                    });
+                }
+            }
+        } else {
+            // For volunteers/admins, create a record in nonShibirarthiUsers collection
+            // This allows them to have profile information like shibirarthi
+            await db.collection('nonShibirarthiUsers').doc(trimmedUniqueId).set({
+                uniqueId: trimmedUniqueId,
+                normalizedId: normalizedId,
+                name: trimmedName,
+                email: trimmedEmail || null,
+                country: 'Bharat',
+                Country: 'Bharat',
+                shreni: 'Volunteer',
+                Shreni: 'Volunteer',
+                role: role,
+                volunteerTeams: role === 'volunteer' ? volunteerTeams : [],
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdBy: currentUser.uid
+            });
+        }
         
         // Sign out the newly created user
         await firebase.auth().signOut();
@@ -5290,6 +5337,26 @@ async function deleteUser(uniqueId, name, email) {
 
 
 // Handle user creation form submission
+// Handle role change in user creation form
+function handleRoleChange() {
+    const roleSelect = document.getElementById('newUserRole');
+    const volunteerTeamsGroup = document.getElementById('volunteerTeamsGroup');
+    
+    if (!roleSelect || !volunteerTeamsGroup) return;
+    
+    const role = roleSelect.value;
+    
+    // Show volunteer teams only for volunteer role
+    if (role === 'volunteer') {
+        volunteerTeamsGroup.style.display = 'block';
+    } else {
+        volunteerTeamsGroup.style.display = 'none';
+        // Clear team selections for non-volunteer roles
+        const teamCheckboxes = document.querySelectorAll('#newUserTeams .volunteer-team-checkbox');
+        teamCheckboxes.forEach(cb => { cb.checked = false; });
+    }
+}
+
 async function handleUserCreationSubmit(event) {
     event.preventDefault();
     
@@ -5633,11 +5700,11 @@ async function previewBatchUsers(event) {
             // Role validation
             if (!role) {
                 rowErrors.push('role is empty');
-            } else if (role !== 'volunteer' && role !== 'admin') {
-                rowErrors.push('role must be "volunteer" or "admin"');
+            } else if (role !== 'volunteer' && role !== 'admin' && role !== 'shibirarthi') {
+                rowErrors.push('role must be "volunteer", "admin", or "shibirarthi"');
             }
             
-            // Teams validation (required for volunteers)
+            // Teams validation (required for volunteers only)
             if (role === 'volunteer') {
                 if (teams.length === 0) {
                     rowErrors.push('volunteerTeams required for volunteers');
@@ -5648,6 +5715,7 @@ async function previewBatchUsers(event) {
                     }
                 }
             }
+            // For Shibirarthi and Admin, teams are not required (and will be ignored)
             
             if (rowErrors.length > 0) {
                 validationErrors.push({ row: rowNum, errors: rowErrors, name, uniqueId });
@@ -5665,8 +5733,8 @@ async function previewBatchUsers(event) {
                     name,
                     uniqueId,
                     email,
-                    role: role === 'admin' ? 'admin' : 'volunteer',
-                    volunteerTeams: teams,
+                    role: role, // Keep the role as-is (volunteer, admin, or shibirarthi)
+                    volunteerTeams: role === 'shibirarthi' ? [] : teams, // Shibirarthi doesn't need teams
                     status: 'pending',
                     errors: []
                 });
@@ -5862,16 +5930,29 @@ async function executeBatchUserCreation() {
                 statusCell.style.color = '#007bff';
             }
             
-            // Check if user already exists in nonShibirarthiUsers
-            const existingUser = await db.collection('nonShibirarthiUsers').doc(user.uniqueId).get();
-            if (existingUser.exists) {
-                if (statusCell) {
-                    statusCell.textContent = 'Already exists';
-                    statusCell.style.color = '#ffc107';
+            // Check if user already exists (in appropriate collection based on role)
+            if (user.role === 'shibirarthi') {
+                const existingReg = await db.collection('registrations').doc(user.uniqueId).get();
+                if (existingReg.exists) {
+                    if (statusCell) {
+                        statusCell.textContent = 'Already exists';
+                        statusCell.style.color = '#ffc107';
+                    }
+                    if (row) row.style.backgroundColor = '#fff3cd';
+                    errorCount++;
+                    continue;
                 }
-                if (row) row.style.backgroundColor = '#fff3cd';
-                errorCount++;
-                continue;
+            } else {
+                const existingUser = await db.collection('nonShibirarthiUsers').doc(user.uniqueId).get();
+                if (existingUser.exists) {
+                    if (statusCell) {
+                        statusCell.textContent = 'Already exists';
+                        statusCell.style.color = '#ffc107';
+                    }
+                    if (row) row.style.backgroundColor = '#fff3cd';
+                    errorCount++;
+                    continue;
+                }
             }
             
             // Create user in Firestore collections (NO Firebase Auth - stays logged in as admin)
@@ -5887,28 +5968,75 @@ async function executeBatchUserCreation() {
                     role: user.role,
                     volunteerTeams: user.role === 'volunteer' ? user.volunteerTeams : [],
                     country: 'Bharat',
-                    shreni: 'Volunteer',
+                    shreni: user.role === 'shibirarthi' ? 'Shibirarthi' : 'Volunteer',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     createdBy: currentUser.uid,
                     batchCreated: true
                 });
                 
-                // 2. Then create in nonShibirarthiUsers collection
-                await db.collection('nonShibirarthiUsers').doc(user.uniqueId).set({
-                    uniqueId: user.uniqueId,
-                    normalizedId: normalizedId,
-                    name: user.name,
-                    email: user.email,
-                    country: 'Bharat',
-                    Country: 'Bharat',
-                    shreni: 'Volunteer',
-                    Shreni: 'Volunteer',
-                    role: user.role,
-                    volunteerTeams: user.role === 'volunteer' ? user.volunteerTeams : [],
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    createdBy: currentUser.uid,
-                    batchCreated: true
-                });
+                // 2. Then create in appropriate collection based on role
+                if (user.role === 'shibirarthi') {
+                    // For Shibirarthi, save to registrations collection
+                    const registrationData = {
+                        uniqueId: user.uniqueId,
+                        normalizedId: normalizedId,
+                        name: user.name,
+                        'Full Name': user.name,
+                        email: user.email || null,
+                        'Email address': user.email || null,
+                        country: 'Bharat',
+                        Country: 'Bharat',
+                        shreni: 'Shibirarthi',
+                        Shreni: 'Shibirarthi',
+                        role: 'shibirarthi',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        createdBy: currentUser.uid,
+                        batchCreated: true,
+                        createdViaUserManagement: true
+                    };
+                    
+                    await db.collection('registrations').doc(user.uniqueId).set(registrationData);
+                    
+                    // Also update emailToUids if email is provided
+                    if (user.email) {
+                        const emailLower = user.email.toLowerCase().trim();
+                        const emailToUidsRef = db.collection('emailToUids').doc(emailLower);
+                        const emailToUidsDoc = await emailToUidsRef.get();
+                        
+                        if (emailToUidsDoc.exists) {
+                            const existingData = emailToUidsDoc.data();
+                            const existingUids = existingData.uids || [];
+                            if (!existingUids.includes(user.uniqueId)) {
+                                await emailToUidsRef.update({
+                                    uids: firebase.firestore.FieldValue.arrayUnion(user.uniqueId),
+                                    email: emailLower
+                                });
+                            }
+                        } else {
+                            await emailToUidsRef.set({
+                                uids: [user.uniqueId],
+                                email: emailLower
+                            });
+                        }
+                    }
+                } else {
+                    // For volunteers/admins, create in nonShibirarthiUsers collection
+                    await db.collection('nonShibirarthiUsers').doc(user.uniqueId).set({
+                        uniqueId: user.uniqueId,
+                        normalizedId: normalizedId,
+                        name: user.name,
+                        email: user.email,
+                        country: 'Bharat',
+                        Country: 'Bharat',
+                        shreni: 'Volunteer',
+                        Shreni: 'Volunteer',
+                        role: user.role,
+                        volunteerTeams: user.role === 'volunteer' ? user.volunteerTeams : [],
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        createdBy: currentUser.uid,
+                        batchCreated: true
+                    });
+                }
                 
                 // Update status
                 if (statusCell) {

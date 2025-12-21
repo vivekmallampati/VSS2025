@@ -3374,6 +3374,46 @@ body {
     }
 }
 
+/* Checkin Form Buttons */
+.checkin-form-buttons {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.checkin-form-buttons .btn {
+    flex: 1;
+    min-width: 120px;
+}
+
+/* Registration Checkbox Options */
+.registration-checkbox-container {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.registration-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    width: 100%;
+    padding: 0.5rem 0;
+}
+
+.registration-checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.registration-checkbox-label span {
+    flex: 1;
+}
+
 /* Responsive Design for Checkin */
 @media (max-width: 768px) {
     .checkin-type-tabs {
@@ -3390,6 +3430,33 @@ body {
     
     .form-input {
         width: 100%;
+        min-width: 100%;
+    }
+    
+    .checkin-form-buttons {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .checkin-form-buttons .btn {
+        width: 100%;
+        min-width: 100%;
+    }
+    
+    .checkin-form-card {
+        padding: 1rem;
+    }
+    
+    .checkin-form-card .form-group {
+        margin-bottom: 1.25rem;
+    }
+    
+    .registration-checkbox-container {
+        gap: 0.75rem;
+    }
+    
+    .registration-checkbox-label {
+        padding: 0.75rem 0;
     }
     
     .recent-checkin-item {
@@ -3403,6 +3470,14 @@ body {
     
     .checkin-status-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .participant-info-card {
+        padding: 1rem;
+    }
+    
+    .checkin-search-section {
+        padding: 1rem;
     }
 }
 
