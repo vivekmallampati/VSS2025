@@ -315,6 +315,36 @@ function activateTab(tabName, skipAuthCheck = false) {
     }
 }
 
+// Clear shibir resources when user logs out
+function clearShibirResources() {
+    // Clear PDF iframes
+    const schedulePdfIframe = document.getElementById('schedulePdfIframe');
+    if (schedulePdfIframe) {
+        schedulePdfIframe.src = '';
+    }
+    
+    const pdfIframe = document.getElementById('orientationPdfIframe');
+    if (pdfIframe) {
+        pdfIframe.src = '';
+    }
+    
+    // Clear video
+    const videoElement = document.getElementById('vyayamyogVideo');
+    if (videoElement && videoElement.querySelector('source')) {
+        videoElement.querySelector('source').src = '';
+        videoElement.load();
+    }
+    
+    // Hide content and show unauthorized message
+    const loadingDiv = document.getElementById('shibirResourcesLoading');
+    const contentDiv = document.getElementById('shibirResourcesContent');
+    const unauthorizedDiv = document.getElementById('shibirResourcesUnauthorized');
+    
+    if (loadingDiv) loadingDiv.style.display = 'none';
+    if (contentDiv) contentDiv.style.display = 'none';
+    if (unauthorizedDiv) unauthorizedDiv.style.display = 'block';
+}
+
 // Initialize Shibir Resources page with authentication check
 function initializeShibirResources(user) {
     const loadingDiv = document.getElementById('shibirResourcesLoading');
@@ -324,10 +354,8 @@ function initializeShibirResources(user) {
     if (!loadingDiv || !contentDiv || !unauthorizedDiv) return;
     
     if (!user) {
-        // User not logged in - show unauthorized message
-        loadingDiv.style.display = 'none';
-        contentDiv.style.display = 'none';
-        unauthorizedDiv.style.display = 'block';
+        // User not logged in - clear resources and show unauthorized message
+        clearShibirResources();
         return;
     }
     
@@ -337,6 +365,11 @@ function initializeShibirResources(user) {
     contentDiv.style.display = 'block';
     
     // Load resources (PDF, video) only when authenticated
+    const schedulePdfIframe = document.getElementById('schedulePdfIframe');
+    if (schedulePdfIframe) {
+        schedulePdfIframe.src = 'docs/VSS 2025 Schedule for website.pdf#toolbar=1&navpanes=1&scrollbar=1';
+    }
+    
     const pdfIframe = document.getElementById('orientationPdfIframe');
     if (pdfIframe) {
         pdfIframe.src = 'docs/VSS2025_countrywise_preshibir_orientation.pdf#toolbar=1&navpanes=1&scrollbar=1';
@@ -1767,6 +1800,9 @@ async function handleAuthStateChange(user) {
             }
         }
     } else {
+        // User is logged out - clear shibir resources
+        clearShibirResources();
+        
         // User is logged out
         if (loginBtn) {
             loginBtn.textContent = 'Login';
