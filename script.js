@@ -9893,6 +9893,11 @@ function updateCheckinFormForType() {
     
     if (registrationOptionsGroup) {
         registrationOptionsGroup.style.display = currentCheckinType === 'registration' ? 'block' : 'none';
+        
+        // Setup checkbox event listeners for registration type
+        if (currentCheckinType === 'registration') {
+            setupRegistrationCheckboxes();
+        }
     }
     
     if (cloakRoomFields) {
@@ -9904,6 +9909,55 @@ function updateCheckinFormForType() {
     }
 }
 
+// Setup registration checkboxes with event listeners
+function setupRegistrationCheckboxes() {
+    const registrationCheckbox = document.getElementById('registrationCheckbox');
+    const shulkPaidCheckbox = document.getElementById('shulkPaidCheckbox');
+    const kitCollectedCheckbox = document.getElementById('kitCollectedCheckbox');
+    
+    // Remove existing listeners if any
+    if (registrationCheckbox) {
+        registrationCheckbox.removeEventListener('change', handleRegistrationCheckboxChange);
+        registrationCheckbox.addEventListener('change', handleRegistrationCheckboxChange);
+    }
+    if (shulkPaidCheckbox) {
+        shulkPaidCheckbox.removeEventListener('change', handleRegistrationCheckboxChange);
+        shulkPaidCheckbox.addEventListener('change', handleRegistrationCheckboxChange);
+    }
+    if (kitCollectedCheckbox) {
+        kitCollectedCheckbox.removeEventListener('change', handleRegistrationCheckboxChange);
+        kitCollectedCheckbox.addEventListener('change', handleRegistrationCheckboxChange);
+    }
+}
+
+// Handle registration checkbox changes
+function handleRegistrationCheckboxChange(event) {
+    const checkbox = event.target;
+    
+    // Don't allow unchecking frozen checkboxes
+    if (checkbox.dataset.frozen === 'true' && !checkbox.checked) {
+        checkbox.checked = true;
+        showNotification('This item is already checked in and cannot be unchecked', 'info');
+        return;
+    }
+    
+    const registrationCheckbox = document.getElementById('registrationCheckbox');
+    const shulkPaidCheckbox = document.getElementById('shulkPaidCheckbox');
+    const kitCollectedCheckbox = document.getElementById('kitCollectedCheckbox');
+    
+    const regChecked = registrationCheckbox && registrationCheckbox.checked && registrationCheckbox.dataset.frozen !== 'true';
+    const shulkChecked = shulkPaidCheckbox && shulkPaidCheckbox.checked && shulkPaidCheckbox.dataset.frozen !== 'true';
+    const kitChecked = kitCollectedCheckbox && kitCollectedCheckbox.checked && kitCollectedCheckbox.dataset.frozen !== 'true';
+    
+    // Count how many are checked (excluding frozen ones)
+    const checkedCount = [regChecked, shulkChecked, kitChecked].filter(Boolean).length;
+    
+    // If 2 or more are selected, registration must be included
+    if (checkedCount >= 2 && registrationCheckbox && !registrationCheckbox.checked && registrationCheckbox.dataset.frozen !== 'true') {
+        registrationCheckbox.checked = true;
+    }
+}
+
 // Get selected registration actions from checkboxes
 function getSelectedRegistrationActions() {
     const types = [];
@@ -9912,13 +9966,30 @@ function getSelectedRegistrationActions() {
     const shulkPaidCheckbox = document.getElementById('shulkPaidCheckbox');
     const kitCollectedCheckbox = document.getElementById('kitCollectedCheckbox');
     
-    if (registrationCheckbox && registrationCheckbox.checked) {
+    const regChecked = registrationCheckbox && registrationCheckbox.checked;
+    const shulkChecked = shulkPaidCheckbox && shulkPaidCheckbox.checked;
+    const kitChecked = kitCollectedCheckbox && kitCollectedCheckbox.checked;
+    
+    // Count how many are checked
+    const checkedCount = [regChecked, shulkChecked, kitChecked].filter(Boolean).length;
+    
+    // If 2 or more are selected, registration must be included
+    if (checkedCount >= 2 && !regChecked) {
+        // Auto-check registration if not already frozen
+        if (registrationCheckbox && registrationCheckbox.dataset.frozen !== 'true') {
+            registrationCheckbox.checked = true;
+            types.push('registration');
+        }
+    }
+    
+    // Add checked types
+    if (regChecked) {
         types.push('registration');
     }
-    if (shulkPaidCheckbox && shulkPaidCheckbox.checked) {
+    if (shulkChecked) {
         types.push('shulk_paid');
     }
-    if (kitCollectedCheckbox && kitCollectedCheckbox.checked) {
+    if (kitChecked) {
         types.push('kit_collected');
     }
     
@@ -10073,6 +10144,212 @@ async function searchByNameForCheckin() {
     } catch (error) {
         console.error('Error searching by name:', error);
         showNotification('Error searching: ' + error.message, 'error');
+    }
+}
+
+// Search by email for checkin (email only, with multi-select)
+async function searchByEmailForCheckin() {
+    const emailInput = document.getElementById('searchByEmail');
+    if (!emailInput) return;
+    
+    const email = emailInput.value.trim();
+    if (!email) {
+        showNotification('Please enter an email address to search', 'error');
+        return;
+    }
+    
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Firebase not initialized', 'error');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        const emailLower = email.toLowerCase().trim();
+        const allUids = new Set();
+        
+        // First, try exact match using emailToUids collection
+        const emailToUidsDoc = await db.collection('emailToUids').doc(emailLower).get();
+        
+        if (emailToUidsDoc.exists) {
+            // Found exact match - get all UIDs for this email
+            const emailToUidsData = emailToUidsDoc.data();
+            const uids = emailToUidsData.uids || [];
+            uids.forEach(uid => allUids.add(uid));
+        } else {
+            // No exact match - try partial search in emailToUids collection
+            // Get all emailToUids documents and filter for emails containing the search term
+            const allEmailToUids = await db.collection('emailToUids').get();
+            
+            allEmailToUids.docs.forEach(doc => {
+                const emailData = doc.data();
+                const docEmail = (emailData.email || doc.id).toLowerCase();
+                if (docEmail.includes(emailLower)) {
+                    const uids = emailData.uids || [];
+                    uids.forEach(uid => allUids.add(uid));
+                }
+            });
+        }
+        
+        if (allUids.size === 0) {
+            showNotification('No participants found with this email', 'info');
+            clearParticipantInfo();
+            return;
+        }
+        
+        // Fetch all registration documents for these UIDs
+        const registrationPromises = Array.from(allUids).map(uid => 
+            db.collection('registrations').doc(uid).get()
+                .then(doc => doc.exists ? doc : null)
+                .catch(error => {
+                    console.error(`Error fetching registration for ${uid}:`, error);
+                    return null;
+                })
+        );
+        
+        const registrationDocs = await Promise.all(registrationPromises);
+        const results = registrationDocs.filter(doc => doc !== null);
+        
+        if (results.length === 0) {
+            showNotification('No participants found with this email', 'info');
+            clearParticipantInfo();
+            return;
+        }
+        
+        // Display results with multi-select capability
+        displayEmailSearchResultsForCheckin(results, email);
+        
+    } catch (error) {
+        console.error('Error searching by email:', error);
+        showNotification('Error searching by email: ' + error.message, 'error');
+    }
+}
+
+// Display email search results with multi-select for checkin
+function displayEmailSearchResultsForCheckin(docs, searchEmail) {
+    const participantInfo = document.getElementById('participantInfo');
+    const participantDetails = document.getElementById('participantDetails');
+    
+    if (!participantInfo || !participantDetails) return;
+    
+    // Store selected uniqueIds
+    window.selectedUniqueIdsForCheckin = new Set();
+    
+    let html = `<div class="participant-search-results">
+        <h4>${docs.length} participant(s) found with email "${escapeHtml(searchEmail)}". Select participants to check in:</h4>
+        <div style="margin-bottom: 1rem;">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="selectAllEmailResults()" style="margin-right: 0.5rem;">Select All</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="deselectAllEmailResults()">Deselect All</button>
+        </div>
+        <ul style="list-style: none; padding: 0; max-height: 400px; overflow-y: auto;">`;
+    
+    docs.forEach((doc, index) => {
+        const data = doc.data();
+        const name = data.name || data['Full Name'] || 'Unknown';
+        const uniqueId = data.uniqueId || doc.id;
+        const email = data.email || data['Email address'] || '';
+        
+        html += `
+            <li style="margin: 0.5rem 0; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+                <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer;">
+                    <input type="checkbox" class="email-result-checkbox" data-unique-id="${escapeHtml(uniqueId)}" data-index="${index}" onchange="toggleEmailResultSelection('${escapeHtml(uniqueId)}')" style="width: 18px; height: 18px; cursor: pointer;">
+                    <div style="flex: 1;">
+                        <strong>${escapeHtml(name)}</strong><br>
+                        <small style="color: #666;">Praveshika ID: ${escapeHtml(uniqueId)}${email ? ' - ' + escapeHtml(email) : ''}</small>
+                    </div>
+                </label>
+            </li>`;
+    });
+    
+    html += `</ul>
+        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 2px solid #007bff;">
+            <button class="btn btn-primary" onclick="proceedWithSelectedEmailResults()" id="proceedEmailCheckinBtn" disabled>
+                Check In Selected (0)
+            </button>
+            <button class="btn btn-secondary" onclick="clearParticipantInfo()" style="margin-left: 0.5rem;">
+                Cancel
+            </button>
+        </div>
+    </div>`;
+    
+    participantDetails.innerHTML = html;
+    participantInfo.style.display = 'block';
+}
+
+// Toggle email result selection
+function toggleEmailResultSelection(uniqueId) {
+    if (!window.selectedUniqueIdsForCheckin) {
+        window.selectedUniqueIdsForCheckin = new Set();
+    }
+    
+    const checkbox = document.querySelector(`.email-result-checkbox[data-unique-id="${escapeHtml(uniqueId)}"]`);
+    if (checkbox && checkbox.checked) {
+        window.selectedUniqueIdsForCheckin.add(uniqueId);
+    } else {
+        window.selectedUniqueIdsForCheckin.delete(uniqueId);
+    }
+    
+    updateProceedButton();
+}
+
+// Select all email results
+function selectAllEmailResults() {
+    if (!window.selectedUniqueIdsForCheckin) {
+        window.selectedUniqueIdsForCheckin = new Set();
+    }
+    
+    document.querySelectorAll('.email-result-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+        const uniqueId = checkbox.getAttribute('data-unique-id');
+        window.selectedUniqueIdsForCheckin.add(uniqueId);
+    });
+    
+    updateProceedButton();
+}
+
+// Deselect all email results
+function deselectAllEmailResults() {
+    if (window.selectedUniqueIdsForCheckin) {
+        window.selectedUniqueIdsForCheckin.clear();
+    }
+    
+    document.querySelectorAll('.email-result-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    updateProceedButton();
+}
+
+// Update proceed button
+function updateProceedButton() {
+    const proceedBtn = document.getElementById('proceedEmailCheckinBtn');
+    if (proceedBtn) {
+        const count = window.selectedUniqueIdsForCheckin ? window.selectedUniqueIdsForCheckin.size : 0;
+        proceedBtn.textContent = `Check In Selected (${count})`;
+        proceedBtn.disabled = count === 0;
+    }
+}
+
+// Proceed with selected email results
+async function proceedWithSelectedEmailResults() {
+    if (!window.selectedUniqueIdsForCheckin || window.selectedUniqueIdsForCheckin.size === 0) {
+        showNotification('Please select at least one participant', 'error');
+        return;
+    }
+    
+    const uniqueIds = Array.from(window.selectedUniqueIdsForCheckin);
+    
+    if (uniqueIds.length === 1) {
+        // Single selection - display participant info for checkin
+        const uniqueId = uniqueIds[0];
+        const db = firebase.firestore();
+        const regDoc = await db.collection('registrations').doc(uniqueId).get();
+        if (regDoc.exists) {
+            displayParticipantInfo(regDoc.data(), uniqueId);
+        }
+    } else {
+        // Multiple selections - use batch checkin
+        await executeBatchCheckin(uniqueIds);
     }
 }
 
@@ -10527,11 +10804,22 @@ async function performCheckin() {
             const participantName = regData.name || regData['Full Name'] || uniqueIdToCheckIn;
             const labels = successTypes.map(t => CHECKIN_TYPE_LABELS[t] || t).join(', ');
             showNotification(`Check-in successful for ${participantName} (${uniqueIdToCheckIn}): ${labels}`, 'success');
+            
+            // If registration type, refresh checkin status to freeze checkboxes
+            if (currentCheckinType === 'registration' && currentCheckinParticipantUniqueId === uniqueIdToCheckIn) {
+                await checkCheckinStatus(uniqueIdToCheckIn);
+            }
         }
         
-        // Clear form and participant display
-        clearCheckinForm();
-        clearParticipantInfo();
+        // Clear form and participant display only if not staying on same participant
+        if (currentCheckinType !== 'registration' || !successTypes.some(t => ['registration', 'shulk_paid', 'kit_collected'].includes(t))) {
+            clearCheckinForm();
+            clearParticipantInfo();
+        } else {
+            // For registration, just clear notes and other fields, but keep participant info
+            const notes = document.getElementById('checkinNotes');
+            if (notes) notes.value = '';
+        }
         
         // Reload recent checkins for current visible tab
         await loadRecentCheckins(currentCheckinType);
@@ -10556,13 +10844,20 @@ function clearCheckinForm() {
     if (itemCount) itemCount.value = '';
     if (tagId) tagId.value = '';
     
-    // Reset registration checkboxes
+    // Reset registration checkboxes only if they're not frozen
     const registrationCheckbox = document.getElementById('registrationCheckbox');
     const shulkPaidCheckbox = document.getElementById('shulkPaidCheckbox');
     const kitCollectedCheckbox = document.getElementById('kitCollectedCheckbox');
-    if (registrationCheckbox) registrationCheckbox.checked = false;
-    if (shulkPaidCheckbox) shulkPaidCheckbox.checked = false;
-    if (kitCollectedCheckbox) kitCollectedCheckbox.checked = false;
+    
+    if (registrationCheckbox && registrationCheckbox.dataset.frozen !== 'true') {
+        registrationCheckbox.checked = false;
+    }
+    if (shulkPaidCheckbox && shulkPaidCheckbox.dataset.frozen !== 'true') {
+        shulkPaidCheckbox.checked = false;
+    }
+    if (kitCollectedCheckbox && kitCollectedCheckbox.dataset.frozen !== 'true') {
+        kitCollectedCheckbox.checked = false;
+    }
 }
 
 // Perform Cloak Room checkout
@@ -10655,89 +10950,230 @@ async function checkCheckinStatus(uniqueId) {
     
     try {
         const db = firebase.firestore();
-        const checkinsQuery = await db.collection('checkins')
-            .where('uniqueId', '==', uniqueId)
-            .where('checkinType', '==', currentCheckinType)
-            .orderBy('timestamp', 'desc')
-            .limit(1)
-            .get();
+        const user = firebase.auth().currentUser;
+        const isAdminUser = user ? await isAdmin(user) : false;
         
-        const checkinForm = document.getElementById('checkinForm');
-        const checkinFormElement = document.getElementById('checkinFormElement');
-        const submitButton = checkinFormElement?.querySelector('button[type="submit"]');
-        
-        if (!checkinsQuery.empty) {
-            const checkinDoc = checkinsQuery.docs[0];
-            const checkinDocId = checkinDoc.id;
-            const checkinData = checkinDoc.data();
-            const timestamp = checkinData.timestamp?.toDate();
-            const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
-            const typeLabel = CHECKIN_TYPE_LABELS[currentCheckinType] || currentCheckinType;
+        // For registration type, check all three types
+        if (currentCheckinType === 'registration') {
+            const registrationTypes = ['registration', 'shulk_paid', 'kit_collected'];
+            const checkinStatuses = {};
             
-            // Get participant name for the undo function
-            const participantName = document.getElementById('participantDetails')?.querySelector('.checkin-item-name')?.textContent || uniqueId;
+            // Check status for each type
+            for (const type of registrationTypes) {
+                const checkinsQuery = await db.collection('checkins')
+                    .where('uniqueId', '==', uniqueId)
+                    .where('checkinType', '==', type)
+                    .orderBy('timestamp', 'desc')
+                    .limit(1)
+                    .get();
+                
+                if (!checkinsQuery.empty) {
+                    const checkinDoc = checkinsQuery.docs[0];
+                    const checkinData = checkinDoc.data();
+                    checkinStatuses[type] = {
+                        exists: true,
+                        docId: checkinDoc.id,
+                        timestamp: checkinData.timestamp?.toDate(),
+                        checkedInBy: checkinData.checkedInBy || 'Unknown'
+                    };
+                } else {
+                    checkinStatuses[type] = { exists: false };
+                }
+            }
             
-            // Show status in the form
+            // Update checkboxes based on status
+            updateRegistrationCheckboxes(checkinStatuses, isAdminUser);
+            
+            // Show status summary
             const participantDetails = document.getElementById('participantDetails');
             if (participantDetails) {
-                const statusDiv = document.createElement('div');
-                statusDiv.id = 'checkinStatusDiv';
-                statusDiv.style.cssText = 'background: #f8d7da; padding: 0.75rem; border-radius: 4px; margin-top: 1rem; border-left: 4px solid #dc3545;';
-                statusDiv.innerHTML = `
-                    <p style="margin: 0; color: #721c24; font-weight: bold;">⚠️ Already Checked In</p>
-                    <p style="margin: 0.5rem 0 0 0; color: #721c24; font-size: 0.9em;">
-                        This participant is already checked in for <strong>${escapeHtml(typeLabel)}</strong> at ${escapeHtml(timeStr)}.
-                    </p>
-                    <p style="margin: 0.5rem 0 0 0; color: #721c24; font-size: 0.85em;">
-                        Duplicate check-ins are not allowed for the same check-in type.
-                    </p>
-                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-                        <button type="button" class="btn" style="background-color: #dc3545; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer;" 
-                                onclick="undoCheckinFromStatus('${escapeHtml(checkinDocId)}', '${escapeHtml(uniqueId)}', '${escapeHtml(participantName.replace(/'/g, "\\'"))}')">
-                            Undo Check-in
-                        </button>
-                        <button type="button" class="btn btn-secondary" style="padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;" 
-                                onclick="clearParticipantInfo()">
-                            Clear
-                        </button>
-                    </div>
-                `;
-                
-                // Remove existing status if any
                 const existingStatus = participantDetails.querySelector('#checkinStatusDiv');
                 if (existingStatus) {
                     existingStatus.remove();
                 }
-                participantDetails.appendChild(statusDiv);
-            }
-            
-            // Disable the submit button
-            if (submitButton) {
-                submitButton.disabled = true;
-                submitButton.style.opacity = '0.6';
-                submitButton.style.cursor = 'not-allowed';
-                submitButton.textContent = 'Already Checked In';
+                
+                const checkedInCount = Object.values(checkinStatuses).filter(s => s.exists).length;
+                if (checkedInCount > 0) {
+                    const statusDiv = document.createElement('div');
+                    statusDiv.id = 'checkinStatusDiv';
+                    
+                    let statusText = '';
+                    let statusColor = '#28a745';
+                    let bgColor = '#d4edda';
+                    let borderColor = '#28a745';
+                    
+                    if (checkedInCount === 3) {
+                        statusText = '✅ Fully Checked In (Registration, Shulk, Kit)';
+                    } else if (checkedInCount === 2) {
+                        const checkedTypes = Object.entries(checkinStatuses)
+                            .filter(([_, s]) => s.exists)
+                            .map(([type, _]) => CHECKIN_TYPE_LABELS[type] || type);
+                        statusText = `⚠️ Partially Checked In (${checkedTypes.join(', ')})`;
+                        statusColor = '#ffc107';
+                        bgColor = '#fff3cd';
+                        borderColor = '#ffc107';
+                    } else {
+                        const checkedTypes = Object.entries(checkinStatuses)
+                            .filter(([_, s]) => s.exists)
+                            .map(([type, _]) => CHECKIN_TYPE_LABELS[type] || type);
+                        statusText = `⚠️ Partially Checked In (${checkedTypes.join(', ')})`;
+                        statusColor = '#ffc107';
+                        bgColor = '#fff3cd';
+                        borderColor = '#ffc107';
+                    }
+                    
+                    statusDiv.style.cssText = `background: ${bgColor}; padding: 0.75rem; border-radius: 4px; margin-top: 1rem; border-left: 4px solid ${borderColor};`;
+                    statusDiv.innerHTML = `
+                        <p style="margin: 0; color: ${statusColor}; font-weight: bold;">${statusText}</p>
+                        <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.85em;">
+                            Checked items are frozen and cannot be unchecked.
+                        </p>
+                    `;
+                    participantDetails.appendChild(statusDiv);
+                }
             }
         } else {
-            // Remove status message if exists
-            const participantDetails = document.getElementById('participantDetails');
-            if (participantDetails) {
-                const existingStatus = participantDetails.querySelector('#checkinStatusDiv');
-                if (existingStatus) {
-                    existingStatus.remove();
-                }
-            }
+            // For other checkin types, use original logic
+            const checkinsQuery = await db.collection('checkins')
+                .where('uniqueId', '==', uniqueId)
+                .where('checkinType', '==', currentCheckinType)
+                .orderBy('timestamp', 'desc')
+                .limit(1)
+                .get();
             
-            // Enable the submit button
-            if (submitButton) {
-                submitButton.disabled = false;
-                submitButton.style.opacity = '1';
-                submitButton.style.cursor = 'pointer';
-                submitButton.textContent = 'Check In';
+            const checkinForm = document.getElementById('checkinForm');
+            const checkinFormElement = document.getElementById('checkinFormElement');
+            const submitButton = checkinFormElement?.querySelector('button[type="submit"]');
+            
+            if (!checkinsQuery.empty) {
+                const checkinDoc = checkinsQuery.docs[0];
+                const checkinDocId = checkinDoc.id;
+                const checkinData = checkinDoc.data();
+                const timestamp = checkinData.timestamp?.toDate();
+                const timeStr = timestamp ? timestamp.toLocaleString() : 'Unknown';
+                const typeLabel = CHECKIN_TYPE_LABELS[currentCheckinType] || currentCheckinType;
+                
+                // Get participant name for the undo function
+                const participantName = document.getElementById('participantDetails')?.querySelector('.checkin-item-name')?.textContent || uniqueId;
+                
+                // Show status in the form
+                const participantDetails = document.getElementById('participantDetails');
+                if (participantDetails) {
+                    const statusDiv = document.createElement('div');
+                    statusDiv.id = 'checkinStatusDiv';
+                    statusDiv.style.cssText = 'background: #f8d7da; padding: 0.75rem; border-radius: 4px; margin-top: 1rem; border-left: 4px solid #dc3545;';
+                    
+                    let undoButton = '';
+                    if (isAdminUser) {
+                        undoButton = `
+                            <button type="button" class="btn" style="background-color: #dc3545; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer;" 
+                                    onclick="undoCheckinFromStatus('${escapeHtml(checkinDocId)}', '${escapeHtml(uniqueId)}', '${escapeHtml(participantName.replace(/'/g, "\\'"))}')">
+                                Undo Check-in
+                            </button>
+                        `;
+                    }
+                    
+                    statusDiv.innerHTML = `
+                        <p style="margin: 0; color: #721c24; font-weight: bold;">⚠️ Already Checked In</p>
+                        <p style="margin: 0.5rem 0 0 0; color: #721c24; font-size: 0.9em;">
+                            This participant is already checked in for <strong>${escapeHtml(typeLabel)}</strong> at ${escapeHtml(timeStr)}.
+                        </p>
+                        <p style="margin: 0.5rem 0 0 0; color: #721c24; font-size: 0.85em;">
+                            Duplicate check-ins are not allowed for the same check-in type.
+                        </p>
+                        ${undoButton ? `<div style="margin-top: 1rem; display: flex; gap: 0.5rem;">${undoButton}
+                            <button type="button" class="btn btn-secondary" style="padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;" 
+                                    onclick="clearParticipantInfo()">
+                                Clear
+                            </button>
+                        </div>` : ''}
+                    `;
+                    
+                    // Remove existing status if any
+                    const existingStatus = participantDetails.querySelector('#checkinStatusDiv');
+                    if (existingStatus) {
+                        existingStatus.remove();
+                    }
+                    participantDetails.appendChild(statusDiv);
+                }
+                
+                // Disable the submit button
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.style.opacity = '0.6';
+                    submitButton.style.cursor = 'not-allowed';
+                    submitButton.textContent = 'Already Checked In';
+                }
+            } else {
+                // Remove status message if exists
+                const participantDetails = document.getElementById('participantDetails');
+                if (participantDetails) {
+                    const existingStatus = participantDetails.querySelector('#checkinStatusDiv');
+                    if (existingStatus) {
+                        existingStatus.remove();
+                    }
+                }
+                
+                // Enable the submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.style.opacity = '1';
+                    submitButton.style.cursor = 'pointer';
+                    submitButton.textContent = 'Check In';
+                }
             }
         }
     } catch (error) {
         console.error('Error checking checkin status:', error);
+    }
+}
+
+// Update registration checkboxes based on checkin status
+function updateRegistrationCheckboxes(checkinStatuses, isAdminUser) {
+    const registrationCheckbox = document.getElementById('registrationCheckbox');
+    const shulkPaidCheckbox = document.getElementById('shulkPaidCheckbox');
+    const kitCollectedCheckbox = document.getElementById('kitCollectedCheckbox');
+    
+    // Update registration checkbox
+    if (registrationCheckbox) {
+        if (checkinStatuses.registration?.exists) {
+            registrationCheckbox.checked = true;
+            registrationCheckbox.disabled = true;
+            registrationCheckbox.dataset.frozen = 'true';
+            registrationCheckbox.title = 'Already checked in - frozen';
+        } else {
+            registrationCheckbox.disabled = false;
+            registrationCheckbox.dataset.frozen = 'false';
+            registrationCheckbox.title = '';
+        }
+    }
+    
+    // Update shulk checkbox
+    if (shulkPaidCheckbox) {
+        if (checkinStatuses.shulk_paid?.exists) {
+            shulkPaidCheckbox.checked = true;
+            shulkPaidCheckbox.disabled = true;
+            shulkPaidCheckbox.dataset.frozen = 'true';
+            shulkPaidCheckbox.title = 'Already checked in - frozen';
+        } else {
+            shulkPaidCheckbox.disabled = false;
+            shulkPaidCheckbox.dataset.frozen = 'false';
+            shulkPaidCheckbox.title = '';
+        }
+    }
+    
+    // Update kit checkbox
+    if (kitCollectedCheckbox) {
+        if (checkinStatuses.kit_collected?.exists) {
+            kitCollectedCheckbox.checked = true;
+            kitCollectedCheckbox.disabled = true;
+            kitCollectedCheckbox.dataset.frozen = 'true';
+            kitCollectedCheckbox.title = 'Already checked in - frozen';
+        } else {
+            kitCollectedCheckbox.disabled = false;
+            kitCollectedCheckbox.dataset.frozen = 'false';
+            kitCollectedCheckbox.title = '';
+        }
     }
 }
 
@@ -10860,6 +11296,13 @@ async function undoCheckin(checkinDocId, uniqueId, participantName) {
         return;
     }
     
+    // Check if user is admin
+    const isAdminUser = await isAdmin(user);
+    if (!isAdminUser) {
+        showNotification('Only admin users can undo check-ins', 'error');
+        return;
+    }
+    
     // Confirm with user
     const confirmed = confirm(`Are you sure you want to undo the check-in for ${participantName} (${uniqueId})?\n\nThis action cannot be undone.`);
     if (!confirmed) {
@@ -10900,6 +11343,13 @@ async function undoCheckinFromStatus(checkinDocId, uniqueId, participantName) {
     const user = firebase.auth().currentUser;
     if (!user) {
         showNotification('Please log in to undo checkin', 'error');
+        return;
+    }
+    
+    // Check if user is admin
+    const isAdminUser = await isAdmin(user);
+    if (!isAdminUser) {
+        showNotification('Only admin users can undo check-ins', 'error');
         return;
     }
     
