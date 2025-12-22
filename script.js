@@ -4889,8 +4889,7 @@ async function createNewUser(name, email, uniqueId, role, volunteerTeams = []) {
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 createdBy: currentUser.uid
             });
-        }
-        
+            
             // Sign out the newly created user
             await firebase.auth().signOut();
             

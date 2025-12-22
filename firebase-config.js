@@ -47,20 +47,37 @@ function configureFirestore() {
     if (!firebase || !firebase.firestore || typeof firebase.firestore !== 'function') {
         return;
     }
+    
+    // Prevent duplicate configuration
+    if (typeof window !== 'undefined' && window.firestoreConfigured) {
+        return;
+    }
+    
     try {
         const db = firebase.firestore();
-        if (db.settings) {
+        // Only configure if settings haven't been called yet
+        // Check if settings method exists and hasn't been called
+        if (db.settings && !window.firestoreSettingsCalled) {
             db.settings({
                 experimentalAutoDetectLongPolling: true,
                 useFetchStreams: false,
                 ignoreUndefinedProperties: true
             });
+            if (typeof window !== 'undefined') {
+                window.firestoreSettingsCalled = true;
+            }
         }
         if (typeof window !== 'undefined') {
             window.firestoreConfigured = true;
         }
     } catch (e) {
-        console.warn('Could not configure Firestore networking', e);
+        // Settings may have already been called, which is fine
+        if (e.message && !e.message.includes('already been called')) {
+            console.warn('Could not configure Firestore networking', e);
+        }
+        if (typeof window !== 'undefined') {
+            window.firestoreConfigured = true;
+        }
     }
 }
 
