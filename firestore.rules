@@ -169,9 +169,11 @@ service cloud.firestore {
     // Document ID is normalized email (lowercase)
     match /emailToUids/{normalizedEmail} {
       // Authenticated users can read their own email mapping, admins can read all
+      // Volunteers can also read email mappings for checkin purposes
       // The document ID is the normalized email (lowercase), compare with normalized user email
       allow read: if request.auth != null && 
                     (isAdmin() ||
+                     isVolunteer() ||
                      normalizedEmail == request.auth.token.email.lower() ||
                      (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email.lower() == normalizedEmail));

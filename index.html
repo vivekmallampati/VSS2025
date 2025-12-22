@@ -1136,7 +1136,12 @@
                                 <span class="analytics-section-toggle">▼</span>
                             </div>
                             <div class="analytics-section-content">
-                                <p class="section-description">Click on a zone to see country-wise breakdown</p>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                    <p class="section-description" style="margin: 0;">Click on a zone to see country-wise breakdown</p>
+                                    <button class="btn btn-secondary btn-sm" onclick="exportZoneCheckinData()" style="margin-left: auto;">
+                                        Export Zone & Country Data
+                                    </button>
+                                </div>
                                 <div id="zoneBreakdown" class="data-table-container">
                                 <table class="data-table">
                                     <thead>

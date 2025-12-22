@@ -4790,32 +4790,12 @@ async function createNewUser(name, email, uniqueId, role, volunteerTeams = []) {
         // Store current auth credentials to restore later
         const currentUserEmail = currentUser.email;
         
-        // If no email provided, generate a placeholder email using the uniqueId
-        const userEmail = trimmedEmail || `${trimmedUniqueId}@placeholder.local`;
-        
-        // Create the user account
-        // NOTE: This will sign out the current user and sign in the new user
-        const userCredential = await firebase.auth().createUserWithEmailAndPassword(userEmail, tempPassword);
-        const newUser = userCredential.user;
-        
-        // Create user document in Firestore
-        const db = firebase.firestore();
-        await db.collection('users').doc(newUser.uid).set({
-            email: trimmedEmail || null,
-            name: trimmedName,
-            uniqueId: trimmedUniqueId,
-            role: role,
-            volunteerTeams: role === 'volunteer' ? volunteerTeams : [],
-            country: 'Bharat',
-            shreni: role === 'shibirarthi' ? 'Shibirarthi' : 'Volunteer',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: currentUser.uid
-        });
-        
         // Handle different collections based on role
         const normalizedId = trimmedUniqueId.toLowerCase().replace(/[/-]/g, '');
+        const db = firebase.firestore();
         
         if (role === 'shibirarthi') {
+            // For Shibirarthi, DO NOT create auth user - only add to registrations collection
             // For Shibirarthi, save to registrations collection
             const registrationData = {
                 uniqueId: trimmedUniqueId,
@@ -4858,7 +4838,41 @@ async function createNewUser(name, email, uniqueId, role, volunteerTeams = []) {
                     });
                 }
             }
+            
+            // Return success without creating auth user
+            return {
+                success: true,
+                uid: null,
+                email: trimmedEmail || 'No email provided',
+                name: trimmedName,
+                uniqueId: trimmedUniqueId,
+                role: role,
+                temporaryPassword: null,
+                needsReauth: false,
+                adminEmail: currentUserEmail
+            };
         } else {
+            // For volunteers/admins, create auth user
+            // If no email provided, generate a placeholder email using the uniqueId
+            const userEmail = trimmedEmail || `${trimmedUniqueId}@placeholder.local`;
+            
+            // Create the user account
+            // NOTE: This will sign out the current user and sign in the new user
+            const userCredential = await firebase.auth().createUserWithEmailAndPassword(userEmail, tempPassword);
+            const newUser = userCredential.user;
+            
+            // Create user document in Firestore
+            await db.collection('users').doc(newUser.uid).set({
+                email: trimmedEmail || null,
+                name: trimmedName,
+                uniqueId: trimmedUniqueId,
+                role: role,
+                volunteerTeams: role === 'volunteer' ? volunteerTeams : [],
+                country: 'Bharat',
+                shreni: 'Volunteer',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdBy: currentUser.uid
+            });
             // For volunteers/admins, create a record in nonShibirarthiUsers collection
             // This allows them to have profile information like shibirarthi
             await db.collection('nonShibirarthiUsers').doc(trimmedUniqueId).set({
@@ -4877,29 +4891,30 @@ async function createNewUser(name, email, uniqueId, role, volunteerTeams = []) {
             });
         }
         
-        // Sign out the newly created user
-        await firebase.auth().signOut();
-        
-        // Send password reset email to the new user (only if email provided)
-        if (trimmedEmail) {
-            try {
-                await firebase.auth().sendPasswordResetEmail(trimmedEmail);
-            } catch (emailError) {
-                console.warn('Could not send password reset email:', emailError);
+            // Sign out the newly created user
+            await firebase.auth().signOut();
+            
+            // Send password reset email to the new user (only if email provided)
+            if (trimmedEmail) {
+                try {
+                    await firebase.auth().sendPasswordResetEmail(trimmedEmail);
+                } catch (emailError) {
+                    console.warn('Could not send password reset email:', emailError);
+                }
             }
+            
+            return {
+                success: true,
+                uid: newUser.uid,
+                email: trimmedEmail || 'No email provided',
+                name: trimmedName,
+                uniqueId: trimmedUniqueId,
+                role: role,
+                temporaryPassword: tempPassword,
+                needsReauth: true,
+                adminEmail: currentUserEmail
+            };
         }
-        
-        return {
-            success: true,
-            uid: newUser.uid,
-            email: trimmedEmail || 'No email provided',
-            name: trimmedName,
-            uniqueId: trimmedUniqueId,
-            role: role,
-            temporaryPassword: tempPassword,
-            needsReauth: true,
-            adminEmail: currentUserEmail
-        };
         
     } catch (error) {
         console.error('Error creating user:', error);
@@ -5959,23 +5974,9 @@ async function executeBatchUserCreation() {
             try {
                 const normalizedId = user.uniqueId.toLowerCase().replace(/[/-]/g, '');
                 
-                // 1. First create in users collection (using uniqueId as doc ID)
-                await db.collection('users').doc(user.uniqueId).set({
-                    email: user.email,
-                    name: user.name,
-                    uniqueId: user.uniqueId,
-                    normalizedId: normalizedId,
-                    role: user.role,
-                    volunteerTeams: user.role === 'volunteer' ? user.volunteerTeams : [],
-                    country: 'Bharat',
-                    shreni: user.role === 'shibirarthi' ? 'Shibirarthi' : 'Volunteer',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    createdBy: currentUser.uid,
-                    batchCreated: true
-                });
-                
-                // 2. Then create in appropriate collection based on role
+                // Handle different collections based on role
                 if (user.role === 'shibirarthi') {
+                    // For Shibirarthi, only add to registrations collection (no auth user, no users collection)
                     // For Shibirarthi, save to registrations collection
                     const registrationData = {
                         uniqueId: user.uniqueId,
@@ -6021,6 +6022,7 @@ async function executeBatchUserCreation() {
                     }
                 } else {
                     // For volunteers/admins, create in nonShibirarthiUsers collection
+                    // Note: Auth users are created separately via API call if needed
                     await db.collection('nonShibirarthiUsers').doc(user.uniqueId).set({
                         uniqueId: user.uniqueId,
                         normalizedId: normalizedId,
@@ -6386,6 +6388,11 @@ function displayParticipantSelectionList(docs, searchType = 'email') {
     
     const searchTypeText = searchType === 'name' ? 'with this name' : 'with this email';
     let html = `<div class="participant-search-results">
+        <div style="margin-bottom: 1rem;">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="clearParticipantLookupResults(); document.getElementById('lookupName')?.value && (document.getElementById('lookupName').value = ''); document.getElementById('lookupEmail')?.value && (document.getElementById('lookupEmail').value = '');" style="display: flex; align-items: center; gap: 0.5rem;">
+                <span>←</span> Back
+            </button>
+        </div>
         <h4>${docs.length} participant(s) found ${searchTypeText}. Please select:</h4>
         <ul style="list-style: none; padding: 0;">`;
     
@@ -7427,6 +7434,102 @@ async function displayZoneWithStatusTable(registrations, users) {
     `;
     
     tableBody.innerHTML = html;
+    
+    // Store data for export
+    window.zoneCheckinData = {
+        zoneCounts: zoneCounts,
+        zoneCountryMap: zoneCountryMap,
+        zoneOrder: zoneOrder,
+        zoneLabels: zoneLabels,
+        totals: {
+            registered: totalRegistered,
+            loggedIn: totalLoggedIn,
+            checkedIn: totalCheckedIn
+        }
+    };
+}
+
+// Export zone and country checkin data to CSV
+function exportZoneCheckinData() {
+    if (!window.zoneCheckinData) {
+        showNotification('No data available to export', 'error');
+        return;
+    }
+    
+    const data = window.zoneCheckinData;
+    const rows = [];
+    
+    // Header row
+    rows.push(['Zone', 'Country', 'Registered', 'Web Logged In', 'Venue Check In']);
+    
+    // Add data for each zone
+    data.zoneOrder.forEach(zone => {
+        const label = data.zoneLabels[zone] || zone;
+        const counts = data.zoneCounts[zone];
+        const countryMap = data.zoneCountryMap[zone] || {};
+        
+        // Add zone summary row
+        rows.push([label, 'All Countries', counts.registered, counts.loggedIn, counts.checkedIn]);
+        
+        // Add country breakdown rows
+        const countries = Object.keys(countryMap).sort();
+        countries.forEach(country => {
+            const countryCount = countryMap[country];
+            // Calculate country-specific checkin counts (approximate based on proportion)
+            const registered = countryCount;
+            const loggedIn = Math.round((counts.loggedIn / counts.registered) * countryCount) || 0;
+            const checkedIn = Math.round((counts.checkedIn / counts.registered) * countryCount) || 0;
+            rows.push(['', country, registered, loggedIn, checkedIn]);
+        });
+        
+        // Add empty row for spacing
+        rows.push([]);
+    });
+    
+    // Add Others zone
+    if (data.zoneCounts['Others']) {
+        const othersCounts = data.zoneCounts['Others'];
+        const othersCountryMap = data.zoneCountryMap['Others'] || {};
+        rows.push(['Others', 'All Countries', othersCounts.registered, othersCounts.loggedIn, othersCounts.checkedIn]);
+        
+        const countries = Object.keys(othersCountryMap).sort();
+        countries.forEach(country => {
+            const countryCount = othersCountryMap[country];
+            const registered = countryCount;
+            const loggedIn = Math.round((othersCounts.loggedIn / othersCounts.registered) * countryCount) || 0;
+            const checkedIn = Math.round((othersCounts.checkedIn / othersCounts.registered) * countryCount) || 0;
+            rows.push(['', country, registered, loggedIn, checkedIn]);
+        });
+        rows.push([]);
+    }
+    
+    // Add totals row
+    rows.push(['Total', 'All Countries', data.totals.registered, data.totals.loggedIn, data.totals.checkedIn]);
+    
+    // Convert to CSV
+    const csvContent = rows.map(row => {
+        return row.map(cell => {
+            if (cell === null || cell === undefined) return '';
+            const str = String(cell);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        }).join(',');
+    }).join('\n');
+    
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `zone_country_checkin_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showNotification('Zone and country checkin data exported successfully', 'success');
 }
 
 // Display Registrations by Shreni with Male, Female, Total, Percentage columns
@@ -8412,6 +8515,11 @@ function displayRelatedIds(relatedRegs, searchedId) {
     }
     
     let html = `<div class="participant-search-results">
+        <div style="margin-bottom: 1rem;">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="clearParticipantLookupResults(); document.getElementById('lookupUniqueId')?.value && (document.getElementById('lookupUniqueId').value = '');" style="display: flex; align-items: center; gap: 0.5rem;">
+                <span>←</span> Back
+            </button>
+        </div>
         <h4>Found ${relatedRegs.length} related registration(s) for this login ID. Please select:</h4>
         <ul style="list-style: none; padding: 0;">`;
     
@@ -9906,6 +10014,9 @@ async function initializeCheckinInterface() {
             // Setup checkin form
             setupCheckinForm();
             
+            // Setup uppercase conversion for Praveshika ID inputs
+            setupPraveshikaIdInputs();
+            
             // Setup real-time listeners
             setupCheckinListeners();
             
@@ -10156,7 +10267,12 @@ async function searchParticipant() {
     const barcodeInput = document.getElementById('barcodeInput');
     if (!barcodeInput) return;
     
-    const uniqueId = barcodeInput.value.trim();
+    let uniqueId = barcodeInput.value.trim().toUpperCase();
+    // Update the input field to uppercase
+    if (barcodeInput.value !== uniqueId) {
+        barcodeInput.value = uniqueId;
+    }
+    
     if (!uniqueId) {
         showNotification('Please enter a barcode or Praveshika ID', 'error');
         return;
@@ -10170,7 +10286,12 @@ async function searchByPraveshikaId() {
     const manualInput = document.getElementById('manualPraveshikaId');
     if (!manualInput) return;
     
-    const uniqueId = manualInput.value.trim();
+    let uniqueId = manualInput.value.trim().toUpperCase();
+    // Update the input field to uppercase
+    if (manualInput.value !== uniqueId) {
+        manualInput.value = uniqueId;
+    }
+    
     if (!uniqueId) {
         showNotification('Please enter a Praveshika ID', 'error');
         return;
@@ -10239,6 +10360,12 @@ async function searchByNameForCheckin() {
         return;
     }
     
+    // Clear previous selections when new search is performed
+    clearParticipantInfo();
+    if (window.selectedUniqueIdsForCheckin) {
+        window.selectedUniqueIdsForCheckin.clear();
+    }
+    
     try {
         const db = firebase.firestore();
         const nameLower = name.toLowerCase();
@@ -10289,6 +10416,12 @@ async function searchByEmailForCheckin() {
     if (!window.firebase || !firebase.firestore) {
         showNotification('Firebase not initialized', 'error');
         return;
+    }
+    
+    // Clear previous selections when new search is performed
+    clearParticipantInfo();
+    if (window.selectedUniqueIdsForCheckin) {
+        window.selectedUniqueIdsForCheckin.clear();
     }
     
     try {
@@ -10682,6 +10815,10 @@ function displayParticipantInfo(regData, uniqueId) {
     
     currentCheckinParticipantUniqueId = uniqueId;
     
+    // Reset registration checkboxes before displaying new participant
+    // This ensures old checkbox states don't carry over to the new participant
+    resetRegistrationCheckboxes();
+    
     const name = regData.name || regData['Full Name'] || 'Unknown';
     const email = regData.email || regData['Email address'] || 'N/A';
     const country = regData.country || regData.Country || 'N/A';
@@ -10727,8 +10864,37 @@ function displayParticipantInfo(regData, uniqueId) {
         }
     }
     
-    // Check if already checked in
+    // Check if already checked in (this will update checkboxes based on new participant's status)
     checkCheckinStatus(uniqueId);
+}
+
+// Reset registration checkboxes to default state
+function resetRegistrationCheckboxes() {
+    const registrationCheckbox = document.getElementById('registrationCheckbox');
+    const shulkPaidCheckbox = document.getElementById('shulkPaidCheckbox');
+    const kitCollectedCheckbox = document.getElementById('kitCollectedCheckbox');
+    
+    // Reset all checkboxes to unchecked and unfrozen
+    if (registrationCheckbox) {
+        registrationCheckbox.checked = false;
+        registrationCheckbox.disabled = false;
+        registrationCheckbox.dataset.frozen = 'false';
+        registrationCheckbox.title = '';
+    }
+    
+    if (shulkPaidCheckbox) {
+        shulkPaidCheckbox.checked = false;
+        shulkPaidCheckbox.disabled = false;
+        shulkPaidCheckbox.dataset.frozen = 'false';
+        shulkPaidCheckbox.title = '';
+    }
+    
+    if (kitCollectedCheckbox) {
+        kitCollectedCheckbox.checked = false;
+        kitCollectedCheckbox.disabled = false;
+        kitCollectedCheckbox.dataset.frozen = 'false';
+        kitCollectedCheckbox.title = '';
+    }
 }
 
 // Clear participant info
@@ -10777,6 +10943,64 @@ function setupCheckinForm() {
         e.preventDefault();
         await performCheckin();
     });
+    
+    // Setup automatic uppercase conversion for Praveshika ID inputs
+    setupPraveshikaIdInputs();
+}
+
+// Setup automatic uppercase conversion for Praveshika ID inputs
+function setupPraveshikaIdInputs() {
+    // Barcode input - convert to uppercase on input
+    const barcodeInput = document.getElementById('barcodeInput');
+    if (barcodeInput && !barcodeInput.dataset.uppercaseSetup) {
+        barcodeInput.dataset.uppercaseSetup = 'true';
+        barcodeInput.addEventListener('input', function(e) {
+            const cursorPos = this.selectionStart;
+            const originalLength = this.value.length;
+            this.value = this.value.toUpperCase();
+            // Restore cursor position after uppercase conversion
+            const newLength = this.value.length;
+            const newCursorPos = cursorPos + (newLength - originalLength);
+            this.setSelectionRange(newCursorPos, newCursorPos);
+        });
+        // Also convert on paste
+        barcodeInput.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                const cursorPos = this.selectionStart;
+                const originalLength = this.value.length;
+                this.value = this.value.toUpperCase();
+                const newLength = this.value.length;
+                const newCursorPos = cursorPos + (newLength - originalLength);
+                this.setSelectionRange(newCursorPos, newCursorPos);
+            }, 0);
+        });
+    }
+    
+    // Manual Praveshika ID input - convert to uppercase on input
+    const manualInput = document.getElementById('manualPraveshikaId');
+    if (manualInput && !manualInput.dataset.uppercaseSetup) {
+        manualInput.dataset.uppercaseSetup = 'true';
+        manualInput.addEventListener('input', function(e) {
+            const cursorPos = this.selectionStart;
+            const originalLength = this.value.length;
+            this.value = this.value.toUpperCase();
+            // Restore cursor position after uppercase conversion
+            const newLength = this.value.length;
+            const newCursorPos = cursorPos + (newLength - originalLength);
+            this.setSelectionRange(newCursorPos, newCursorPos);
+        });
+        // Also convert on paste
+        manualInput.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                const cursorPos = this.selectionStart;
+                const originalLength = this.value.length;
+                this.value = this.value.toUpperCase();
+                const newLength = this.value.length;
+                const newCursorPos = cursorPos + (newLength - originalLength);
+                this.setSelectionRange(newCursorPos, newCursorPos);
+            }, 0);
+        });
+    }
 }
 
 // Perform checkin
@@ -11728,25 +11952,38 @@ async function processBatchCheckin() {
             `;
             
             // Only show confirmation checkboxes and button if there are valid participants and no already checked-in
+            // Only show checkboxes for registration checkin type
             if (alreadyCheckedIn.length === 0) {
-                html += `
-                    <div style="margin: 1rem 0; padding: 0.75rem; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
-                        <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #856404;">
-                            Please confirm the following for this batch:
-                        </p>
-                        <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.9rem;">
-                            <input type="checkbox" id="batchShulkPaidConfirm" onchange="updateBatchConfirmState()">
-                            <span>All shulk paid</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
-                            <input type="checkbox" id="batchKitCollectedConfirm" onchange="updateBatchConfirmState()">
-                            <span>All kits collected</span>
-                        </label>
-                    </div>
-                    <button id="batchConfirmButton" class="btn btn-primary" onclick="executeBatchCheckinFromPreview()" disabled style="opacity: 0.6; cursor: not-allowed;">
-                        Confirm Batch Checkin
-                    </button>
-                `;
+                if (currentCheckinType === 'registration') {
+                    html += `
+                        <div style="margin: 1rem 0; padding: 0.75rem; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                            <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #856404;">
+                                Please confirm the following for this batch:
+                            </p>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.9rem;">
+                                <input type="checkbox" id="batchAllRegistrationsDoneConfirm" onchange="updateBatchConfirmState()">
+                                <span>All Registrations Done</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.9rem;">
+                                <input type="checkbox" id="batchShulkPaidConfirm" onchange="updateBatchConfirmState()">
+                                <span>All shulk paid</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                                <input type="checkbox" id="batchKitCollectedConfirm" onchange="updateBatchConfirmState()">
+                                <span>All kits collected</span>
+                            </label>
+                        </div>
+                        <button id="batchConfirmButton" class="btn btn-primary" onclick="executeBatchCheckinFromPreview()" disabled style="opacity: 0.6; cursor: not-allowed;">
+                            Confirm Batch Checkin
+                        </button>
+                    `;
+                } else {
+                    html += `
+                        <button id="batchConfirmButton" class="btn btn-primary" onclick="executeBatchCheckinFromPreview()">
+                            Confirm Batch Checkin
+                        </button>
+                    `;
+                }
             } else {
                 html += `
                     <div style="margin: 1rem 0; padding: 0.75rem; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;">
@@ -11789,13 +12026,16 @@ async function processBatchCheckin() {
 
 // Execute batch checkin from preview
 async function executeBatchCheckinFromPreview() {
-    // Ensure confirmation checkboxes are checked
-    const shulkCheckbox = document.getElementById('batchShulkPaidConfirm');
-    const kitCheckbox = document.getElementById('batchKitCollectedConfirm');
-    if (shulkCheckbox && kitCheckbox) {
-        if (!shulkCheckbox.checked || !kitCheckbox.checked) {
-            showNotification('Please confirm that all shulk are paid and all kits are collected before proceeding.', 'error');
-            return;
+    // Ensure confirmation checkboxes are checked (only for registration type)
+    if (currentCheckinType === 'registration') {
+        const allRegistrationsDoneCheckbox = document.getElementById('batchAllRegistrationsDoneConfirm');
+        const shulkCheckbox = document.getElementById('batchShulkPaidConfirm');
+        const kitCheckbox = document.getElementById('batchKitCollectedConfirm');
+        if (allRegistrationsDoneCheckbox && shulkCheckbox && kitCheckbox) {
+            if (!allRegistrationsDoneCheckbox.checked || !shulkCheckbox.checked || !kitCheckbox.checked) {
+                showNotification('Please confirm all checkboxes before proceeding.', 'error');
+                return;
+            }
         }
     }
     
@@ -12054,18 +12294,29 @@ async function executeBatchCheckin(ids) {
         failCount === 0 ? 'success' : 'info');
 }
 
-// Update state of batch confirm button based on shulk/kit confirmation checkboxes
+// Update state of batch confirm button based on confirmation checkboxes
 function updateBatchConfirmState() {
-    const shulkCheckbox = document.getElementById('batchShulkPaidConfirm');
-    const kitCheckbox = document.getElementById('batchKitCollectedConfirm');
     const confirmButton = document.getElementById('batchConfirmButton');
+    if (!confirmButton) return;
     
-    if (!confirmButton || !shulkCheckbox || !kitCheckbox) return;
-    
-    const enabled = shulkCheckbox.checked && kitCheckbox.checked;
-    confirmButton.disabled = !enabled;
-    confirmButton.style.opacity = enabled ? '1' : '0.6';
-    confirmButton.style.cursor = enabled ? 'pointer' : 'not-allowed';
+    // For registration type, require all checkboxes to be checked
+    if (currentCheckinType === 'registration') {
+        const allRegistrationsDoneCheckbox = document.getElementById('batchAllRegistrationsDoneConfirm');
+        const shulkCheckbox = document.getElementById('batchShulkPaidConfirm');
+        const kitCheckbox = document.getElementById('batchKitCollectedConfirm');
+        
+        if (!allRegistrationsDoneCheckbox || !shulkCheckbox || !kitCheckbox) return;
+        
+        const enabled = allRegistrationsDoneCheckbox.checked && shulkCheckbox.checked && kitCheckbox.checked;
+        confirmButton.disabled = !enabled;
+        confirmButton.style.opacity = enabled ? '1' : '0.6';
+        confirmButton.style.cursor = enabled ? 'pointer' : 'not-allowed';
+    } else {
+        // For other types, button is always enabled
+        confirmButton.disabled = false;
+        confirmButton.style.opacity = '1';
+        confirmButton.style.cursor = 'pointer';
+    }
 }
 
 // Cancel batch checkin
@@ -12787,16 +13038,18 @@ async function startBarcodeScan() {
                 // Stop scanning immediately
                 stopBarcodeScan();
                 
-                // Set the barcode input value
+                // Set the barcode input value (convert to uppercase)
                 const barcodeInput = document.getElementById('barcodeInput');
+                // Convert scanned code to uppercase to match backend format
+                const uppercasedCode = code.toUpperCase();
                 if (barcodeInput) {
-                    barcodeInput.value = code;
+                    barcodeInput.value = uppercasedCode;
                 }
                 
-                // Automatically search for the participant
-                showNotification('Barcode detected: ' + code, 'success');
+                // Automatically search for the participant (use uppercase code)
+                showNotification('Barcode detected: ' + uppercasedCode, 'success');
                 setTimeout(() => {
-                    searchByPraveshikaIdDirect(code);
+                    searchByPraveshikaIdDirect(uppercasedCode);
                 }, 500);
             }
         });
