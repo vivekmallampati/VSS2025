@@ -1170,22 +1170,108 @@ async function migrateCancelledRegistrations() {
 
 // Migrate specific participant IDs to cancelledRegistrations collection
 async function migrateSpecificIdsToCancelled() {
-    const participantIds = ['AMBA2717','AMKK2120',
+    const participantIds = ['AFSK1793',
+        'AFSK1798',
+        'AFYV1794', 
+        'AFYV1795',
+        'AMBA2717',
+        'AMKK2120',
         'AMKK2199',
         'AMKK2715',
+        'AMKK3091',
+        'AMKK4012',
+        'AMSK2187',
         'AMSK2716',
+        'AMYV2455',
+        'ARBA1175',
+        'ARBA1329',
+        'ARBA1330',
+        'ARBA1331',
+        'ARBA1443',
+        'ARBA1502',
+        'ARKI1174',
+        'ARKI1383',
+        'ARKI1442',
+        'ARKI1664',
+        'ARKI1665',
+        'ARKK1124',
+        'ARKK1185',
+        'ARKK1259',
+        'ARKK1339',
+        'ARKK1441',
+        'ARKK2382',
+        'ARKK2385',
+        'ARKK2585',
+        'ARKK2607',
+        'ARKK2653',
         'ARKK2904',
+        'ARSK1173',
+        'ARSK1245',
+        'AMKK2120', 
+        'AMKK2199',
+        'AMKK2715',
+        'AMKK3091',
+        'AMKK4012',
+        'AMSK2187',
+        'AMSK2716',
+        'AMYV2455',
+        'ARBA1175',
+        'ARBA1329',
+        'ARBA1330',
+        'ARBA1331',
+        'ARBA1443',
+        'ARBA1502',
+        'ARKI1174',
+        'ARKI1383',
+        'ARKI1442',
+        'ARKI1664',
+        'ARKI1665',
+        'ARKK1124',
+        'ARKK1185',
+        'ARKK1259',
+        'ARKK1339',
+        'ARKK1441',
+        'ARKK2382',
+        'ARKK2385',
+        'ARKK2585',
+        'ARKK2607',
+        'ARKK2653',
+        'ARKK2904',
+        'ARSK1173',
+        'ARSK1245',
+        'ARSK1286',
+        'ARKK2385',
+        'ARKK2585',
+        'ARSK1328',
+        'ARSK1380',
+        'ARSK1501',
+        'ARSK1674',
+        'ARSK2352',
+        'ARSK2556',
+        'ARSK2566',
         'ASBA4191',
         'ASKK2913',
-        'ASKK3054',
         'ASKK4184',
         'ASKK4189',
+        'ASSK2309',
         'ASSK2918',
         'ASSK3055',
         'ASSK4185',
         'ASSK4190',
+        'ASYV2784',
         'ASYV4122',
-        'AUKK4014'];
+        'AUBA4060',
+        'AUKI4059',     
+        'AUKK1907',
+        'AUKK2001',
+        'AUKK2790',
+        'AUKK4014',
+        'AUSK4057',
+        'AUYV4058',
+        'EUKK1746',
+        'EUKK2053',
+        'EUSK1777',
+        'EUSK2111'];
 
     console.log(`Migrating ${participantIds.length} specific participant IDs to cancelledRegistrations...\n`);
     
@@ -1257,6 +1343,88 @@ async function migrateSpecificIdsToCancelled() {
         
     } catch (error) {
         console.error('Fatal error during migration:', error);
+        throw error;
+    }
+}
+
+// ============================================================================
+// DELETE CHECKINS BY TYPE
+// ============================================================================
+
+// Delete checkins with specific checkinType values
+async function deleteCheckinsByType() {
+    const checkinTypesToDelete = ['registration', 'shulk_paid', 'kit_collected'];
+    
+    console.log(`Deleting checkins with checkinType: ${checkinTypesToDelete.join(', ')}...\n`);
+    
+    let deletedCount = 0;
+    let errorCount = 0;
+    const batchSize = 500; // Firestore batch limit
+    
+    try {
+        // Query all checkins with the specified types
+        // Using 'in' operator to query multiple values at once
+        const checkinsSnapshot = await db.collection('checkins')
+            .where('checkinType', 'in', checkinTypesToDelete)
+            .get();
+        
+        console.log(`Found ${checkinsSnapshot.size} checkins to delete.\n`);
+        
+        if (checkinsSnapshot.empty) {
+            console.log('No checkins found matching the criteria.');
+            return;
+        }
+        
+        // Process deletions in batches
+        const docs = checkinsSnapshot.docs;
+        let batch = db.batch();
+        let batchCount = 0;
+        
+        for (let i = 0; i < docs.length; i++) {
+            const doc = docs[i];
+            const docData = doc.data();
+            const checkinType = docData.checkinType || 'unknown';
+            const uniqueId = docData.uniqueId || 'N/A';
+            
+            try {
+                batch.delete(doc.ref);
+                batchCount++;
+                deletedCount++;
+                
+                // Log progress for every 100 deletions
+                if (deletedCount % 100 === 0) {
+                    console.log(`Progress: ${deletedCount}/${docs.length} checkins processed...`);
+                }
+                
+                // Commit batch when it reaches the limit
+                if (batchCount >= batchSize) {
+                    await batch.commit();
+                    console.log(`✓ Committed batch: ${batchCount} deletions`);
+                    batch = db.batch();
+                    batchCount = 0;
+                    // Small delay to avoid rate limits
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            } catch (error) {
+                console.error(`✗ Error deleting checkin ${doc.id} (${checkinType}, ${uniqueId}):`, error.message);
+                errorCount++;
+            }
+        }
+        
+        // Commit remaining batch
+        if (batchCount > 0) {
+            await batch.commit();
+            console.log(`✓ Committed final batch: ${batchCount} deletions`);
+        }
+        
+        console.log(`\n=== Deletion Summary ===`);
+        console.log(`Total checkins found: ${docs.length}`);
+        console.log(`Successfully deleted: ${deletedCount}`);
+        console.log(`Errors: ${errorCount}`);
+        console.log(`\nCheckin types deleted: ${checkinTypesToDelete.join(', ')}`);
+        
+    } catch (error) {
+        console.error('Fatal error during deletion:', error);
         throw error;
     }
 }
@@ -2495,6 +2663,9 @@ async function main() {
             case 'migrate-specific-ids-to-cancelled':
                 await migrateSpecificIdsToCancelled();
                 break;
+            case 'delete-checkins-by-type':
+                await deleteCheckinsByType();
+                break;
             case 'find-duplicates':
                 await findAllDuplicates();
                 break;
@@ -2544,6 +2715,7 @@ async function main() {
                 console.log('  migrate-non-shibirarthi - Migrate volunteers/admins to nonShibirarthiUsers collection');
                 console.log('  migrate-cancelled   - Migrate cancelled/rejected to cancelledRegistrations collection');
                 console.log('  migrate-specific-ids-to-cancelled - Migrate specific participant IDs to cancelledRegistrations');
+                console.log('  delete-checkins-by-type - Delete checkins with checkinType: registration, shulk_paid, kit_collected');
                 console.log('  find-duplicates     - Find all duplicates (by name+email and last 4 digits)');
                 console.log('  find-duplicates-name-email - Find duplicates by name and email');
                 console.log('  find-duplicates-last4 - Find duplicates by last 4 digits of PraveshikaID');

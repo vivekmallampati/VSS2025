@@ -7270,7 +7270,7 @@ function displayAdminStatistics(stats, registrations, users = []) {
     }
     
     // Display three main tables:
-    // 1. Registrations by Zone (with Registered, Web Logged In, Venue Check In)
+    // 1. Registrations by Zone (with Registered and Upasthita)
     // 2. Registrations by Shreni (with Male, Female, Total, Percentage + Volunteers, Others, Grand Total)
     // 3. Registrations by Shreni/Zone Matrix
     
@@ -7298,7 +7298,7 @@ function displayAdminStatistics(stats, registrations, users = []) {
     // updateDashboardWithFilter();
 }
 
-// Display Registrations by Zone with Registered, Web Logged In, Venue Check In columns
+// Display Registrations by Zone with Registered and Upasthita columns
 async function displayZoneWithStatusTable(registrations, users) {
     const tableBody = document.getElementById('zoneTableBody');
     if (!tableBody) return;
@@ -7314,18 +7314,7 @@ async function displayZoneWithStatusTable(registrations, users) {
         'AU': 'Australasia'
     };
     
-    // Get user uniqueIds (for Web Logged In)
-    const userUniqueIds = new Set();
-    users.forEach(user => {
-        if (user.uniqueId) userUniqueIds.add(user.uniqueId);
-        if (user.associatedRegistrations) {
-            user.associatedRegistrations.forEach(reg => {
-                if (reg.uniqueId) userUniqueIds.add(reg.uniqueId);
-            });
-        }
-    });
-    
-    // Get checked-in uniqueIds (for Venue Check In)
+    // Get checked-in uniqueIds (for Upasthita / venue check-in)
     const checkedInIds = new Set();
     try {
         if (window.firebase && firebase.firestore) {
@@ -7346,10 +7335,10 @@ async function displayZoneWithStatusTable(registrations, users) {
     const zoneCounts = {};
     const zoneCountryMap = {};
     zoneOrder.forEach(zone => {
-        zoneCounts[zone] = { registered: 0, loggedIn: 0, checkedIn: 0 };
+        zoneCounts[zone] = { registered: 0, checkedIn: 0 };
         zoneCountryMap[zone] = {};
     });
-    zoneCounts['Others'] = { registered: 0, loggedIn: 0, checkedIn: 0 };
+    zoneCounts['Others'] = { registered: 0, checkedIn: 0 };
     zoneCountryMap['Others'] = {};
     
     registrations.forEach(reg => {
@@ -7358,9 +7347,6 @@ async function displayZoneWithStatusTable(registrations, users) {
         const country = reg.Country || reg.country || reg['Country of Current Residence'] || 'Unknown';
         
         zoneCounts[normalizedZone].registered++;
-        if (userUniqueIds.has(reg.uniqueId)) {
-            zoneCounts[normalizedZone].loggedIn++;
-        }
         if (checkedInIds.has(reg.uniqueId)) {
             zoneCounts[normalizedZone].checkedIn++;
         }
@@ -7371,13 +7357,12 @@ async function displayZoneWithStatusTable(registrations, users) {
     
     // Build table HTML
     let html = '';
-    let totalRegistered = 0, totalLoggedIn = 0, totalCheckedIn = 0;
+    let totalRegistered = 0, totalCheckedIn = 0;
     
     zoneOrder.forEach(zone => {
         const label = zoneLabels[zone] || zone;
         const counts = zoneCounts[zone];
         totalRegistered += counts.registered;
-        totalLoggedIn += counts.loggedIn;
         totalCheckedIn += counts.checkedIn;
         
         // Escape the country breakdown for onclick
@@ -7387,7 +7372,6 @@ async function displayZoneWithStatusTable(registrations, users) {
             <tr>
                 <td>${escapeHtml(label)}</td>
                 <td>${counts.registered}</td>
-                <td>${counts.loggedIn}</td>
                 <td>${counts.checkedIn}</td>
                 <td>
                     <button class="btn btn-small btn-secondary" 
@@ -7402,7 +7386,6 @@ async function displayZoneWithStatusTable(registrations, users) {
     // Add Others row
     const others = zoneCounts['Others'];
     totalRegistered += others.registered;
-    totalLoggedIn += others.loggedIn;
     totalCheckedIn += others.checkedIn;
     
     const othersCountryBreakdownJson = JSON.stringify(zoneCountryMap['Others']).replace(/"/g, '&quot;');
@@ -7410,7 +7393,6 @@ async function displayZoneWithStatusTable(registrations, users) {
         <tr>
             <td>Others</td>
             <td>${others.registered}</td>
-            <td>${others.loggedIn}</td>
             <td>${others.checkedIn}</td>
             <td>
                 <button class="btn btn-small btn-secondary" 
@@ -7426,7 +7408,6 @@ async function displayZoneWithStatusTable(registrations, users) {
         <tr style="font-weight: bold; background-color: #f0f0f0;">
             <td>Total</td>
             <td>${totalRegistered}</td>
-            <td>${totalLoggedIn}</td>
             <td>${totalCheckedIn}</td>
             <td></td>
         </tr>
@@ -7442,7 +7423,6 @@ async function displayZoneWithStatusTable(registrations, users) {
         zoneLabels: zoneLabels,
         totals: {
             registered: totalRegistered,
-            loggedIn: totalLoggedIn,
             checkedIn: totalCheckedIn
         }
     };
@@ -7459,7 +7439,7 @@ function exportZoneCheckinData() {
     const rows = [];
     
     // Header row
-    rows.push(['Zone', 'Country', 'Registered', 'Web Logged In', 'Venue Check In']);
+    rows.push(['Zone', 'Country', 'Registered', 'Upasthita']);
     
     // Add data for each zone
     data.zoneOrder.forEach(zone => {
@@ -7468,7 +7448,7 @@ function exportZoneCheckinData() {
         const countryMap = data.zoneCountryMap[zone] || {};
         
         // Add zone summary row
-        rows.push([label, 'All Countries', counts.registered, counts.loggedIn, counts.checkedIn]);
+        rows.push([label, 'All Countries', counts.registered, counts.checkedIn]);
         
         // Add country breakdown rows
         const countries = Object.keys(countryMap).sort();
@@ -7476,9 +7456,8 @@ function exportZoneCheckinData() {
             const countryCount = countryMap[country];
             // Calculate country-specific checkin counts (approximate based on proportion)
             const registered = countryCount;
-            const loggedIn = Math.round((counts.loggedIn / counts.registered) * countryCount) || 0;
             const checkedIn = Math.round((counts.checkedIn / counts.registered) * countryCount) || 0;
-            rows.push(['', country, registered, loggedIn, checkedIn]);
+            rows.push(['', country, registered, checkedIn]);
         });
         
         // Add empty row for spacing
@@ -7489,21 +7468,20 @@ function exportZoneCheckinData() {
     if (data.zoneCounts['Others']) {
         const othersCounts = data.zoneCounts['Others'];
         const othersCountryMap = data.zoneCountryMap['Others'] || {};
-        rows.push(['Others', 'All Countries', othersCounts.registered, othersCounts.loggedIn, othersCounts.checkedIn]);
+        rows.push(['Others', 'All Countries', othersCounts.registered, othersCounts.checkedIn]);
         
         const countries = Object.keys(othersCountryMap).sort();
         countries.forEach(country => {
             const countryCount = othersCountryMap[country];
             const registered = countryCount;
-            const loggedIn = Math.round((othersCounts.loggedIn / othersCounts.registered) * countryCount) || 0;
             const checkedIn = Math.round((othersCounts.checkedIn / othersCounts.registered) * countryCount) || 0;
-            rows.push(['', country, registered, loggedIn, checkedIn]);
+            rows.push(['', country, registered, checkedIn]);
         });
         rows.push([]);
     }
     
     // Add totals row
-    rows.push(['Total', 'All Countries', data.totals.registered, data.totals.loggedIn, data.totals.checkedIn]);
+    rows.push(['Total', 'All Countries', data.totals.registered, data.totals.checkedIn]);
     
     // Convert to CSV
     const csvContent = rows.map(row => {
@@ -7896,17 +7874,6 @@ async function updateZoneStatsTable() {
     
     const stats = {};
     
-    // Get logged in uniqueIds
-    const userUniqueIds = new Set();
-    users.forEach(user => {
-        if (user.uniqueId) userUniqueIds.add(user.uniqueId);
-        if (user.associatedRegistrations) {
-            user.associatedRegistrations.forEach(reg => {
-                if (reg.uniqueId) userUniqueIds.add(reg.uniqueId);
-            });
-        }
-    });
-    
     // Get checked in uniqueIds
     const db = firebase.firestore();
     const checkinSnapshot = await db.collection('checkins')
@@ -7920,12 +7887,9 @@ async function updateZoneStatsTable() {
     registrations.forEach(reg => {
         const zone = zoneMap[reg.zone] || reg.zone || 'Unknown';
         if (!stats[zone]) {
-            stats[zone] = { registered: 0, logged: 0, checkedin: 0 };
+            stats[zone] = { registered: 0, checkedin: 0 };
         }
         stats[zone].registered++;
-        if (userUniqueIds.has(reg.uniqueId)) {
-            stats[zone].logged++;
-        }
         if (checkedInIds.has(reg.uniqueId)) {
             stats[zone].checkedin++;
         }
@@ -7933,12 +7897,11 @@ async function updateZoneStatsTable() {
     
     let html = '';
     zones.forEach(zone => {
-        const s = stats[zone] || { registered: 0, logged: 0, checkedin: 0 };
+        const s = stats[zone] || { registered: 0, checkedin: 0 };
         html += `
             <tr>
                 <td>${escapeHtml(zone)}</td>
                 <td>${s.registered}</td>
-                <td>${s.logged}</td>
                 <td>${s.checkedin}</td>
             </tr>
         `;
@@ -7946,22 +7909,18 @@ async function updateZoneStatsTable() {
     
     // Add totals
     const totalRegistered = Object.values(stats).reduce((sum, s) => sum + s.registered, 0);
-    const totalLogged = Object.values(stats).reduce((sum, s) => sum + s.logged, 0);
     const totalCheckedIn = Object.values(stats).reduce((sum, s) => sum + s.checkedin, 0);
-    const pctLogged = totalRegistered > 0 ? Math.round((totalLogged / totalRegistered) * 100) : 0;
     const pctCheckedIn = totalRegistered > 0 ? Math.round((totalCheckedIn / totalRegistered) * 100) : 0;
     
     html += `
         <tr style="font-weight: bold; background: #f0f0f0;">
             <td>Total</td>
             <td>${totalRegistered}</td>
-            <td>${totalLogged}</td>
             <td>${totalCheckedIn}</td>
         </tr>
         <tr style="font-weight: bold;">
             <td>% to Registered</td>
             <td></td>
-            <td>${pctLogged}%</td>
             <td>${pctCheckedIn}%</td>
         </tr>
     `;
@@ -10371,7 +10330,7 @@ async function searchByNameForCheckin() {
         const results = [];
         
         // Fetch all registrations and filter client-side for case-insensitive partial name match
-        const allRegistrations = await db.collection('registrations').limit(1000).get();
+        const allRegistrations = await db.collection('registrations').limit(2000).get();
         
         allRegistrations.docs.forEach(doc => {
             const data = doc.data();

@@ -195,6 +195,19 @@ services:
     command: node firestore-utils.js migrate-specific-ids-to-cancelled
     # Migrates specific participant IDs to cancelledRegistrations collection
 
+  delete-checkins-by-type:
+    build: .
+    container_name: vss2025-delete-checkins-by-type
+    volumes:
+      # Mount the service account key from your local machine
+      - ./serviceAccountKey.json:/app/secrets/serviceAccountKey.json:ro
+    environment:
+      - NODE_ENV=production
+      - SERVICE_ACCOUNT_PATH=/app/secrets/serviceAccountKey.json
+      - COMMAND=delete-checkins-by-type
+    command: node firestore-utils.js delete-checkins-by-type
+    # Deletes checkins with checkinType: registration, shulk_paid, kit_collected
+
   import-volunteers:
     build: .
     container_name: vss2025-import-volunteers

@@ -1098,8 +1098,7 @@
                             <label for="dashboardStatusFilter" style="margin-right: 1rem; font-weight: bold;">Filter by Status:</label>
                             <select id="dashboardStatusFilter" class="form-input" style="width: 200px; display: inline-block;" onchange="updateDashboardWithFilter()">
                                 <option value="registered">Registered</option>
-                                <option value="logged">Logged In</option>
-                                <option value="checkedin">Checked In</option>
+                                <option value="checkedin">Upasthita</option>
                             </select>
                         </div>
                         
@@ -1129,7 +1128,7 @@
                             </div>
                         </div>
 
-                        <!-- Registrations by Zone - with Registered, Web Logged In, Venue Check In columns -->
+                        <!-- Registrations by Zone - with Registered and Upasthita columns -->
                         <div class="analytics-section">
                             <div class="analytics-section-header" onclick="toggleSection(this)">
                                 <h3>Registrations by Zone</h3>
@@ -1148,8 +1147,7 @@
                                         <tr>
                                             <th>Zone</th>
                                             <th>Registered</th>
-                                            <th>Web Logged In</th>
-                                            <th>Venue Check In</th>
+                                            <th>Upasthita</th>
                                             <th>Action</th>
                                         </tr>
                                     </thead>
@@ -1388,8 +1386,7 @@
                                     <label for="shreniGenderFilter" style="margin-right: 1rem;">Filter:</label>
                                     <select id="shreniGenderFilter" class="form-input" style="width: 200px; display: inline-block;" onchange="updateShreniGenderTable()">
                                         <option value="registered">Registered</option>
-                                        <option value="logged">Logged In</option>
-                                        <option value="checkedin">Checked In</option>
+                                        <option value="checkedin">Upasthita</option>
                                     </select>
                                 </div>
                                 <div id="shreniGenderBreakdown" class="data-table-container">
@@ -1420,8 +1417,7 @@
                                     <label for="zoneStatsFilter" style="margin-right: 1rem;">Filter:</label>
                                     <select id="zoneStatsFilter" class="form-input" style="width: 200px; display: inline-block;" onchange="updateZoneStatsTable()">
                                         <option value="registered">Registered</option>
-                                        <option value="logged">Logged In</option>
-                                        <option value="checkedin">Checked In</option>
+                                        <option value="checkedin">Upasthita</option>
                                     </select>
                                 </div>
                                 <div id="zoneStatsBreakdown" class="data-table-container">
@@ -1430,8 +1426,7 @@
                                             <tr>
                                                 <th>Zone</th>
                                                 <th>Registered</th>
-                                                <th>Web logedin</th>
-                                                <th>Venue checkin</th>
+                                                <th>Upasthita</th>
                                             </tr>
                                         </thead>
                                         <tbody id="zoneStatsTableBody">
@@ -1451,8 +1446,7 @@
                                     <label for="zoneShreniTableFilter" style="margin-right: 1rem;">Filter:</label>
                                     <select id="zoneShreniTableFilter" class="form-input" style="width: 200px; display: inline-block;" onchange="updateZoneShreniTable()">
                                         <option value="registered">Registered</option>
-                                        <option value="logged">Logged In</option>
-                                        <option value="checkedin">Checked In</option>
+                                        <option value="checkedin">Upasthita</option>
                                     </select>
                                 </div>
                                 <div id="zoneShreniTableBreakdown" class="data-table-container">
@@ -2316,10 +2310,7 @@
                                     <div class="form-group">
                                         <label>Checkin Type: <span id="checkinTypeDisplay"></span></label>
                                     </div>
-                                    <div class="form-group" id="pickupLocationGroup" style="display: none;">
-                                        <label for="checkinPickupLocation">Pickup Location:</label>
-                                        <input type="text" id="checkinPickupLocation" class="form-input" placeholder="Enter pickup location">
-                                    </div>
+                                    <!-- Pickup Location field removed as per instructions -->
                                     <div class="form-group" id="registrationOptionsGroup" style="display: none;">
                                         <label>Registration Check-in Options:</label>
                                         <div class="registration-checkbox-container">
