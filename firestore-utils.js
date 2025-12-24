@@ -1347,6 +1347,103 @@ async function migrateSpecificIdsToCancelled() {
     }
 }
 
+// Reverse migration: Migrate specific participant IDs from cancelledRegistrations back to registrations
+async function migrateSpecificIdsFromCancelled() {
+    const participantIds = ['ASKK3054'];
+
+    console.log(`Migrating ${participantIds.length} specific participant IDs from cancelledRegistrations back to registrations...\n`);
+    
+    let migratedCount = 0;
+    let errorCount = 0;
+    let notFoundCount = 0;
+    const batchSize = 500;
+    
+    try {
+        
+        let batch = db.batch();
+        let batchCount = 0;
+        
+        for (let i = 0; i < participantIds.length; i++) {
+            const participantId = participantIds[i].trim();
+            
+            try {
+                // Check if document exists in cancelledRegistrations
+                const cancelledDocRef = db.collection('cancelledRegistrations').doc(participantId);
+                const cancelledDoc = await cancelledDocRef.get();
+                
+                if (!cancelledDoc.exists) {
+                    console.log(`⚠ Not found in cancelledRegistrations: ${participantId}`);
+                    notFoundCount++;
+                    continue;
+                }
+                
+                const data = cancelledDoc.data();
+                
+                // Check if already exists in registrations (shouldn't happen, but check anyway)
+                const regDocRef = db.collection('registrations').doc(participantId);
+                const existingRegDoc = await regDocRef.get();
+                
+                if (existingRegDoc.exists) {
+                    console.log(`⚠ Already exists in registrations: ${participantId} - skipping`);
+                    notFoundCount++;
+                    continue;
+                }
+                
+                // Prepare data for registrations collection
+                // Remove migration metadata fields, restore original status if available
+                const registrationData = { ...data };
+                
+                // Remove migration-specific fields
+                delete registrationData.migratedAt;
+                delete registrationData.originalCollection;
+                delete registrationData.manuallyMigrated;
+                
+                // Restore original status if it was stored
+                if (data.originalStatus) {
+                    registrationData.status = data.originalStatus;
+                } else if (!registrationData.status) {
+                    // If no original status and no current status, default to 'Approved'
+                    registrationData.status = 'Approved';
+                }
+                
+                // Copy to registrations collection
+                batch.set(regDocRef, registrationData);
+                
+                // Delete from cancelledRegistrations
+                batch.delete(cancelledDocRef);
+                
+                batchCount++;
+                migratedCount++;
+                
+                if (batchCount >= batchSize) {
+                    await batch.commit();
+                    console.log(`Migrated ${migratedCount} participants so far...`);
+                    batch = db.batch();
+                    batchCount = 0;
+                }
+            } catch (error) {
+                console.error(`✗ Error migrating ${participantId}:`, error.message);
+                errorCount++;
+            }
+        }
+        
+        // Commit remaining batch
+        if (batchCount > 0) {
+            await batch.commit();
+        }
+        
+        console.log(`\n=== Reverse Migration Summary ===`);
+        console.log(`Total participant IDs to migrate: ${participantIds.length}`);
+        console.log(`Successfully migrated: ${migratedCount}`);
+        console.log(`Not found in cancelledRegistrations: ${notFoundCount}`);
+        console.log(`Errors: ${errorCount}`);
+        
+    } catch (error) {
+        console.error('Fatal error during reverse migration:', error);
+        throw error;
+    }
+}
+
 // ============================================================================
 // DELETE CHECKINS BY TYPE
 // ============================================================================
@@ -2663,6 +2760,9 @@ async function main() {
             case 'migrate-specific-ids-to-cancelled':
                 await migrateSpecificIdsToCancelled();
                 break;
+            case 'migrate-specific-ids-from-cancelled':
+                await migrateSpecificIdsFromCancelled();
+                break;
             case 'delete-checkins-by-type':
                 await deleteCheckinsByType();
                 break;
@@ -2715,6 +2815,7 @@ async function main() {
                 console.log('  migrate-non-shibirarthi - Migrate volunteers/admins to nonShibirarthiUsers collection');
                 console.log('  migrate-cancelled   - Migrate cancelled/rejected to cancelledRegistrations collection');
                 console.log('  migrate-specific-ids-to-cancelled - Migrate specific participant IDs to cancelledRegistrations');
+                console.log('  migrate-specific-ids-from-cancelled - Reverse migration: Migrate specific participant IDs from cancelledRegistrations back to registrations');
                 console.log('  delete-checkins-by-type - Delete checkins with checkinType: registration, shulk_paid, kit_collected');
                 console.log('  find-duplicates     - Find all duplicates (by name+email and last 4 digits)');
                 console.log('  find-duplicates-name-email - Find duplicates by name and email');

@@ -6234,18 +6234,36 @@ async function searchParticipantByName() {
         const nameLower = name.toLowerCase();
         const results = [];
         
-        // Fetch all registrations and filter client-side for case-insensitive partial name match
-        // Only show registrations with status "Approved"
-        const allRegistrations = await db.collection('registrations').limit(1000).get();
+        // Fetch all registrations in batches to avoid limit restrictions
+        // This matches the behavior of Praveshika ID search (no status filter)
+        let allRegistrations = [];
+        let lastDoc = null;
+        const batchSize = 2000;
         
-        allRegistrations.docs.forEach(doc => {
+        // Fetch registrations in batches until all are retrieved
+        while (true) {
+            let query = db.collection('registrations').limit(batchSize);
+            if (lastDoc) {
+                query = query.startAfter(lastDoc);
+            }
+            
+            const batch = await query.get();
+            if (batch.empty) break;
+            
+            allRegistrations = allRegistrations.concat(batch.docs);
+            lastDoc = batch.docs[batch.docs.length - 1];
+            
+            // If we got fewer than batchSize, we've reached the end
+            if (batch.docs.length < batchSize) break;
+        }
+        
+        // Filter client-side for case-insensitive partial name match
+        // No status filter - show all registrations like Praveshika ID search
+        allRegistrations.forEach(doc => {
             const data = doc.data();
-            // Only include registrations with status "Approved"
-            if (data.status === 'Approved') {
-                const regName = (data.name || data['Full Name'] || '').toLowerCase();
-                if (regName.includes(nameLower)) {
-                    results.push(doc);
-                }
+            const regName = (data.name || data['Full Name'] || '').toLowerCase();
+            if (regName.includes(nameLower)) {
+                results.push(doc);
             }
         });
         
@@ -10647,10 +10665,30 @@ async function advancedSearch() {
             searchType = 'name';
             const nameLower = name.toLowerCase();
             
-            // Fetch all registrations and filter client-side for case-insensitive partial name match
-            const allRegistrations = await db.collection('registrations').limit(1000).get();
+            // Fetch all registrations in batches to avoid limit restrictions
+            let allRegistrations = [];
+            let lastDoc = null;
+            const batchSize = 1000;
             
-            allRegistrations.docs.forEach(doc => {
+            // Fetch registrations in batches until all are retrieved
+            while (true) {
+                let query = db.collection('registrations').limit(batchSize);
+                if (lastDoc) {
+                    query = query.startAfter(lastDoc);
+                }
+                
+                const batch = await query.get();
+                if (batch.empty) break;
+                
+                allRegistrations = allRegistrations.concat(batch.docs);
+                lastDoc = batch.docs[batch.docs.length - 1];
+                
+                // If we got fewer than batchSize, we've reached the end
+                if (batch.docs.length < batchSize) break;
+            }
+            
+            // Filter client-side for case-insensitive partial name match
+            allRegistrations.forEach(doc => {
                 const data = doc.data();
                 const regName = (data.name || data['Full Name'] || '').toLowerCase();
                 if (regName.includes(nameLower)) {
@@ -12025,15 +12063,42 @@ async function executeBatchCheckin(ids) {
         return;
     }
     
-    const batchPreview = document.getElementById('batchPreview');
-    if (batchPreview) {
-        batchPreview.innerHTML = '<p>Processing batch checkin...</p>';
-    }
-    
     const db = firebase.firestore();
     const userDoc = await db.collection('users').doc(user.uid).get();
     const userData = userDoc.exists ? userDoc.data() : {};
     const checkedInByName = userData.volunteerName || userData.name || user.email || 'Unknown';
+    
+    // Determine types to process ONCE at the beginning (for registration, read checkboxes BEFORE updating DOM)
+    // IMPORTANT: Read checkboxes BEFORE setting innerHTML, otherwise they'll be removed from DOM
+    let baseTypesToProcess = [];
+    if (currentCheckinType === 'registration') {
+        // Get confirmation checkboxes from batch preview ONCE before updating the DOM
+        const shulkCheckbox = document.getElementById('batchShulkPaidConfirm');
+        const kitCheckbox = document.getElementById('batchKitCollectedConfirm');
+        
+        // Always include registration if we're on registration tab
+        baseTypesToProcess.push('registration');
+        
+        // Include shulk_paid and kit_collected if checkboxes are checked
+        if (shulkCheckbox && shulkCheckbox.checked) {
+            baseTypesToProcess.push('shulk_paid');
+        }
+        if (kitCheckbox && kitCheckbox.checked) {
+            baseTypesToProcess.push('kit_collected');
+        }
+        
+        console.log('Batch checkin types to process:', baseTypesToProcess);
+        console.log('Shulk checkbox found:', !!shulkCheckbox, 'checked:', shulkCheckbox?.checked);
+        console.log('Kit checkbox found:', !!kitCheckbox, 'checked', kitCheckbox?.checked);
+    } else {
+        baseTypesToProcess = [currentCheckinType];
+    }
+    
+    // Now update the preview (after reading checkbox values)
+    const batchPreview = document.getElementById('batchPreview');
+    if (batchPreview) {
+        batchPreview.innerHTML = '<p>Processing batch checkin...</p>';
+    }
     
     let successCount = 0;
     let failCount = 0;
@@ -12103,26 +12168,8 @@ async function executeBatchCheckin(ids) {
             
             const regData = regDoc.data();
             
-            // Determine types to process (for registration, use confirmation checkboxes)
-            let typesToProcess = [];
-            if (currentCheckinType === 'registration') {
-                // Get confirmation checkboxes from batch preview
-                const shulkCheckbox = document.getElementById('batchShulkPaidConfirm');
-                const kitCheckbox = document.getElementById('batchKitCollectedConfirm');
-                
-                // Always include registration if we're on registration tab
-                typesToProcess.push('registration');
-                
-                // Include shulk_paid and kit_collected if checkboxes are checked
-                if (shulkCheckbox && shulkCheckbox.checked) {
-                    typesToProcess.push('shulk_paid');
-                }
-                if (kitCheckbox && kitCheckbox.checked) {
-                    typesToProcess.push('kit_collected');
-                }
-            } else {
-                typesToProcess = [currentCheckinType];
-            }
+            // Use the types determined at the beginning of the function
+            const typesToProcess = [...baseTypesToProcess];
             
             // Check if Registration check-in is required for certain types
             const typesRequiringRegistration = ['ganvesh_collected', 'cloak_room'];
