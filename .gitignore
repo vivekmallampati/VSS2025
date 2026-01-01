@@ -29,3 +29,7 @@ Thumbs.db
 .env
 .md
 *.md
+duplicates.txt
+/dataprocessing
+/exports
+/dataprocessing

@@ -1349,14 +1349,14 @@ async function migrateSpecificIdsToCancelled() {
 
 // Reverse migration: Migrate specific participant IDs from cancelledRegistrations back to registrations
 async function migrateSpecificIdsFromCancelled() {
-    const participantIds = ['ASKK3054'];
+    const participantIds = ['ARSK2696'];
 
     console.log(`Migrating ${participantIds.length} specific participant IDs from cancelledRegistrations back to registrations...\n`);
     
     let migratedCount = 0;
     let errorCount = 0;
     let notFoundCount = 0;
-    const batchSize = 500;
+    const batchSize = 2000;
     
     try {
         
