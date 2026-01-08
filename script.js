@@ -33,7 +33,8 @@ function waitForFirebase(callback, maxRetries = 50) {
 }
 
 // Protected tabs that require authentication
-const PROTECTED_TABS = ['shibirarthi', 'shibir-resources', 'myprofile', 'mytransportation', 'mytours', 'checkin', 'admin-dashboard', 'user-management', 'participant-lookup'];
+const PROTECTED_TABS = ['shibirarthi', 'shibir-resources', 'checkin', 'admin-dashboard', 'user-management', 'participant-lookup'];
+// Removed tabs (commented out): 'myprofile', 'mytransportation', 'mytours'
 
 // Helper function to check if a tab is protected
 function isProtectedTab(tabName) {
@@ -195,15 +196,15 @@ function loadPageContent(pageName) {
                 case 'checkin':
                     initializeCheckinInterface();
                     break;
-                case 'myprofile':
-                    loadUserProfile(user);
-                    break;
-                case 'mytransportation':
-                    loadTransportationInfo(user);
-                    break;
-                case 'mytours':
-                    loadToursInfo(user);
-                    break;
+                // case 'myprofile':
+                //     loadUserProfile(user);
+                //     break;
+                // case 'mytransportation':
+                //     loadTransportationInfo(user);
+                //     break;
+                // case 'mytours':
+                //     loadToursInfo(user);
+                //     break;
                 case 'admin-dashboard':
                     loadAdminDashboard(user);
                     break;
@@ -282,15 +283,15 @@ function activateTab(tabName, skipAuthCheck = false) {
                     case 'checkin':
                         initializeCheckinInterface();
                         break;
-                    case 'myprofile':
-                        loadUserProfile(user);
-                        break;
-                    case 'mytransportation':
-                        loadTransportationInfo(user);
-                        break;
-                    case 'mytours':
-                        loadToursInfo(user);
-                        break;
+                    // case 'myprofile':
+                    //     loadUserProfile(user);
+                    //     break;
+                    // case 'mytransportation':
+                    //     loadTransportationInfo(user);
+                    //     break;
+                    // case 'mytours':
+                    //     loadToursInfo(user);
+                    //     break;
                     case 'admin-dashboard':
                         loadAdminDashboard(user);
                         break;
@@ -1673,9 +1674,9 @@ async function handleAuthStateChange(user) {
     const mediaNavItem = document.getElementById('mediaNavItem');
     const shibirarthiNavItem = document.getElementById('shibirarthiNavItem');
     const shibirResourcesNavItem = document.getElementById('shibirResourcesNavItem');
-    const myProfileNavItem = document.getElementById('myProfileNavItem');
-    const myTransportationNavItem = document.getElementById('myTransportationNavItem');
-    const myToursNavItem = document.getElementById('myToursNavItem');
+    // const myProfileNavItem = document.getElementById('myProfileNavItem');
+    // const myTransportationNavItem = document.getElementById('myTransportationNavItem');
+    // const myToursNavItem = document.getElementById('myToursNavItem');
     const checkinNavItem = document.getElementById('checkinNavItem');
     const adminDashboardNavItem = document.getElementById('adminDashboardNavItem');
     const userManagementNavItem = document.getElementById('userManagementNavItem');
@@ -1714,9 +1715,9 @@ async function handleAuthStateChange(user) {
             if (mediaNavItem) mediaNavItem.style.display = 'none';
             if (shibirarthiNavItem) shibirarthiNavItem.style.display = 'none';
             if (shibirResourcesNavItem) shibirResourcesNavItem.style.display = 'none';
-            if (myProfileNavItem) myProfileNavItem.style.display = 'none';
-            if (myTransportationNavItem) myTransportationNavItem.style.display = 'none';
-            if (myToursNavItem) myToursNavItem.style.display = 'none';
+            // if (myProfileNavItem) myProfileNavItem.style.display = 'none';
+            // if (myTransportationNavItem) myTransportationNavItem.style.display = 'none';
+            // if (myToursNavItem) myToursNavItem.style.display = 'none';
             if (adminDashboardNavItem) adminDashboardNavItem.style.display = 'none';
             if (userManagementNavItem) userManagementNavItem.style.display = 'none';
             if (participantLookupNavItem) participantLookupNavItem.style.display = 'none';
@@ -1750,18 +1751,18 @@ async function handleAuthStateChange(user) {
             if (shibirResourcesNavItem) {
                 shibirResourcesNavItem.style.display = '';
             }
-            if (myProfileNavItem) {
-                myProfileNavItem.style.display = '';
-                loadUserProfile(user);
-            }
-            if (myTransportationNavItem) {
-                myTransportationNavItem.style.display = '';
-                loadTransportationInfo(user);
-            }
-            if (myToursNavItem) {
-                myToursNavItem.style.display = '';
-                loadToursInfo(user);
-            }
+            // if (myProfileNavItem) {
+            //     myProfileNavItem.style.display = '';
+            //     loadUserProfile(user);
+            // }
+            // if (myTransportationNavItem) {
+            //     myTransportationNavItem.style.display = '';
+            //     loadTransportationInfo(user);
+            // }
+            // if (myToursNavItem) {
+            //     myToursNavItem.style.display = '';
+            //     loadToursInfo(user);
+            // }
             
             // Show checkin tab for superadmin, admin, or volunteers
             if (checkinNavItem) {
@@ -1827,15 +1828,15 @@ async function handleAuthStateChange(user) {
         if (shibirResourcesNavItem) {
             shibirResourcesNavItem.style.display = 'none';
         }
-        if (myProfileNavItem) {
-            myProfileNavItem.style.display = 'none';
-        }
-        if (myTransportationNavItem) {
-            myTransportationNavItem.style.display = 'none';
-        }
-        if (myToursNavItem) {
-            myToursNavItem.style.display = 'none';
-        }
+        // if (myProfileNavItem) {
+        //     myProfileNavItem.style.display = 'none';
+        // }
+        // if (myTransportationNavItem) {
+        //     myTransportationNavItem.style.display = 'none';
+        // }
+        // if (myToursNavItem) {
+        //     myToursNavItem.style.display = 'none';
+        // }
         if (checkinNavItem) {
             checkinNavItem.style.display = 'none';
         }

@@ -115,9 +115,9 @@
                     <a href="#shibirarthi" class="nav-link" data-tab="shibirarthi">Shibirarthi Info </a>
                 </li>
                 <li id="shibirResourcesNavItem" style="display: none;"><a href="#shibir-resources" class="nav-link" data-tab="shibir-resources">Shibir Resources</a></li>
-                <li id="myProfileNavItem" style="display: none;"><a href="#myprofile" class="nav-link" data-tab="myprofile">My Profile</a></li>
-                <li id="myTransportationNavItem" style="display: none;"><a href="#mytransportation" class="nav-link" data-tab="mytransportation">My Transportation</a></li>
-                <li id="myToursNavItem" style="display: none;"><a href="#mytours" class="nav-link" data-tab="mytours">My Tours</a></li>
+                <!-- <li id="myProfileNavItem" style="display: none;"><a href="#myprofile" class="nav-link" data-tab="myprofile">My Profile</a></li> -->
+                <!-- <li id="myTransportationNavItem" style="display: none;"><a href="#mytransportation" class="nav-link" data-tab="mytransportation">My Transportation</a></li> -->
+                <!-- <li id="myToursNavItem" style="display: none;"><a href="#mytours" class="nav-link" data-tab="mytours">My Tours</a></li> -->
                 <li id="checkinNavItem" style="display: none;"><a href="#checkin" class="nav-link" data-tab="checkin">Checkin</a></li>
                 <li id="adminDashboardNavItem" style="display: none;"><a href="#admin-dashboard" class="nav-link" data-tab="admin-dashboard">Admin Dashboard</a></li>
                 <li id="userManagementNavItem" style="display: none;"><a href="#user-management" class="nav-link" data-tab="user-management">User Management</a></li>
@@ -807,7 +807,46 @@
                         <p>Essential resources and materials for Shibirarthis</p>
                     </div>
                     
-                    <!-- Top Section: Sarvajanik Karyakram and Vyayamyog Side by Side -->
+                    <!-- Sub Tabs -->
+                    <div class="subtab-container" style="margin-top: 2rem; margin-bottom: 2rem;">
+                        <button type="button" class="subtab-button active" onclick="openSubTab('shibir-resources-content', event)">Resources</button>
+                        <button type="button" class="subtab-button" onclick="openSubTab('shibir-photos', event)">Shibir Photos</button>
+                        <button type="button" class="subtab-button" onclick="openSubTab('shibir-feedback', event)">Shibir Feedback</button>
+                    </div>
+                    
+                    <!-- Resources Sub Tab Content -->
+                    <div id="shibir-resources-content" class="subtab-content" style="display: block;">
+                        <!-- The Shibir Sutra (VSS 2025 Schedule) - At the Top -->
+                        <div style="margin-bottom: 3rem;">
+                            <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                                    <div>
+                                        <h3 style="margin: 0; color: #333; display: flex; align-items: center; gap: 0.5rem;">
+                                            <span style="font-size: 1.5rem;">📅</span>
+                                            The Shibir Sutra (VSS 2025 Schedule)
+                                        </h3>
+                                        <p style="margin: 0.5rem 0 0 0; color: #666;">Complete schedule for Vishwa Sangh Shibir 2025</p>
+                                    </div>
+                                </div>
+                                <div style="border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden; background: #f5f5f5; position: relative;">
+                                    <iframe 
+                                        id="schedulePdfIframe"
+                                        src="" 
+                                        style="width: 100%; height: 80vh; min-height: 600px; border: none; display: block;"
+                                        type="application/pdf"
+                                        title="The Shibir Sutra (VSS 2025 Schedule PDF)">
+                                        <p style="padding: 2rem; text-align: center; color: #666;">
+                                            Your browser does not support inline PDF viewing. 
+                                            <a href="docs/VSS 2025 Schedule for website.pdf" target="_blank" onclick="return checkAuthBeforeDownload(event)" style="color: #0066cc; text-decoration: underline; display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px;">
+                                                Open PDF in New Tab
+                                            </a>
+                                        </p>
+                                    </iframe>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Top Section: Sarvajanik Karyakram and Vyayamyog Side by Side -->
                     <div class="half-page-grid">
                         <!-- Sarvajanik Karyakram Image - Left Half -->
                         <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
@@ -860,36 +899,6 @@
                         </div>
                     </div>
                     
-                    <!-- VSS2025 Schedule - Display PDF Inline (View Only) -->
-                    <div style="margin-top: 2rem; margin-bottom: 3rem;">
-                        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
-                                <div>
-                                    <h3 style="margin: 0; color: #333; display: flex; align-items: center; gap: 0.5rem;">
-                                        <span style="font-size: 1.5rem;">📅</span>
-                                        VSS2025 Schedule
-                                    </h3>
-                                    <p style="margin: 0.5rem 0 0 0; color: #666;">Complete schedule for Vishwa Sangh Shibir 2025</p>
-                                </div>
-                            </div>
-                            <div style="border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden; background: #f5f5f5; position: relative;">
-                                <iframe 
-                                    id="schedulePdfIframe"
-                                    src="" 
-                                    style="width: 100%; height: 80vh; min-height: 600px; border: none; display: block;"
-                                    type="application/pdf"
-                                    title="VSS2025 Schedule PDF">
-                                    <p style="padding: 2rem; text-align: center; color: #666;">
-                                        Your browser does not support inline PDF viewing. 
-                                        <a href="docs/VSS 2025 Schedule for website.pdf" target="_blank" onclick="return checkAuthBeforeDownload(event)" style="color: #0066cc; text-decoration: underline; display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px;">
-                                            Open PDF in New Tab
-                                        </a>
-                                    </p>
-                                </iframe>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <!-- VSS Orientation Slide Pack - Display PDF Inline -->
                     <div style="margin-top: 2rem; margin-bottom: 3rem;">
                         <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
@@ -921,6 +930,105 @@
                                         Your browser does not support inline PDF viewing. 
                                         <a href="docs/VSS2025_countrywise_preshibir_orientation.pdf" target="_blank" style="color: #0066cc; text-decoration: underline; display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px;">
                                             Open PDF in New Tab
+                                        </a>
+                                    </p>
+                                </iframe>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                    
+                    <!-- Shibir Photos Sub Tab Content -->
+                    <div id="shibir-photos" class="subtab-content" style="display: none;">
+                        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <div style="margin-bottom: 1.5rem;">
+                                <h3 style="margin: 0; color: #333; display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-size: 1.5rem;">📸</span>
+                                    Shibir Photos
+                                </h3>
+                                <p style="margin: 0.5rem 0 0 0; color: #666;">Group photos from Vishwa Sangh Shibir 2025</p>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
+                                <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <img src="docs/GroupPhotos/Africa-6V4A5899.JPG" alt="Africa Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/Africa-6V4A5899.JPG', '_blank')" title="Click to view full size">
+                                    <div style="padding: 1rem; text-align: center;">
+                                        <p style="margin: 0; font-weight: 600; color: #333;">Africa</p>
+                                    </div>
+                                </div>
+                                <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <img src="docs/GroupPhotos/AUS-6V4A5928.JPG" alt="Australia Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/AUS-6V4A5928.JPG', '_blank')" title="Click to view full size">
+                                    <div style="padding: 1rem; text-align: center;">
+                                        <p style="margin: 0; font-weight: 600; color: #333;">Australia</p>
+                                    </div>
+                                </div>
+                                <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <img src="docs/GroupPhotos/AUS-DJI_20251227210123_0077_D.jpeg" alt="Australia Aerial Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/AUS-DJI_20251227210123_0077_D.jpeg', '_blank')" title="Click to view full size">
+                                    <div style="padding: 1rem; text-align: center;">
+                                        <p style="margin: 0; font-weight: 600; color: #333;">Australia (Aerial)</p>
+                                    </div>
+                                </div>
+                                <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <img src="docs/GroupPhotos/Europe-6V4A5883.JPG" alt="Europe Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/Europe-6V4A5883.JPG', '_blank')" title="Click to view full size">
+                                    <div style="padding: 1rem; text-align: center;">
+                                        <p style="margin: 0; font-weight: 600; color: #333;">Europe</p>
+                                    </div>
+                                </div>
+                                <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <img src="docs/GroupPhotos/Nepal-Mynamar-6V4A5906.JPG" alt="Nepal-Myanmar Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/Nepal-Mynamar-6V4A5906.JPG', '_blank')" title="Click to view full size">
+                                    <div style="padding: 1rem; text-align: center;">
+                                        <p style="margin: 0; font-weight: 600; color: #333;">Nepal-Myanmar</p>
+                                    </div>
+                                </div>
+                                <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <img src="docs/GroupPhotos/SE-Asia-6V4A5920.JPG" alt="Southeast Asia Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/SE-Asia-6V4A5920.JPG', '_blank')" title="Click to view full size">
+                                    <div style="padding: 1rem; text-align: center;">
+                                        <p style="margin: 0; font-weight: 600; color: #333;">Southeast Asia</p>
+                                    </div>
+                                </div>
+                                <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <img src="docs/GroupPhotos/US-6V4A5938.JPG" alt="US Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/US-6V4A5938.JPG', '_blank')" title="Click to view full size">
+                                    <div style="padding: 1rem; text-align: center;">
+                                        <p style="margin: 0; font-weight: 600; color: #333;">United States</p>
+                                    </div>
+                                </div>
+                                <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <img src="docs/GroupPhotos/US-DJI_20251227210741_0081_D.JPG" alt="US Aerial Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/US-DJI_20251227210741_0081_D.JPG', '_blank')" title="Click to view full size">
+                                    <div style="padding: 1rem; text-align: center;">
+                                        <p style="margin: 0; font-weight: 600; color: #333;">United States (Aerial)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Shibir Feedback Sub Tab Content -->
+                    <div id="shibir-feedback" class="subtab-content" style="display: none;">
+                        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <div style="margin-bottom: 1.5rem;">
+                                <h3 style="margin: 0; color: #333; display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-size: 1.5rem;">💬</span>
+                                    Shibir Feedback
+                                </h3>
+                                <p style="margin: 0.5rem 0 0 0; color: #666;">Share your feedback and experience from Vishwa Sangh Shibir 2025</p>
+                            </div>
+                            <div style="text-align: center; margin-bottom: 2rem;">
+                                <a href="https://forms.gle/yV74QMCi6fRyyAVw5" target="_blank" style="display: inline-block; padding: 1rem 2rem; background: #0066cc; color: #fff; border-radius: 8px; text-decoration: none; font-size: 1.1rem; font-weight: 600; transition: background 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'">
+                                    📝 Open Feedback Form
+                                </a>
+                            </div>
+                            <div style="border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden; background: #f5f5f5; min-height: 1200px;">
+                                <iframe 
+                                    src="https://docs.google.com/forms/d/e/1FAIpQLSdYV74QMCi6fRyyAVw5/viewform?embedded=true" 
+                                    width="100%" 
+                                    height="1200" 
+                                    frameborder="0" 
+                                    marginheight="0" 
+                                    marginwidth="0"
+                                    style="display: block; border: none;">
+                                    <p style="padding: 2rem; text-align: center; color: #666;">
+                                        Your browser does not support iframes. 
+                                        <a href="https://forms.gle/yV74QMCi6fRyyAVw5" target="_blank" style="color: #0066cc; text-decoration: underline; display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px;">
+                                            Open Feedback Form in New Tab
                                         </a>
                                     </p>
                                 </iframe>
@@ -1035,7 +1143,7 @@
 
 
         <!-- My Profile Tab -->
-        <section id="myprofile" class="tab-content">
+        <!-- <section id="myprofile" class="tab-content">
             <div class="container">
                 <div class="section-header">
                     <h2>My Profile</h2>
@@ -1048,10 +1156,10 @@
                     
                 </div>
             </div>
-        </section>
+        </section> -->
 
         <!-- My Transportation Tab -->
-        <section id="mytransportation" class="tab-content">
+        <!-- <section id="mytransportation" class="tab-content">
             <div class="container">
                 <div class="section-header">
                     <h2>My Transportation</h2>
@@ -1063,10 +1171,10 @@
                     </div>
                 </div>
             </div>
-        </section>
+        </section> -->
 
         <!-- My Tours Tab -->
-        <section id="mytours" class="tab-content">
+        <!-- <section id="mytours" class="tab-content">
             <div class="container">
                 <div class="section-header">
                     <h2>My Tours</h2>
@@ -1078,7 +1186,7 @@
                     </div>
                 </div>
             </div>
-        </section>
+        </section> -->
 
         <!-- Admin Dashboard Tab -->
         <section id="admin-dashboard" class="tab-content">
