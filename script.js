@@ -502,14 +502,21 @@ function initializeShibirResources(user) {
             });
     }
     
-    // Re-initialize any protected images within the Shibir Resources section (e.g., group photos)
-    try {
-        const resourcesSection = document.getElementById('shibir-resources');
-        if (resourcesSection) {
-            const protectedImages = resourcesSection.querySelectorAll('img[data-protected-src]');
+    // Load photos when Shibir Photos subtab is opened (will be called by openSubTab)
+    // Also make the function available globally
+    if (typeof window !== 'undefined') {
+        window.loadShibirPhotos = function() {
+            const photosTab = document.getElementById('shibir-photos');
+            if (!photosTab) return;
+            
+            const protectedImages = photosTab.querySelectorAll('img[data-protected-src]');
             protectedImages.forEach(img => {
                 const relPath = img.getAttribute('data-protected-src');
-                if (!relPath) return;
+                if (!relPath || img.src) {
+                    // Skip if no path or already loaded
+                    return;
+                }
+                
                 getProtectedResourceUrl(relPath)
                     .then(url => {
                         img.src = url;
@@ -518,12 +525,18 @@ function initializeShibirResources(user) {
                         }
                     })
                     .catch(err => {
-                        console.error('Error loading protected image in Shibir Resources', relPath, err);
+                        console.error('Error loading photo:', relPath, err);
                     });
             });
+        };
+    }
+    
+    // Pre-load photos if the photos tab is already visible (shouldn't happen, but just in case)
+    const photosTab = document.getElementById('shibir-photos');
+    if (photosTab && photosTab.style.display !== 'none') {
+        if (window.loadShibirPhotos) {
+            window.loadShibirPhotos();
         }
-    } catch (e) {
-        console.error('Error initializing Shibir Resources images', e);
     }
 }
 

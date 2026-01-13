@@ -2774,6 +2774,39 @@ function openSubTab(tabName, event) {
       }
     });
   }
+  
+  // Load photos when Shibir Photos subtab is opened
+  if (tabName === 'shibir-photos') {
+    // Use the function from script.js if available, otherwise define it here
+    if (typeof window.loadShibirPhotos === 'function') {
+      window.loadShibirPhotos();
+    } else {
+      // Fallback: try to load photos directly
+      setTimeout(function() {
+        if (typeof window.loadShibirPhotos === 'function') {
+          window.loadShibirPhotos();
+        } else if (typeof getProtectedResourceUrl === 'function') {
+          // Direct fallback if function exists but not yet on window
+          const photosTab = document.getElementById('shibir-photos');
+          if (photosTab) {
+            const protectedImages = photosTab.querySelectorAll('img[data-protected-src]');
+            protectedImages.forEach(img => {
+              const relPath = img.getAttribute('data-protected-src');
+              if (!relPath || img.src) return;
+              getProtectedResourceUrl(relPath)
+                .then(url => {
+                  img.src = url;
+                  if (!img.onclick) {
+                    img.onclick = () => window.open(url, '_blank');
+                  }
+                })
+                .catch(err => console.error('Error loading photo:', relPath, err));
+            });
+          }
+        }
+      }, 100);
+    }
+  }
 }
 
 // Toggle collapsible section
