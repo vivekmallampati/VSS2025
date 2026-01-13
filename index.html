@@ -6,7 +6,7 @@
     <title>Vishwa Sangh Shibir 2025</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/png" href="docs/logo.png">
+    <link rel="icon" type="image/png" href="">
     <style>
         .analytics-section {
             border: 1px solid #e0e0e0;
@@ -88,7 +88,7 @@
         <div class="container">
             <div class="header-content">
                 <div class="logo">
-                    <img src="docs/logo.png" alt="VSS2025 Logo" class="logo-img" loading="eager" decoding="async">
+                    <img src="" alt="VSS2025 Logo" class="logo-img" loading="eager" decoding="async">
                     <div class="logo-text">
                         <h1>Vishwa Sangh Shibir 2025</h1>
                     </div>
@@ -181,7 +181,7 @@
                 <!-- <div class="about-location">
                     <h3>Shibir Location</h3>
                     <div class="about-location-map">
-                        <img src="docs/VSS_locations.png" alt="VSS2025 Location Map" loading="lazy" decoding="async" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <img src="" data-protected-src="VSS_locations.png" alt="VSS2025 Location Map" loading="lazy" decoding="async" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                         <div style="display:none; padding:2rem; background:#f0f0f0; border-radius:10px; text-align:center;">
                             <p>Image failed to load. Please check your internet connection or try refreshing the page.</p>
                         </div>
@@ -837,7 +837,7 @@
                                         title="The Shibir Sutra (VSS 2025 Schedule PDF)">
                                         <p style="padding: 2rem; text-align: center; color: #666;">
                                             Your browser does not support inline PDF viewing. 
-                                            <a href="docs/VSS 2025 Schedule for website.pdf" target="_blank" onclick="return checkAuthBeforeDownload(event)" style="color: #0066cc; text-decoration: underline; display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px;">
+                                    <a href="#" id="schedulePdfFallbackLink" target="_blank" onclick="return checkAuthBeforeDownload(event)" style="color: #0066cc; text-decoration: underline; display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px;">
                                                 Open PDF in New Tab
                                             </a>
                                         </p>
@@ -859,13 +859,13 @@
                                     <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">Event invitation and information</p>
                                 </div>
                                 <div>
-                                    <a href="docs/SarvajanikKaryakram.jpg" download class="btn btn-primary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap; font-size: 0.9rem;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'" onclick="return checkAuthBeforeDownload(event)">
+                                    <a href="#" id="sarvajanikDownloadLink" download class="btn btn-primary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap; font-size: 0.9rem;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'" onclick="return checkAuthBeforeDownload(event)">
                                         📥 Download
                                     </a>
                                 </div>
                             </div>
                             <div style="text-align: center; background: #f5f5f5; border-radius: 4px; padding: 1rem;">
-                                <img src="docs/SarvajanikKaryakram.jpg" alt="Sarvajanik Karyakram" style="max-width: 100%; max-height: 400px; height: auto; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" onclick="window.open('docs/SarvajanikKaryakram.jpg', '_blank')" title="Click to view full size">
+                                <img src="" id="sarvajanikImage" alt="Sarvajanik Karyakram" style="max-width: 100%; max-height: 400px; height: auto; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" title="Click to view full size">
                             </div>
                         </div>
 
@@ -880,7 +880,7 @@
                                     <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">Learn Vyayamyog exercises and practices</p>
                                 </div>
                                 <div>
-                                    <a href="docs/VyayamYog.mp4" download class="btn btn-primary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap; font-size: 0.9rem;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'" onclick="return checkAuthBeforeDownload(event)">
+                                    <a href="#" id="vyayamyogDownloadLink" download class="btn btn-primary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap; font-size: 0.9rem;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'" onclick="return checkAuthBeforeDownload(event)">
                                         📥 Download
                                     </a>
                                 </div>
@@ -911,10 +911,10 @@
                                     <p style="margin: 0.5rem 0 0 0; color: #666;">Countrywise pre-shibir orientation presentation</p>
                                 </div>
                                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                    <a href="docs/VSS2025_countrywise_preshibir_orientation.pdf" download class="btn btn-primary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'" onclick="return checkAuthBeforeDownload(event)">
+                                    <a href="#" id="orientationPdfDownloadLink" download class="btn btn-primary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap;" onmouseover="this.style.background='#0052a3'" onmouseout="this.style.background='#0066cc'" onclick="return checkAuthBeforeDownload(event)">
                                         📥 Download PDF
                                     </a>
-                                    <a href="docs/VSS2025 countrywise pre-shibir orientation.pptx" download class="btn btn-secondary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #6c757d; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap;" onmouseover="this.style.background='#5a6268'" onmouseout="this.style.background='#6c757d'" onclick="return checkAuthBeforeDownload(event)">
+                                    <a href="#" id="orientationPptDownloadLink" download class="btn btn-secondary shibir-resource-download" style="display: inline-block; text-decoration: none; padding: 0.75rem 1.5rem; background: #6c757d; color: #fff; border-radius: 4px; transition: background 0.2s; white-space: nowrap;" onmouseover="this.style.background='#5a6268'" onmouseout="this.style.background='#6c757d'" onclick="return checkAuthBeforeDownload(event)">
                                         📥 Download PPTX
                                     </a>
                                 </div>
@@ -928,7 +928,7 @@
                                     title="VSS Orientation Slide Pack PDF">
                                     <p style="padding: 2rem; text-align: center; color: #666;">
                                         Your browser does not support inline PDF viewing. 
-                                        <a href="docs/VSS2025_countrywise_preshibir_orientation.pdf" target="_blank" style="color: #0066cc; text-decoration: underline; display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px;">
+                                        <a href="#" id="orientationPdfFallbackLink" target="_blank" style="color: #0066cc; text-decoration: underline; display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #0066cc; color: #fff; border-radius: 4px;">
                                             Open PDF in New Tab
                                         </a>
                                     </p>
@@ -956,49 +956,49 @@
                             </div>
                             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
                                 <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                    <img src="docs/GroupPhotos/Africa-6V4A5899.JPG" alt="Africa Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/Africa-6V4A5899.JPG', '_blank')" title="Click to view full size">
+                                    <img src="" data-protected-src="GroupPhotos/Africa-6V4A5899.JPG" alt="Africa Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" title="Click to view full size">
                                     <div style="padding: 1rem; text-align: center;">
                                         <p style="margin: 0; font-weight: 600; color: #333;">Africa</p>
                                     </div>
                                 </div>
                                 <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                    <img src="docs/GroupPhotos/AUS-6V4A5928.JPG" alt="Australia Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/AUS-6V4A5928.JPG', '_blank')" title="Click to view full size">
+                                    <img src="" data-protected-src="GroupPhotos/AUS-6V4A5928.JPG" alt="Australia Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" title="Click to view full size">
                                     <div style="padding: 1rem; text-align: center;">
                                         <p style="margin: 0; font-weight: 600; color: #333;">Australia</p>
                                     </div>
                                 </div>
                                 <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                    <img src="docs/GroupPhotos/AUS-DJI_20251227210123_0077_D.jpeg" alt="Australia Aerial Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/AUS-DJI_20251227210123_0077_D.jpeg', '_blank')" title="Click to view full size">
+                                    <img src="" data-protected-src="GroupPhotos/AUS-DJI_20251227210123_0077_D.jpeg" alt="Australia Aerial Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" title="Click to view full size">
                                     <div style="padding: 1rem; text-align: center;">
                                         <p style="margin: 0; font-weight: 600; color: #333;">Australia (Aerial)</p>
                                     </div>
                                 </div>
                                 <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                    <img src="docs/GroupPhotos/Europe-6V4A5883.JPG" alt="Europe Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/Europe-6V4A5883.JPG', '_blank')" title="Click to view full size">
+                                    <img src="" data-protected-src="GroupPhotos/Europe-6V4A5883.JPG" alt="Europe Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" title="Click to view full size">
                                     <div style="padding: 1rem; text-align: center;">
                                         <p style="margin: 0; font-weight: 600; color: #333;">Europe</p>
                                     </div>
                                 </div>
                                 <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                    <img src="docs/GroupPhotos/Nepal-Mynamar-6V4A5906.JPG" alt="Nepal-Myanmar Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/Nepal-Mynamar-6V4A5906.JPG', '_blank')" title="Click to view full size">
+                                    <img src="" data-protected-src="GroupPhotos/Nepal-Mynamar-6V4A5906.JPG" alt="Nepal-Myanmar Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" title="Click to view full size">
                                     <div style="padding: 1rem; text-align: center;">
                                         <p style="margin: 0; font-weight: 600; color: #333;">Nepal-Myanmar</p>
                                     </div>
                                 </div>
                                 <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                    <img src="docs/GroupPhotos/SE-Asia-6V4A5920.JPG" alt="Southeast Asia Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/SE-Asia-6V4A5920.JPG', '_blank')" title="Click to view full size">
+                                    <img src="" data-protected-src="GroupPhotos/SE-Asia-6V4A5920.JPG" alt="Southeast Asia Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" title="Click to view full size">
                                     <div style="padding: 1rem; text-align: center;">
                                         <p style="margin: 0; font-weight: 600; color: #333;">Southeast Asia</p>
                                     </div>
                                 </div>
                                 <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                    <img src="docs/GroupPhotos/US-6V4A5938.JPG" alt="US Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/US-6V4A5938.JPG', '_blank')" title="Click to view full size">
+                                    <img src="" data-protected-src="GroupPhotos/US-6V4A5938.JPG" alt="US Group Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" title="Click to view full size">
                                     <div style="padding: 1rem; text-align: center;">
                                         <p style="margin: 0; font-weight: 600; color: #333;">United States</p>
                                     </div>
                                 </div>
                                 <div style="background: #f5f5f5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                    <img src="docs/GroupPhotos/US-DJI_20251227210741_0081_D.JPG" alt="US Aerial Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" onclick="window.open('docs/GroupPhotos/US-DJI_20251227210741_0081_D.JPG', '_blank')" title="Click to view full size">
+                                    <img src="" data-protected-src="GroupPhotos/US-DJI_20251227210741_0081_D.JPG" alt="US Aerial Photo" style="width: 100%; height: auto; display: block; cursor: pointer;" title="Click to view full size">
                                     <div style="padding: 1rem; text-align: center;">
                                         <p style="margin: 0; font-weight: 600; color: #333;">United States (Aerial)</p>
                                     </div>
@@ -1109,7 +1109,7 @@
                 </div>
                 <div id="mediaImages" class="media-section" style="display:none;">
                     <div class="image-grid">
-                        <img src="docs/logo.png" alt="VSS2025" loading="lazy">
+                        <img src="" alt="VSS2025" loading="lazy">
                     </div>
                 </div>
             </div>
@@ -2564,7 +2564,7 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-logo">
-                    <img src="docs/logo.png" alt="VSS2025 Logo" class="footer-logo-img" loading="lazy" decoding="async">
+                    <img src="" alt="VSS2025 Logo" class="footer-logo-img" loading="lazy" decoding="async">
                     <p>Vishwa Sangh Shibir 2025</p>
                 </div>
                 <div class="footer-text">
@@ -2645,6 +2645,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
     <!-- EmailJS for contact form emails -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <!-- Barcode Generation Library -->

@@ -346,6 +346,21 @@ function clearShibirResources() {
     if (unauthorizedDiv) unauthorizedDiv.style.display = 'block';
 }
 
+// Helper: get Firebase Storage download URL for a file under protected-resources
+function getProtectedResourceUrl(relativePath) {
+    if (!window.firebase || !firebase.storage) {
+        console.error('Firebase Storage SDK not available.');
+        return Promise.reject(new Error('Firebase Storage not available'));
+    }
+    try {
+        const storageRef = firebase.storage().ref(`protected-resources/${relativePath}`);
+        return storageRef.getDownloadURL();
+    } catch (err) {
+        console.error('Error creating Storage ref for', relativePath, err);
+        return Promise.reject(err);
+    }
+}
+
 // Initialize Shibir Resources page with authentication check
 function initializeShibirResources(user) {
     const loadingDiv = document.getElementById('shibirResourcesLoading');
@@ -365,21 +380,39 @@ function initializeShibirResources(user) {
     unauthorizedDiv.style.display = 'none';
     contentDiv.style.display = 'block';
     
-    // Load resources (PDF, video) only when authenticated
+    // Load resources (PDF, video) only when authenticated, from protected-resources in Firebase Storage
     const schedulePdfIframe = document.getElementById('schedulePdfIframe');
     if (schedulePdfIframe) {
-        schedulePdfIframe.src = 'docs/VSS 2025 Schedule for website.pdf#toolbar=1&navpanes=1&scrollbar=1';
+        getProtectedResourceUrl('VSS 2025 Schedule for website.pdf')
+            .then(url => {
+                schedulePdfIframe.src = `${url}#toolbar=1&navpanes=1&scrollbar=1`;
+            })
+            .catch(err => {
+                console.error('Error loading schedule PDF', err);
+            });
     }
     
     const pdfIframe = document.getElementById('orientationPdfIframe');
     if (pdfIframe) {
-        pdfIframe.src = 'docs/VSS2025_countrywise_preshibir_orientation.pdf#toolbar=1&navpanes=1&scrollbar=1';
+        getProtectedResourceUrl('VSS2025_countrywise_preshibir_orientation.pdf')
+            .then(url => {
+                pdfIframe.src = `${url}#toolbar=1&navpanes=1&scrollbar=1`;
+            })
+            .catch(err => {
+                console.error('Error loading orientation PDF', err);
+            });
     }
     
     const videoElement = document.getElementById('vyayamyogVideo');
     if (videoElement && videoElement.querySelector('source')) {
-        videoElement.querySelector('source').src = 'docs/VyayamYog.mp4';
-        videoElement.load();
+        getProtectedResourceUrl('VyayamYog.mp4')
+            .then(url => {
+                videoElement.querySelector('source').src = url;
+                videoElement.load();
+            })
+            .catch(err => {
+                console.error('Error loading VyayamYog video', err);
+            });
     }
 }
 
@@ -406,6 +439,47 @@ function checkAuthBeforeDownload(event) {
 // Tab Navigation Functionality with URL hash support
 // Updated to support both tab-based (index.html) and page-based navigation
 document.addEventListener('DOMContentLoaded', function() {
+    // Load public/protected assets that are not tied to a specific tab
+    // Set favicon from protected-resources/logo.png
+    try {
+        getProtectedResourceUrl('logo.png')
+            .then(url => {
+                const favicon = document.querySelector('link[rel="icon"]');
+                if (favicon) {
+                    favicon.href = url;
+                }
+                const headerLogos = document.querySelectorAll('img[alt="VSS2025 Logo"], img[alt="VSS2025"]');
+                headerLogos.forEach(img => {
+                    img.src = url;
+                });
+            })
+            .catch(err => {
+                console.error('Error loading logo from Storage', err);
+            });
+    } catch (e) {
+        console.error('Error initializing logo load', e);
+    }
+
+    // Initialize any images that use data-protected-src (public pages can still benefit if rules allow)
+    try {
+        const protectedImages = document.querySelectorAll('img[data-protected-src]');
+        protectedImages.forEach(img => {
+            const relPath = img.getAttribute('data-protected-src');
+            if (!relPath) return;
+            getProtectedResourceUrl(relPath)
+                .then(url => {
+                    img.src = url;
+                    if (!img.onclick) {
+                        img.onclick = () => window.open(url, '_blank');
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading protected image', relPath, err);
+                });
+        });
+    } catch (e) {
+        console.error('Error initializing protected images', e);
+    }
     const navLinks = document.querySelectorAll('.nav-link');
     const tabContents = document.querySelectorAll('.tab-content');
 
@@ -659,39 +733,44 @@ document.addEventListener('keydown', function(event) {
 
 // Document Download Functionality
 function downloadDocument(type) {
-    let fileName, filePath;
+    let fileName, storagePath;
     
     switch(type) {
         case 'shibirarthi':
             fileName = 'Letter_to_Approved_shibirarthi.docx';
-            filePath = './docs/Letter to Approved shibirarthi.docx';
+            storagePath = 'Letter to Approved shibirarthi.docx';
             break;
         case 'support':
             fileName = 'Generic_SupportLetter_SREE_VISWA_NIKETAN.docx';
-            filePath = './docs/Generic_SupportLetter_SREE VISWA NIKETAN.docx';
+            storagePath = 'Generic_SupportLetter_SREE VISWA NIKETAN.docx';
             break;
         case 'fundraiser':
             fileName = 'VSS2025_Fundraiser_Flyer.jpg';
-            filePath = './docs/VSS2025_FA.jfif.jpg';
+            storagePath = 'VSS2025_FA.jfif.jpg';
             break;
         default:
             console.error('Unknown document type:', type);
             return;
     }
     
-    // Create a temporary link element to trigger download
-    const link = document.createElement('a');
-    link.href = filePath;
-    link.download = fileName;
-    link.style.display = 'none';
-    
-    // Add to DOM, click, and remove
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Show success message
-    showNotification(`Downloading ${fileName}...`, 'success');
+    // Get download URL from Firebase Storage and trigger download
+    getProtectedResourceUrl(storagePath)
+        .then(url => {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showNotification(`Downloading ${fileName}...`, 'success');
+        })
+        .catch(err => {
+            console.error('Error downloading document', type, err);
+            showNotification('Unable to download document. Please try again later.', 'error');
+        });
 }
 
 
@@ -3937,7 +4016,8 @@ function createToursCardHTML(toursData, index, isActive = false) {
     if (activeTab === 'srisailam') {
         tourDisplayName = 'Srisailam';
         tourDescription = 'Information about the Srisailam tour will be displayed here.';
-        tourImage = '<img src="docs/Srisailam.jpg" alt="Srisailam" class="tour-image" onerror="this.style.display=\'none\'">';
+        // Image will be loaded from Firebase Storage when rendering
+        tourImage = '<img data-protected-src="Srisailam.jpg" alt="Srisailam" class="tour-image" onerror="this.style.display=\'none\'">';
     } else if (activeTab === 'yadadri') {
         tourDisplayName = 'Yadadri Mandir and local sites in Bhagyanagar';
         tourDescription = 'Information about Yadadri Mandir and local sites in Bhagyanagar tour will be displayed here.';
@@ -9646,9 +9726,11 @@ function showBadge(name, country, shreni, barcode, uniqueId) {
     // Use uniqueId if barcode is empty or same as uniqueId
     const barcodeValue = barcode && barcode !== 'N/A' && barcode !== uniqueId ? barcode : uniqueId;
 
-    // Load logo and convert to data URL to avoid CORS issues
-    imageToDataURL('docs/logo.png').then(logoDataUrl => {
-        const logoSrc = logoDataUrl || 'docs/logo.png'; // Fallback to original if conversion fails
+    // Load logo and convert to data URL to avoid CORS issues (from protected-resources)
+    getProtectedResourceUrl('logo.png').then(url => {
+        return imageToDataURL(url);
+    }).then(logoDataUrl => {
+        const logoSrc = logoDataUrl || '';
         
         modal.innerHTML = `
             <div class="modal-content badge-modal-content">
