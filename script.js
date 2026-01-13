@@ -382,10 +382,15 @@ function initializeShibirResources(user) {
     
     // Load resources (PDF, video) only when authenticated, from protected-resources in Firebase Storage
     const schedulePdfIframe = document.getElementById('schedulePdfIframe');
+    const schedulePdfFallbackLink = document.getElementById('schedulePdfFallbackLink');
     if (schedulePdfIframe) {
         getProtectedResourceUrl('VSS 2025 Schedule for website.pdf')
             .then(url => {
-                schedulePdfIframe.src = `${url}#toolbar=1&navpanes=1&scrollbar=1`;
+                const fullUrl = `${url}#toolbar=1&navpanes=1&scrollbar=1`;
+                schedulePdfIframe.src = fullUrl;
+                if (schedulePdfFallbackLink) {
+                    schedulePdfFallbackLink.href = url;
+                }
             })
             .catch(err => {
                 console.error('Error loading schedule PDF', err);
@@ -393,26 +398,94 @@ function initializeShibirResources(user) {
     }
     
     const pdfIframe = document.getElementById('orientationPdfIframe');
+    const orientationPdfDownloadLink = document.getElementById('orientationPdfDownloadLink');
+    const orientationPptDownloadLink = document.getElementById('orientationPptDownloadLink');
+    const orientationPdfFallbackLink = document.getElementById('orientationPdfFallbackLink');
     if (pdfIframe) {
         getProtectedResourceUrl('VSS2025_countrywise_preshibir_orientation.pdf')
             .then(url => {
-                pdfIframe.src = `${url}#toolbar=1&navpanes=1&scrollbar=1`;
+                const fullUrl = `${url}#toolbar=1&navpanes=1&scrollbar=1`;
+                pdfIframe.src = fullUrl;
+                if (orientationPdfDownloadLink) {
+                    orientationPdfDownloadLink.href = url;
+                }
+                if (orientationPdfFallbackLink) {
+                    orientationPdfFallbackLink.href = url;
+                }
             })
             .catch(err => {
                 console.error('Error loading orientation PDF', err);
             });
     }
+    // Orientation PPTX download
+    if (orientationPptDownloadLink) {
+        getProtectedResourceUrl('VSS2025 countrywise pre-shibir orientation.pptx')
+            .then(url => {
+                orientationPptDownloadLink.href = url;
+            })
+            .catch(err => {
+                console.error('Error loading orientation PPTX', err);
+            });
+    }
     
+    // Vyayamyog video + download link
     const videoElement = document.getElementById('vyayamyogVideo');
+    const vyayamyogDownloadLink = document.getElementById('vyayamyogDownloadLink');
     if (videoElement && videoElement.querySelector('source')) {
         getProtectedResourceUrl('VyayamYog.mp4')
             .then(url => {
                 videoElement.querySelector('source').src = url;
                 videoElement.load();
+                if (vyayamyogDownloadLink) {
+                    vyayamyogDownloadLink.href = url;
+                }
             })
             .catch(err => {
                 console.error('Error loading VyayamYog video', err);
             });
+    }
+    
+    // Sarvajanik Karyakram image + download link
+    const sarvajanikImage = document.getElementById('sarvajanikImage');
+    const sarvajanikDownloadLink = document.getElementById('sarvajanikDownloadLink');
+    if (sarvajanikImage || sarvajanikDownloadLink) {
+        getProtectedResourceUrl('SarvajanikKaryakram.jpg')
+            .then(url => {
+                if (sarvajanikImage) {
+                    sarvajanikImage.src = url;
+                    sarvajanikImage.onclick = () => window.open(url, '_blank');
+                }
+                if (sarvajanikDownloadLink) {
+                    sarvajanikDownloadLink.href = url;
+                }
+            })
+            .catch(err => {
+                console.error('Error loading Sarvajanik Karyakram image', err);
+            });
+    }
+    
+    // Re-initialize any protected images within the Shibir Resources section (e.g., group photos)
+    try {
+        const resourcesSection = document.getElementById('shibir-resources');
+        if (resourcesSection) {
+            const protectedImages = resourcesSection.querySelectorAll('img[data-protected-src]');
+            protectedImages.forEach(img => {
+                const relPath = img.getAttribute('data-protected-src');
+                if (!relPath) return;
+                getProtectedResourceUrl(relPath)
+                    .then(url => {
+                        img.src = url;
+                        if (!img.onclick) {
+                            img.onclick = () => window.open(url, '_blank');
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error loading protected image in Shibir Resources', relPath, err);
+                    });
+            });
+        }
+    } catch (e) {
+        console.error('Error initializing Shibir Resources images', e);
     }
 }
 
