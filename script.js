@@ -346,19 +346,57 @@ function clearShibirResources() {
     if (unauthorizedDiv) unauthorizedDiv.style.display = 'block';
 }
 
-// Helper: get Firebase Storage download URL for a file under protected-resources
+// Helper: Wait for Firebase Storage to be available
+function waitForFirebaseStorage(maxRetries = 50) {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const checkStorage = () => {
+            attempts++;
+            if (window.firebase && firebase.storage && typeof firebase.storage === 'function') {
+                try {
+                    const storage = firebase.storage();
+                    resolve(storage);
+                } catch (err) {
+                    if (attempts >= maxRetries) {
+                        reject(new Error('Firebase Storage initialization failed'));
+                    } else {
+                        setTimeout(checkStorage, 100);
+                    }
+                }
+            } else if (attempts >= maxRetries) {
+                reject(new Error('Firebase Storage SDK not available'));
+            } else {
+                setTimeout(checkStorage, 100);
+            }
+        };
+        checkStorage();
+    });
+}
+
+// Helper: get Firebase Storage download URL for a file under protected-resources (requires auth)
 function getProtectedResourceUrl(relativePath) {
-    if (!window.firebase || !firebase.storage) {
-        console.error('Firebase Storage SDK not available.');
-        return Promise.reject(new Error('Firebase Storage not available'));
-    }
-    try {
-        const storageRef = firebase.storage().ref(`protected-resources/${relativePath}`);
-        return storageRef.getDownloadURL();
-    } catch (err) {
-        console.error('Error creating Storage ref for', relativePath, err);
-        return Promise.reject(err);
-    }
+    return waitForFirebaseStorage()
+        .then(storage => {
+            const storageRef = storage.ref(`protected-resources/${relativePath}`);
+            return storageRef.getDownloadURL();
+        })
+        .catch(err => {
+            console.error('Error getting protected resource URL for', relativePath, err);
+            return Promise.reject(err);
+        });
+}
+
+// Helper: get Firebase Storage download URL for a public file (no auth required)
+function getPublicResourceUrl(relativePath) {
+    return waitForFirebaseStorage()
+        .then(storage => {
+            const storageRef = storage.ref(`protected-resources/${relativePath}`);
+            return storageRef.getDownloadURL();
+        })
+        .catch(err => {
+            console.error('Error getting public resource URL for', relativePath, err);
+            return Promise.reject(err);
+        });
 }
 
 // Initialize Shibir Resources page with authentication check
@@ -512,10 +550,14 @@ function checkAuthBeforeDownload(event) {
 // Tab Navigation Functionality with URL hash support
 // Updated to support both tab-based (index.html) and page-based navigation
 document.addEventListener('DOMContentLoaded', function() {
-    // Load public/protected assets that are not tied to a specific tab
-    // Set favicon from protected-resources/logo.png
+    // Load public assets (logo, location map) - these should be accessible without login
+    // Note: These will work if Storage rules allow public read for logo.png and VSS_locations.png
     try {
-        getProtectedResourceUrl('logo.png')
+        // Try to load logo (should be public)
+        waitForFirebaseStorage()
+            .then(() => {
+                return getPublicResourceUrl('logo.png');
+            })
             .then(url => {
                 const favicon = document.querySelector('link[rel="icon"]');
                 if (favicon) {
@@ -527,32 +569,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             })
             .catch(err => {
-                console.error('Error loading logo from Storage', err);
+                console.warn('Logo not available (may require public Storage rules for logo.png)', err);
             });
     } catch (e) {
         console.error('Error initializing logo load', e);
     }
 
-    // Initialize any images that use data-protected-src (public pages can still benefit if rules allow)
+    // Load location map if it exists (should be public)
     try {
-        const protectedImages = document.querySelectorAll('img[data-protected-src]');
-        protectedImages.forEach(img => {
-            const relPath = img.getAttribute('data-protected-src');
-            if (!relPath) return;
-            getProtectedResourceUrl(relPath)
-                .then(url => {
+        waitForFirebaseStorage()
+            .then(() => {
+                return getPublicResourceUrl('VSS_locations.png');
+            })
+            .then(url => {
+                const locationImages = document.querySelectorAll('img[alt*="Location Map"], img[alt*="VSS2025 Location"]');
+                locationImages.forEach(img => {
                     img.src = url;
-                    if (!img.onclick) {
-                        img.onclick = () => window.open(url, '_blank');
-                    }
-                })
-                .catch(err => {
-                    console.error('Error loading protected image', relPath, err);
                 });
-        });
+            })
+            .catch(err => {
+                console.warn('Location map not available (may require public Storage rules for VSS_locations.png)', err);
+            });
     } catch (e) {
-        console.error('Error initializing protected images', e);
+        console.error('Error loading location map', e);
     }
+
+    // Note: Protected images (data-protected-src) are now loaded only when Shibir Resources tab is opened
+    // This ensures they're only loaded when user is authenticated
     const navLinks = document.querySelectorAll('.nav-link');
     const tabContents = document.querySelectorAll('.tab-content');
 
@@ -9800,7 +9843,8 @@ function showBadge(name, country, shreni, barcode, uniqueId) {
     const barcodeValue = barcode && barcode !== 'N/A' && barcode !== uniqueId ? barcode : uniqueId;
 
     // Load logo and convert to data URL to avoid CORS issues (from protected-resources)
-    getProtectedResourceUrl('logo.png').then(url => {
+    // Use public resource URL since logo should be accessible without login
+    getPublicResourceUrl('logo.png').then(url => {
         return imageToDataURL(url);
     }).then(logoDataUrl => {
         const logoSrc = logoDataUrl || '';
